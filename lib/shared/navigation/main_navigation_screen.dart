@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
+import 'package:diu_ride/core/network/websocket_client.dart';
 import 'package:diu_ride/features/chat/presentation/screens/campus_messages_screen.dart';
 import 'package:diu_ride/features/home/presentation/screens/home_screen.dart';
 import 'package:diu_ride/features/notifications/presentation/screens/notifications_screen.dart';
@@ -21,6 +23,7 @@ class MainNavigationScreen extends ConsumerStatefulWidget {
 
 class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   int _currentTab = 0;
+  StreamSubscription? _wsSubscription;
 
   // Tab index mapping:
   // 0 → Home
@@ -36,6 +39,104 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     'Campus Messages',
     'Profile',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupWebSocketLiveUpdates();
+    });
+  }
+
+  @override
+  void dispose() {
+    _wsSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _setupWebSocketLiveUpdates() {
+    try {
+      final wsClient = ref.read(webSocketClientProvider);
+      _wsSubscription?.cancel();
+      _wsSubscription = wsClient.messages.listen((msg) {
+        final event = msg['event'] ?? msg['type'];
+
+        // 1. Live rides updates (New ride published, booked, started, or completed)
+        if (event == 'ride_created' ||
+            event == 'ride_updated' ||
+            event == 'ride_started' ||
+            event == 'ride_completed' ||
+            event == 'ride_cancelled') {
+          debugPrint('[Live WS] Received $event - refreshing live rides cache');
+          ref.invalidate(allAvailableRidesProvider);
+          ref.invalidate(departingSoonRidesProvider);
+        }
+
+        // 2. Live student requests (Requested or accepted by biker)
+        if (event == 'passenger_request_created' ||
+            event == 'passenger_request_accepted') {
+          debugPrint('[Live WS] Received $event - refreshing passenger requests');
+          ref.invalidate(passengerRequestsProvider);
+        }
+
+        // 3. Urgent audio/visual alert ring buzzer
+        if (event == 'alert_ring') {
+          _showAlertRingBuzzer(msg);
+        }
+      });
+    } catch (e) {
+      debugPrint('[MainNavigation] WebSocket live update init error: $e');
+    }
+  }
+
+  void _showAlertRingBuzzer(Map<String, dynamic> msg) {
+    if (!mounted) return;
+    final sender = msg['senderName'] ?? 'Campus Peer';
+    final alertMsg = msg['message'] ?? '🚨 Urgent: Attention requested for pickup!';
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFFD84315),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Row(
+          children: [
+            const Icon(Icons.notifications_active, color: Colors.amber, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '🔔 Buzz from $sender',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    alertMsg,
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        action: SnackBarAction(
+          label: 'View',
+          textColor: Colors.amber,
+          onPressed: () => _onTabSelected(3),
+        ),
+      ),
+    );
+  }
 
   void _onTabSelected(int index) {
     setState(() {

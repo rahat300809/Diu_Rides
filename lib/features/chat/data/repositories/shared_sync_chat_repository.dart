@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
 import 'dart:convert';
 import 'package:diu_ride/core/config/app_config.dart';
+import 'package:diu_ride/core/network/websocket_client.dart';
 import 'package:diu_ride/core/storage/preferences_service.dart';
 import 'package:diu_ride/features/chat/data/models/chat_message.dart';
 import 'package:diu_ride/features/chat/data/repositories/chat_repository.dart';
@@ -11,6 +12,7 @@ import 'package:diu_ride/features/chat/data/repositories/mock_chat_repository.da
 
 class SharedSyncChatRepository implements ChatRepository {
   final PreferencesService? preferences;
+  final WebSocketClient? wsClient;
   final MockChatRepository _localFallback = MockChatRepository();
   final _streamController = StreamController<ChatMessage>.broadcast();
   final Map<String, List<ChatMessage>> _cache = {};
@@ -21,8 +23,29 @@ class SharedSyncChatRepository implements ChatRepository {
     receiveTimeout: const Duration(seconds: 4),
   ));
 
-  SharedSyncChatRepository({this.preferences}) {
+  SharedSyncChatRepository({this.preferences, this.wsClient}) {
     _startPolling();
+    _listenWebSocket();
+  }
+
+  void _listenWebSocket() {
+    wsClient?.messages.listen((msg) {
+      final event = msg['event'] ?? msg['type'];
+      final data = msg['data'];
+      if (event == 'chat_message' && data is Map) {
+        try {
+          final chatMsg = ChatMessage.fromJson(
+            Map<String, dynamic>.from(data),
+            _currentUserId,
+          );
+          final list = _cache.putIfAbsent(chatMsg.rideId, () => []);
+          if (!list.any((m) => m.id == chatMsg.id)) {
+            list.add(chatMsg);
+            _streamController.add(chatMsg);
+          }
+        } catch (_) {}
+      }
+    });
   }
 
   String get _currentUserId {
@@ -120,6 +143,7 @@ class SharedSyncChatRepository implements ChatRepository {
         data: msg.toJson(),
       );
       debugPrint('Message saved to central backend: ${msg.id}');
+      wsClient?.send('chat_message', msg.toJson());
     } catch (e) {
       debugPrint('Note: Central message post error: $e');
     }

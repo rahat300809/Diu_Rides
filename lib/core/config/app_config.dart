@@ -48,7 +48,7 @@ class AppConfig {
   }
 
   static String get fallbackApiUrl {
-    return 'https://servertest.eu.cc/ride/api';
+    return 'http://192.168.0.114:8080/ride/api';
   }
 
   static String get defaultWsUrl {
@@ -66,6 +66,6 @@ class AppConfig {
   }
 
   static String get fallbackWsUrl {
-    return 'wss://servertest.eu.cc/ride/ws';
+    return 'ws://192.168.0.114:8080/ride/ws';
   }
 }

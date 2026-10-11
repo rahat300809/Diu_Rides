@@ -1,8 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:diu_ride/core/config/app_config.dart';
+
+final webSocketClientProvider = Provider<WebSocketClient>((ref) {
+  final client = WebSocketClient();
+  client.connect();
+  ref.onDispose(() {
+    client.dispose();
+  });
+  return client;
+});
 
 enum WebSocketConnectionStatus { connecting, connected, disconnected }
 

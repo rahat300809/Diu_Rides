@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:diu_ride/core/network/websocket_client.dart';
 import 'package:diu_ride/features/auth/presentation/providers/auth_provider.dart';
 import 'package:diu_ride/features/chat/data/models/chat_message.dart';
 import 'package:diu_ride/features/chat/data/repositories/chat_repository.dart';
@@ -6,7 +7,8 @@ import 'package:diu_ride/features/chat/data/repositories/shared_sync_chat_reposi
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
   final prefs = ref.watch(preferencesProvider);
-  return SharedSyncChatRepository(preferences: prefs);
+  final ws = ref.watch(webSocketClientProvider);
+  return SharedSyncChatRepository(preferences: prefs, wsClient: ws);
 });
 
 class ChatState {
