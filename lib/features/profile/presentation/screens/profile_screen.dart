@@ -1,4 +1,5 @@
-import 'dart:io';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -26,6 +27,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late TextEditingController _phoneController;
   late TextEditingController _deptController;
   String? _localPhotoPath;
+  Uint8List? _photoBytes;
 
   @override
   void initState() {
@@ -39,8 +41,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   Future<void> _loadSavedPhoto() async {
     final prefs = await SharedPreferences.getInstance();
+    final b64 = prefs.getString('profile_photo_b64');
+    if (b64 != null && b64.isNotEmpty) {
+      try {
+        final decoded = base64Decode(b64);
+        setState(() => _photoBytes = decoded);
+        return;
+      } catch (_) {}
+    }
     final path = prefs.getString('profile_photo_path');
-    if (path != null && File(path).existsSync()) {
+    if (path != null && !kIsWeb) {
       setState(() => _localPhotoPath = path);
       ref.read(_profilePhotoPathProvider.notifier).state = path;
     }
@@ -85,9 +95,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (source == null) return;
     final image = await picker.pickImage(source: source, imageQuality: 85, maxWidth: 512);
     if (image == null) return;
+    final bytes = await image.readAsBytes();
+    final b64 = base64Encode(bytes);
     final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('profile_photo_b64', b64);
     await prefs.setString('profile_photo_path', image.path);
-    setState(() => _localPhotoPath = image.path);
+    setState(() {
+      _photoBytes = bytes;
+      _localPhotoPath = image.path;
+    });
     ref.read(_profilePhotoPathProvider.notifier).state = image.path;
   }
 
@@ -175,10 +191,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               CircleAvatar(
                                 radius: 46,
                                 backgroundColor: Colors.white24,
-                                backgroundImage: _localPhotoPath != null
-                                    ? FileImage(File(_localPhotoPath!))
+                                backgroundImage: _photoBytes != null
+                                    ? MemoryImage(_photoBytes!)
                                     : null,
-                                child: _localPhotoPath == null
+                                child: _photoBytes == null
                                     ? Text(
                                         (user?.name.isNotEmpty == true
                                             ? user!.name[0].toUpperCase()

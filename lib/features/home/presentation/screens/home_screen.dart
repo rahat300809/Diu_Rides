@@ -1,5 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
 import 'package:diu_ride/features/auth/presentation/providers/auth_provider.dart';
 import 'package:diu_ride/features/booking/presentation/widgets/booking_confirmation_sheet.dart';
@@ -34,6 +37,25 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _activeSearchQuery = '';
   String _currentLocation = 'DIU Smart City, Ashulia';
+  Uint8List? _profilePhotoBytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfilePhoto();
+  }
+
+  Future<void> _loadProfilePhoto() async {
+    final prefs = await SharedPreferences.getInstance();
+    final b64 = prefs.getString('profile_photo_b64');
+    if (b64 != null && b64.isNotEmpty) {
+      try {
+        if (mounted) {
+          setState(() => _profilePhotoBytes = base64Decode(b64));
+        }
+      } catch (_) {}
+    }
+  }
 
   void _showLocationPicker() {
     showModalBottomSheet(
@@ -253,7 +275,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               onTap: () {
                                 Navigator.of(context).push(
                                   MaterialPageRoute(builder: (_) => const ProfileScreen()),
-                                );
+                                ).then((_) => _loadProfilePhoto());
                               },
                               child: Container(
                                 padding: const EdgeInsets.all(2.5),
@@ -264,16 +286,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 child: CircleAvatar(
                                   radius: 21,
                                   backgroundColor: const Color(0xFF141416),
-                                  child: Text(
-                                    user?.name.isNotEmpty == true
-                                        ? user!.name[0].toUpperCase()
-                                        : 'S',
-                                    style: const TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
+                                  backgroundImage: _profilePhotoBytes != null
+                                      ? MemoryImage(_profilePhotoBytes!)
+                                      : null,
+                                  child: _profilePhotoBytes == null
+                                      ? Text(
+                                          user?.name.isNotEmpty == true
+                                              ? user!.name[0].toUpperCase()
+                                              : 'S',
+                                          style: const TextStyle(
+                                            fontSize: 17,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : null,
                                 ),
                               ),
                             ),

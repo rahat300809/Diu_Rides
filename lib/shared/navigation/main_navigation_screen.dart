@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/network/websocket_client.dart';
@@ -93,6 +94,11 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     if (!mounted) return;
     final sender = msg['senderName'] ?? 'Campus Peer';
     final alertMsg = msg['message'] ?? '🚨 Urgent: Attention requested for pickup!';
+
+    try {
+      HapticFeedback.vibrate();
+      SystemSound.play(SystemSoundType.alert);
+    } catch (_) {}
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
