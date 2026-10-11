@@ -27,16 +27,16 @@ class VehicleModel {
 
   factory VehicleModel.fromJson(Map<String, dynamic> json) {
     return VehicleModel(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? 'veh_${DateTime.now().millisecondsSinceEpoch}',
       type: VehicleType.values.firstWhere(
         (e) => e.name == json['type'],
-        orElse: () => VehicleType.car,
+        orElse: () => VehicleType.bike,
       ),
-      modelName: json['modelName'] as String,
-      color: json['color'] as String,
-      licensePlate: json['licensePlate'] as String,
+      modelName: json['modelName'] as String? ?? json['model'] as String? ?? 'Motorbike',
+      color: json['color'] as String? ?? 'Black',
+      licensePlate: json['licensePlate'] as String? ?? 'Dhaka Metro',
       hasAc: json['hasAc'] as bool? ?? false,
-      hasPassengerHelmet: json['hasPassengerHelmet'] as bool? ?? false,
+      hasPassengerHelmet: json['hasPassengerHelmet'] as bool? ?? true,
       isSmokeFree: json['isSmokeFree'] as bool? ?? true,
       hasPhoneCharger: json['hasPhoneCharger'] as bool? ?? true,
       hasLuggageSpace: json['hasLuggageSpace'] as bool? ?? false,

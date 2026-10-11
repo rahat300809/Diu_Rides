@@ -376,10 +376,13 @@ def map_ride(row) -> Dict[str, Any]:
         "isFemaleOnly": bool(row["is_female_only"]),
         "status": row["status"],
         "vehicle": {
+            "id": f"v_{row['id']}",
             "model": row["vehicle_model"],
-            "type": row["vehicle_type"],
+            "modelName": row["vehicle_model"],
+            "type": "bike",
             "licensePlate": row["vehicle_plate"] or "",
             "color": row["vehicle_color"] or "",
+            "hasPassengerHelmet": True,
         },
         "routeCorridor": row["route_corridor"] or "Ashulia Highway Corridor",
         "distanceKm": float(row["distance_km"] or 14.0),
@@ -674,20 +677,33 @@ def reset_password(payload: Dict[str, Any]):
 @app.post("/ride/api/auth/default-address")
 @app.post("/api/auth/default-address")
 def update_default_address(payload: Dict[str, Any]):
-    user_id = str(payload.get("userId", "")).strip()
-    address = str(payload.get("address", "")).strip()
+    user_id = str(payload.get("userId") or payload.get("id") or "").strip()
+    student_id = str(payload.get("studentId") or "").strip()
+    email = str(payload.get("email") or "").strip().lower()
+    address = str(payload.get("defaultAddress") or payload.get("address") or "").strip()
 
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET default_address = ? WHERE id = ? OR student_id = ?", (address, user_id, user_id))
+    cursor.execute("""
+        UPDATE users SET default_address = ? 
+        WHERE (id = ? AND id != '') 
+           OR (student_id = ? AND student_id != '') 
+           OR (LOWER(email) = ? AND email != '')
+    """, (address, user_id, student_id or user_id, email))
     conn.commit()
-    cursor.execute("SELECT * FROM users WHERE id = ? OR student_id = ?", (user_id, user_id))
+
+    cursor.execute("""
+        SELECT * FROM users 
+        WHERE (id = ? AND id != '') 
+           OR (student_id = ? AND student_id != '') 
+           OR (LOWER(email) = ? AND email != '')
+    """, (user_id, student_id or user_id, email))
     row = cursor.fetchone()
     conn.close()
 
     if row:
         return {"status": "success", "user": map_user(row), "defaultAddress": address}
-    return {"status": "success", "defaultAddress": address}
+    return {"status": "success", "user": {"defaultAddress": address}, "defaultAddress": address}
 
 # =====================================================================
 # REST Endpoints: Rides (Bikes Only with Auto Destination Search)
