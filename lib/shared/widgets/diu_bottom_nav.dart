@@ -18,13 +18,14 @@ class DiuBottomNav extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface.withOpacity(0.97),
-        boxShadow: const [
+      decoration: const BoxDecoration(
+        color: AppColors.bottomNavBackground,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0F000000),
-            blurRadius: 16,
-            offset: Offset(0, -3),
+            color: Color(0x33000000),
+            blurRadius: 20,
+            offset: Offset(0, -4),
           ),
         ],
       ),
@@ -51,7 +52,7 @@ class DiuBottomNav extends ConsumerWidget {
                 label: 'All Rides',
               ),
 
-              // 2. Offer Ride (Center Elevated Action)
+              // 2. Offer Ride (Center Elevated Action with Radiant Amber Gradient)
               _buildCenterAction(),
 
               // 3. Community SMS & Messages
@@ -61,7 +62,7 @@ class DiuBottomNav extends ConsumerWidget {
                 activeIcon: Icons.chat_bubble,
                 label: 'Messages',
                 badgeCount: unreadChats,
-                badgeColor: const Color(0xFF007AFF),
+                badgeColor: AppColors.secondary,
               ),
 
               // 4. Profile
@@ -86,18 +87,23 @@ class DiuBottomNav extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Transform.translate(
-            offset: const Offset(0, -10),
+            offset: const Offset(0, -12),
             child: Container(
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primary
-                    : AppColors.primaryContainer,
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFFFFA000), // Golden amber
+                    Color(0xFFE65100), // Sunset orange
+                  ],
+                ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.primaryContainer.withOpacity(0.4),
+                    color: const Color(0xFFE65100).withOpacity(0.45),
                     blurRadius: 14,
                     offset: const Offset(0, 6),
                   ),
@@ -115,7 +121,7 @@ class DiuBottomNav extends ConsumerWidget {
             child: Text(
               'Offer Ride',
               style: AppTypography.labelSm.copyWith(
-                color: isSelected ? AppColors.primary : AppColors.onSurface,
+                color: isSelected ? AppColors.bottomNavSelected : Colors.white70,
                 fontWeight: FontWeight.w600,
                 fontSize: 10.5,
               ),
@@ -133,7 +139,7 @@ class DiuBottomNav extends ConsumerWidget {
     required String label,
   }) {
     final isSelected = currentIndex == index;
-    final color = isSelected ? AppColors.primaryContainer : AppColors.onSurfaceVariant;
+    final color = isSelected ? AppColors.bottomNavSelected : AppColors.bottomNavUnselected;
 
     return InkWell(
       onTap: () => onTap(index),
@@ -169,10 +175,10 @@ class DiuBottomNav extends ConsumerWidget {
     required IconData activeIcon,
     required String label,
     required int badgeCount,
-    Color badgeColor = AppColors.error,
+    Color badgeColor = AppColors.secondary,
   }) {
     final isSelected = currentIndex == index;
-    final color = isSelected ? AppColors.primaryContainer : AppColors.onSurfaceVariant;
+    final color = isSelected ? AppColors.bottomNavSelected : AppColors.bottomNavUnselected;
 
     return InkWell(
       onTap: () => onTap(index),

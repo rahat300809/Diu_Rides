@@ -29,12 +29,12 @@ class DestinationMatchingBikesView extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: const Color(0xFF007AFF).withOpacity(0.35),
+            color: const Color(0xFFE65100).withOpacity(0.25),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF007AFF).withOpacity(0.10),
+              color: const Color(0xFFE65100).withOpacity(0.08),
               blurRadius: 18,
               offset: const Offset(0, 6),
             ),
@@ -61,12 +61,12 @@ class DestinationMatchingBikesView extends StatelessWidget {
                         height: 38,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF007AFF), Color(0xFF0051B3)],
+                            colors: [Color(0xFFE65100), Color(0xFFF57C00)],
                           ),
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF007AFF).withOpacity(0.3),
+                              color: const Color(0xFFE65100).withOpacity(0.3),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
@@ -191,7 +191,7 @@ class DestinationMatchingBikesView extends StatelessWidget {
               icon: const Icon(Icons.notification_add, size: 16),
               label: Text('Set "$query" as Default for Alerts'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF007AFF),
+                backgroundColor: const Color(0xFF141416),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -228,12 +228,12 @@ class DestinationMatchingBikesView extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: 20,
-                    backgroundColor: const Color(0xFFE3F2FD),
+                    backgroundColor: const Color(0xFFFFF3E0),
                     child: Text(
                       ride.driverName.substring(0, 1),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF007AFF),
+                        color: Color(0xFFE65100),
                       ),
                     ),
                   ),
@@ -290,7 +290,7 @@ class DestinationMatchingBikesView extends StatelessWidget {
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF007AFF),
+                      color: Color(0xFFE65100),
                     ),
                   ),
                   const Text(
@@ -315,7 +315,7 @@ class DestinationMatchingBikesView extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.radio_button_checked, size: 14, color: Color(0xFF00C853)),
+                    const Icon(Icons.radio_button_checked, size: 14, color: Color(0xFF2E7D32)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -327,14 +327,14 @@ class DestinationMatchingBikesView extends StatelessWidget {
                     ),
                     Text(
                       DateTimeUtils.formatTime(ride.departureTime),
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF007AFF)),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFE65100)),
                     ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(Icons.location_on, size: 14, color: Color(0xFF007AFF)),
+                    const Icon(Icons.location_on, size: 14, color: Color(0xFFFF3B30)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -360,16 +360,16 @@ class DestinationMatchingBikesView extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE3F2FD),
+                      color: const Color(0xFFFFF3E0),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.two_wheeler, size: 12, color: Color(0xFF007AFF)),
+                        const Icon(Icons.two_wheeler, size: 12, color: Color(0xFFE65100)),
                         const SizedBox(width: 4),
                         Text(
                           ride.vehicle.modelName,
-                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF007AFF)),
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFFE65100)),
                         ),
                       ],
                     ),
@@ -392,7 +392,7 @@ class DestinationMatchingBikesView extends StatelessWidget {
               ElevatedButton(
                 onPressed: () => onRequestSeat(ride),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF007AFF),
+                  backgroundColor: const Color(0xFF141416),
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

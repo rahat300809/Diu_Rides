@@ -75,7 +75,7 @@ class _DefaultCommuteAddressCardState extends ConsumerState<DefaultCommuteAddres
                       height: 36,
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [Color(0xFF007AFF), Color(0xFF0051B3)],
+                          colors: [Color(0xFFE65100), Color(0xFFF57C00)],
                         ),
                         shape: BoxShape.circle,
                       ),
@@ -121,7 +121,7 @@ class _DefaultCommuteAddressCardState extends ConsumerState<DefaultCommuteAddres
                     decoration: const InputDecoration(
                       hintText: 'Enter your commute address (e.g. Uttara)',
                       border: InputBorder.none,
-                      icon: Icon(Icons.location_on, color: Color(0xFF007AFF)),
+                      icon: Icon(Icons.location_on, color: Color(0xFFE65100)),
                     ),
                   ),
                 ),
@@ -205,7 +205,7 @@ class _DefaultCommuteAddressCardState extends ConsumerState<DefaultCommuteAddres
                       }
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF007AFF),
+                      backgroundColor: const Color(0xFF141416),
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -244,7 +244,7 @@ class _DefaultCommuteAddressCardState extends ConsumerState<DefaultCommuteAddres
           ),
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
-            color: hasAddress ? const Color(0xFF007AFF).withOpacity(0.3) : Colors.black.withOpacity(0.06),
+            color: hasAddress ? const Color(0xFFE65100).withOpacity(0.3) : Colors.black.withOpacity(0.06),
             width: 1.2,
           ),
           boxShadow: [
@@ -273,10 +273,10 @@ class _DefaultCommuteAddressCardState extends ConsumerState<DefaultCommuteAddres
                       width: 32,
                       height: 32,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF007AFF).withOpacity(0.12),
+                        color: const Color(0xFFFFF3E0),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: const Icon(Icons.home_work_rounded, color: Color(0xFF007AFF), size: 18),
+                      child: const Icon(Icons.home_work_rounded, color: Color(0xFFE65100), size: 18),
                     ),
                     const SizedBox(width: 10),
                     Column(
@@ -307,13 +307,13 @@ class _DefaultCommuteAddressCardState extends ConsumerState<DefaultCommuteAddres
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF007AFF).withOpacity(0.1),
+                      color: const Color(0xFFFFF3E0),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       hasAddress ? 'Change' : 'Set Address',
                       style: const TextStyle(
-                        color: Color(0xFF007AFF),
+                        color: Color(0xFFE65100),
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
                       ),
@@ -342,7 +342,7 @@ class _DefaultCommuteAddressCardState extends ConsumerState<DefaultCommuteAddres
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.pin_drop, size: 18, color: Color(0xFF007AFF)),
+                    const Icon(Icons.pin_drop, size: 18, color: Color(0xFFE65100)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -357,7 +357,7 @@ class _DefaultCommuteAddressCardState extends ConsumerState<DefaultCommuteAddres
                       ),
                     ),
                     if (hasAddress)
-                      const Icon(Icons.search, size: 16, color: Color(0xFF007AFF)),
+                      const Icon(Icons.search, size: 16, color: Color(0xFFE65100)),
                   ],
                 ),
               ),

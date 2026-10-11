@@ -417,16 +417,16 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 decoration: BoxDecoration(
-                                  color: isSelected ? const Color(0xFF007AFF) : Colors.white,
+                                  color: isSelected ? const Color(0xFFE65100) : Colors.white,
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: isSelected ? const Color(0xFF007AFF) : const Color(0xFFE5E5EA),
+                                    color: isSelected ? const Color(0xFFE65100) : const Color(0xFFE5E5EA),
                                     width: isSelected ? 1.5 : 1.0,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
                                       color: isSelected
-                                          ? const Color(0xFF007AFF).withOpacity(0.2)
+                                          ? const Color(0xFFE65100).withOpacity(0.2)
                                           : Colors.black.withOpacity(0.03),
                                       blurRadius: 6,
                                       offset: const Offset(0, 2),
@@ -477,7 +477,7 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                                   color: Colors.white,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.person, size: 18, color: Color(0xFF007AFF)),
+                                child: const Icon(Icons.person, size: 18, color: Color(0xFFE65100)),
                               ),
                               const SizedBox(width: 10),
                               Column(
@@ -498,13 +498,13 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF007AFF).withOpacity(0.12),
+                              color: const Color(0xFFFFF3E0),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: const Text(
                               '1 Seat',
                               style: TextStyle(
-                                color: Color(0xFF007AFF),
+                                color: Color(0xFFE65100),
                                 fontWeight: FontWeight.w800,
                                 fontSize: 12,
                               ),
@@ -527,7 +527,7 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                         children: [
                           Checkbox(
                             value: _hasPassengerHelmet,
-                            activeColor: const Color(0xFF007AFF),
+                            activeColor: const Color(0xFFE65100),
                             onChanged: (val) => setState(() => _hasPassengerHelmet = val ?? true),
                           ),
                           Expanded(
@@ -536,7 +536,7 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                               children: [
                                 Row(
                                   children: [
-                                    const Icon(Icons.sports_motorsports, size: 16, color: Color(0xFF007AFF)),
+                                    const Icon(Icons.sports_motorsports, size: 16, color: Color(0xFFE65100)),
                                     const SizedBox(width: 5),
                                     Text(
                                       'Clean Passenger Helmet Provided',

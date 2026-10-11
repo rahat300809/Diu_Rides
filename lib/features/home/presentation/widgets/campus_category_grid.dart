@@ -40,12 +40,12 @@ class CampusCategoryGrid extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [Color(0xFF007AFF), Color(0xFF0051B3)],
+                        colors: [Color(0xFFE65100), Color(0xFFF57C00)],
                       ),
                       borderRadius: BorderRadius.circular(10),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF007AFF).withOpacity(0.35),
+                          color: const Color(0xFFE65100).withOpacity(0.35),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -77,7 +77,7 @@ class CampusCategoryGrid extends StatelessWidget {
                   child: Text(
                     'Moto Safety',
                     style: AppTypography.labelSm.copyWith(
-                      color: const Color(0xFF007AFF),
+                      color: const Color(0xFFE65100),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -115,11 +115,11 @@ class CampusCategoryGrid extends StatelessWidget {
                 title: 'Helmet Ready',
                 subtitle: 'DOT clean helmet',
                 badgeText: '🪖 Safety',
-                badgeBg: const Color(0xFFE3F2FD),
-                badgeColor: const Color(0xFF1565C0),
+                badgeBg: const Color(0xFFFFF3E0),
+                badgeColor: const Color(0xFFE65100),
                 icon: Icons.sports_motorsports,
-                iconColor: const Color(0xFF007AFF),
-                iconBg: const Color(0xFFE3F2FD),
+                iconColor: const Color(0xFFE65100),
+                iconBg: const Color(0xFFFFF3E0),
                 isSelected: false,
                 onTap: () => onSelectCategory(VehicleType.bike, false),
               ),
@@ -180,13 +180,13 @@ class CampusCategoryGrid extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? const Color(0xFF007AFF) : Colors.black.withOpacity(0.06),
+            color: isSelected ? const Color(0xFFE65100) : Colors.black.withOpacity(0.06),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
               color: isSelected
-                  ? const Color(0xFF007AFF).withOpacity(0.18)
+                  ? const Color(0xFFE65100).withOpacity(0.18)
                   : Colors.black.withOpacity(0.05),
               blurRadius: isSelected ? 14 : 10,
               offset: const Offset(0, 4),
@@ -302,7 +302,7 @@ class CampusCategoryGrid extends StatelessWidget {
             ElevatedButton(
               onPressed: () => Navigator.of(ctx).pop(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF007AFF),
+                backgroundColor: const Color(0xFF141416),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),

@@ -152,7 +152,7 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
                       'Request a Bike Ride',
                       style: AppTypography.headlineSm.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1C1C1E),
+                        color: const Color(0xFF141416),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -165,19 +165,19 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF007AFF).withOpacity(0.1),
+                    color: const Color(0xFFFFF3E0),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Row(
                     children: [
-                      Icon(Icons.two_wheeler, size: 14, color: Color(0xFF007AFF)),
+                      Icon(Icons.two_wheeler, size: 14, color: Color(0xFFE65100)),
                       SizedBox(width: 4),
                       Text(
                         '1 Passenger',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF007AFF),
+                          color: Color(0xFFE65100),
                         ),
                       ),
                     ],
@@ -199,13 +199,13 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
             const SizedBox(height: 6),
             Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F7),
+                color: const Color(0xFFF4F5F7),
                 borderRadius: BorderRadius.circular(14),
               ),
               child: TextField(
                 controller: _pickupController,
                 decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.trip_origin, size: 18, color: Color(0xFF007AFF)),
+                  prefixIcon: Icon(Icons.trip_origin, size: 18, color: Color(0xFF2E7D32)),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 ),
@@ -323,7 +323,7 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF007AFF),
+                    color: Color(0xFFE65100),
                   ),
                 ),
               ],
@@ -339,7 +339,7 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
                       margin: const EdgeInsets.symmetric(horizontal: 3),
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       decoration: BoxDecoration(
-                        color: isSel ? const Color(0xFF007AFF) : const Color(0xFFF2F2F7),
+                        color: isSel ? const Color(0xFFE65100) : const Color(0xFFF4F5F7),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       alignment: Alignment.center,
@@ -358,14 +358,14 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
             ),
             const SizedBox(height: 22),
 
-            // Submit Button
+            // Submit Button (Obsidian Dark Button Matching Reference 2)
             SizedBox(
               width: double.infinity,
               height: 52,
               child: ElevatedButton(
                 onPressed: _isLoading ? null : _submitRequest,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF007AFF),
+                  backgroundColor: const Color(0xFF141416),
                   foregroundColor: Colors.white,
                   elevation: 2,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

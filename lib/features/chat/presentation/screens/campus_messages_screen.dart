@@ -91,12 +91,12 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF007AFF), Color(0xFF0051B3)],
+                      colors: [Color(0xFFE65100), Color(0xFFF57C00)],
                     ),
                     borderRadius: BorderRadius.circular(18),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF007AFF).withOpacity(0.25),
+                        color: const Color(0xFFE65100).withOpacity(0.25),
                         blurRadius: 10,
                         offset: const Offset(0, 3),
                       ),
@@ -105,7 +105,7 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
                   child: ListTile(
                     leading: const CircleAvatar(
                       backgroundColor: Colors.white,
-                      child: Icon(Icons.forum, color: Color(0xFF007AFF), size: 22),
+                      child: Icon(Icons.forum, color: Color(0xFFE65100), size: 22),
                     ),
                     title: const Row(
                       children: [

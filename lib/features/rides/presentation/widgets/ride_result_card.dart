@@ -177,13 +177,13 @@ class RideResultCard extends StatelessWidget {
                           const Icon(
                             Icons.sports_motorsports,
                             size: 14,
-                            color: Color(0xFF007AFF),
+                            color: Color(0xFFE65100),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             ride.vehicle.hasPassengerHelmet ? 'Passenger Helmet Ready' : 'Motorbike Seat (1/1)',
                             style: AppTypography.labelSm.copyWith(
-                              color: const Color(0xFF007AFF),
+                              color: const Color(0xFFE65100),
                               fontWeight: FontWeight.w700,
                               fontSize: 10.5,
                             ),

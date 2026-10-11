@@ -179,7 +179,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                     Icons.two_wheeler,
                                     size: 16,
                                     color: _selectedMode == 0
-                                        ? const Color(0xFF007AFF)
+                                        ? const Color(0xFFE65100)
                                         : const Color(0xFF8E8E93),
                                   ),
                                   const SizedBox(width: 6),
@@ -189,7 +189,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                       fontSize: 12,
                                       fontWeight: _selectedMode == 0 ? FontWeight.bold : FontWeight.w600,
                                       color: _selectedMode == 0
-                                          ? const Color(0xFF1C1C1E)
+                                          ? const Color(0xFF141416)
                                           : const Color(0xFF8E8E93),
                                     ),
                                   ),
@@ -224,7 +224,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                     Icons.hail,
                                     size: 16,
                                     color: _selectedMode == 1
-                                        ? const Color(0xFF007AFF)
+                                        ? const Color(0xFFE65100)
                                         : const Color(0xFF8E8E93),
                                   ),
                                   const SizedBox(width: 6),
@@ -234,7 +234,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                       fontSize: 12,
                                       fontWeight: _selectedMode == 1 ? FontWeight.bold : FontWeight.w600,
                                       color: _selectedMode == 1
-                                          ? const Color(0xFF1C1C1E)
+                                          ? const Color(0xFF141416)
                                           : const Color(0xFF8E8E93),
                                     ),
                                   ),
@@ -298,17 +298,17 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                 duration: const Duration(milliseconds: 200),
                                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                                 decoration: BoxDecoration(
-                                  color: isSelected ? const Color(0xFF007AFF) : Colors.white,
+                                  color: isSelected ? const Color(0xFFE65100) : Colors.white,
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
                                     color: isSelected
-                                        ? const Color(0xFF007AFF)
+                                        ? const Color(0xFFE65100)
                                         : Colors.black.withOpacity(0.08),
                                   ),
                                   boxShadow: isSelected
                                       ? [
                                           BoxShadow(
-                                            color: const Color(0xFF007AFF).withOpacity(0.25),
+                                            color: const Color(0xFFE65100).withOpacity(0.25),
                                             blurRadius: 6,
                                             offset: const Offset(0, 2),
                                           ),
@@ -469,10 +469,10 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                   width: 64,
                                   height: 64,
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFE3F2FD),
+                                    color: const Color(0xFFFFF3E0),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
-                                  child: const Icon(Icons.two_wheeler, size: 32, color: Color(0xFF007AFF)),
+                                  child: const Icon(Icons.two_wheeler, size: 32, color: Color(0xFFE65100)),
                                 ),
                                 const SizedBox(height: 14),
                                 Text(
@@ -497,7 +497,8 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                   icon: const Icon(Icons.refresh, size: 16),
                                   label: const Text('Reset All Filters'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF007AFF),
+                                    backgroundColor: const Color(0xFF141416),
+                                    foregroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                                   ),
                                 ),
@@ -507,7 +508,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                         }
 
                         return RefreshIndicator(
-                          color: const Color(0xFF007AFF),
+                          color: const Color(0xFFE65100),
                           onRefresh: () async {
                             ref.invalidate(allAvailableRidesProvider);
                           },
@@ -523,7 +524,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                         );
                       },
                       loading: () => const Center(
-                        child: CircularProgressIndicator(color: Color(0xFF007AFF)),
+                        child: CircularProgressIndicator(color: Color(0xFFE65100)),
                       ),
                       error: (err, _) => Center(
                         child: Text('Error: $err', style: AppTypography.bodyMd),
@@ -537,8 +538,8 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
         onPressed: () {
           PostRideRequestSheet.show(context);
         },
-        backgroundColor: const Color(0xFF007AFF),
-        icon: const Icon(Icons.hail, color: Colors.white, size: 20),
+        backgroundColor: const Color(0xFF141416),
+        icon: const Icon(Icons.hail, color: Color(0xFFFFA000), size: 20),
         label: const Text(
           'Request a Ride',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -587,11 +588,11 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                       children: [
                         CircleAvatar(
                           radius: 18,
-                          backgroundColor: const Color(0xFF007AFF).withOpacity(0.12),
+                          backgroundColor: const Color(0xFFFFF3E0),
                           child: Text(
                             ride.driverName.isNotEmpty ? ride.driverName[0].toUpperCase() : 'D',
                             style: const TextStyle(
-                              color: Color(0xFF007AFF),
+                              color: Color(0xFFE65100),
                               fontWeight: FontWeight.bold,
                               fontSize: 15,
                             ),
@@ -605,12 +606,12 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                               ride.driverName,
                               style: AppTypography.labelMd.copyWith(
                                 fontWeight: FontWeight.w700,
-                                color: const Color(0xFF1C1C1E),
+                                color: const Color(0xFF141416),
                               ),
                             ),
                             Row(
                               children: [
-                                const Icon(Icons.star, size: 12, color: Color(0xFFFF9500)),
+                                const Icon(Icons.star, size: 12, color: Color(0xFFFFA000)),
                                 const SizedBox(width: 3),
                                 Text(
                                   '${ride.driverRating.toStringAsFixed(1)} • ${ride.driverDept}',
@@ -635,7 +636,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                           style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF007AFF),
+                            color: Color(0xFFE65100),
                             letterSpacing: -0.5,
                           ),
                         ),
@@ -666,7 +667,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                           width: 10,
                           height: 10,
                           decoration: const BoxDecoration(
-                            color: Color(0xFF007AFF),
+                            color: Color(0xFF2E7D32),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -679,7 +680,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                           width: 10,
                           height: 10,
                           decoration: const BoxDecoration(
-                            color: Color(0xFF34C759),
+                            color: Color(0xFFFF3B30),
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -718,7 +719,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                             ride.destinationName,
                             style: AppTypography.labelMd.copyWith(
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFF007AFF),
+                              color: const Color(0xFF141416),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -799,8 +800,8 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                       icon: const Icon(Icons.chat_bubble_outline, size: 13),
                       label: const Text('SMS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF007AFF),
-                        side: const BorderSide(color: Color(0xFF007AFF)),
+                        foregroundColor: const Color(0xFF141416),
+                        side: BorderSide(color: const Color(0xFF141416).withOpacity(0.2)),
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         minimumSize: Size.zero,
@@ -812,7 +813,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                     ElevatedButton(
                       onPressed: () => _handleBooking(ride),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF007AFF),
+                        backgroundColor: const Color(0xFF141416),
                         foregroundColor: Colors.white,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -845,7 +846,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
       future: ridesRepo.getPassengerRequests(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFF007AFF)));
+          return const Center(child: CircularProgressIndicator(color: Color(0xFFE65100)));
         }
 
         final requests = snapshot.data ?? [];
@@ -861,7 +862,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                     color: const Color(0xFFFFF3E0),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Icon(Icons.hail, size: 32, color: Color(0xFFFF9500)),
+                  child: const Icon(Icons.hail, size: 32, color: Color(0xFFE65100)),
                 ),
                 const SizedBox(height: 14),
                 Text(
@@ -880,7 +881,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                   icon: const Icon(Icons.send_rounded, size: 16),
                   label: const Text('Post a Ride Request Now'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF007AFF),
+                    backgroundColor: const Color(0xFF141416),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
@@ -891,7 +892,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
         }
 
         return RefreshIndicator(
-          color: const Color(0xFF007AFF),
+          color: const Color(0xFFE65100),
           onRefresh: () async {
             setState(() {});
           },
@@ -936,10 +937,10 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                       children: [
                         CircleAvatar(
                           radius: 18,
-                          backgroundColor: const Color(0xFF007AFF).withOpacity(0.12),
+                          backgroundColor: const Color(0xFFFFF3E0),
                           child: Text(
                             pName.isNotEmpty ? pName[0].toUpperCase() : 'S',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF007AFF)),
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFE65100)),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -978,7 +979,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.trip_origin, size: 14, color: Color(0xFF007AFF)),
+                          const Icon(Icons.trip_origin, size: 14, color: Color(0xFF2E7D32)),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(pickup, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
@@ -1061,7 +1062,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                               icon: const Icon(Icons.check_circle_outline, size: 16),
                               label: const Text('Accept Request (রাইড গ্রহণ করুন)'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF007AFF),
+                                backgroundColor: const Color(0xFF141416),
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(vertical: 10),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

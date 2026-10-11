@@ -1,69 +1,80 @@
 import 'package:flutter/material.dart';
 
-/// Exact Stitch Design System Color Tokens for DIU Ride
+/// Exact Stitch & Mockup Color Tokens for DIU Ride (Matching User Reference)
 class AppColors {
   AppColors._();
 
-  // Primary: DIU Emerald Green
-  static const Color primary = Color(0xFF00503A);
-  static const Color primaryContainer = Color(0xFF006A4E);
-  static const Color primaryFixed = Color(0xFF9EF4D0);
-  static const Color onPrimaryFixed = Color(0xFF002116);
-  static const Color onPrimaryFixedVariant = Color(0xFF00513B);
-  static const Color onPrimaryContainer = Color(0xFF92E7C3);
+  // Primary: Warm Amber / Sunset Orange (matching reference mockup headers & accents)
+  static const Color primary = Color(0xFFE65100);
+  static const Color primaryContainer = Color(0xFFEF6C00);
+  static const Color primaryLight = Color(0xFFFFA726);
+  static const Color primaryFixed = Color(0xFFFFE082);
   static const Color onPrimary = Color(0xFFFFFFFF);
+  static const Color onPrimaryContainer = Color(0xFFFFFFFF);
 
-  // Secondary: Cobalt / Electric Blue
-  static const Color secondary = Color(0xFF0057C2);
-  static const Color secondaryContainer = Color(0xFF2C70E2);
-  static const Color secondaryFixed = Color(0xFFD9E2FF);
-  static const Color secondaryFixedDim = Color(0xFFAFC6FF);
-  static const Color onSecondary = Color(0xFFFFFFFF);
-  static const Color onSecondaryContainer = Color(0xFFFEFCFF);
-  static const Color onSecondaryFixed = Color(0xFF001A43);
-  static const Color onSecondaryFixedVariant = Color(0xFF004398);
+  // Radiant Sunset Header Gradient
+  static const Color headerGradientStart = Color(0xFFE65100); // Rich warm sunset
+  static const Color headerGradientMid = Color(0xFFF57C00);   // Radiant amber
+  static const Color headerGradientEnd = Color(0xFFFFA726);   // Soft golden glow
 
-  // Tertiary: Jade / Eco Green
-  static const Color tertiary = Color(0xFF004F35);
-  static const Color tertiaryContainer = Color(0xFF006A48);
-  static const Color tertiaryFixed = Color(0xFF6FFBBE);
-  static const Color tertiaryFixedDim = Color(0xFF4EDEA3);
+  // Obsidian Deep Dark (matching bottom nav, schedule pill, and primary action buttons)
+  static const Color obsidianDark = Color(0xFF141416);
+  static const Color obsidianCard = Color(0xFF1C1C1E);
+  static const Color onObsidian = Color(0xFFFFFFFF);
+
+  // Secondary: Golden Amber
+  static const Color secondary = Color(0xFFFFA000);
+  static const Color secondaryContainer = Color(0xFFFFF3E0);
+  static const Color onSecondary = Color(0xFF141416);
+
+  // Tertiary: Jade / Eco Commute
+  static const Color tertiary = Color(0xFF2E7D32);
+  static const Color tertiaryContainer = Color(0xFFE8F5E9);
   static const Color onTertiary = Color(0xFFFFFFFF);
-  static const Color onTertiaryContainer = Color(0xFF60EEB1);
-  static const Color onTertiaryFixed = Color(0xFF002113);
-  static const Color onTertiaryFixedVariant = Color(0xFF005236);
 
-  // Surfaces & Backgrounds
-  static const Color background = Color(0xFFF9F9FF);
-  static const Color surface = Color(0xFFF9F9FF);
-  static const Color surfaceBright = Color(0xFFF9F9FF);
-  static const Color surfaceDim = Color(0xFFD3DAEF);
+  // Surfaces & Backgrounds (Porcelain & Soft warm white)
+  static const Color background = Color(0xFFF8F9FA);
+  static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceContainerLowest = Color(0xFFFFFFFF);
-  static const Color surfaceContainerLow = Color(0xFFF1F3FF);
-  static const Color surfaceContainer = Color(0xFFE9EDFF);
-  static const Color surfaceContainerHigh = Color(0xFFE1E8FD);
-  static const Color surfaceContainerHighest = Color(0xFFDCE2F7);
-  static const Color surfaceVariant = Color(0xFFDCE2F7);
+  static const Color surfaceContainerLow = Color(0xFFF4F5F7);
+  static const Color surfaceContainer = Color(0xFFEEEEF2);
+  static const Color surfaceContainerHigh = Color(0xFFE5E7EB);
+  static const Color surfaceVariant = Color(0xFFF0F1F5);
 
   // Text & Content on Surfaces
-  static const Color onBackground = Color(0xFF141B2B);
-  static const Color onSurface = Color(0xFF141B2B);
-  static const Color onSurfaceVariant = Color(0xFF3F4944);
-  static const Color inverseSurface = Color(0xFF293040);
-  static const Color inverseOnSurface = Color(0xFFEDF0FF);
-  static const Color inversePrimary = Color(0xFF83D7B4);
+  static const Color onBackground = Color(0xFF141416);
+  static const Color onSurface = Color(0xFF141416);
+  static const Color onSurfaceVariant = Color(0xFF6B7280);
+  static const Color inverseSurface = Color(0xFF141416);
+  static const Color inverseOnSurface = Color(0xFFFFFFFF);
 
   // Outlines & Dividers
-  static const Color outline = Color(0xFF6F7A73);
-  static const Color outlineVariant = Color(0xFFBEC9C2);
+  static const Color outline = Color(0xFFE5E7EB);
+  static const Color outlineVariant = Color(0xFFF0F0F2);
+
+  // Bottom Navigation (Deep obsidian black matching reference 1)
+  static const Color bottomNavBackground = Color(0xFF121214);
+  static const Color bottomNavSelected = Color(0xFFFFA000);
+  static const Color bottomNavUnselected = Color(0xFF8E8E93);
 
   // Error & Safety SOS
-  static const Color error = Color(0xFFBA1A1A);
-  static const Color errorContainer = Color(0xFFFFDAD6);
+  static const Color error = Color(0xFFE53935);
+  static const Color errorContainer = Color(0xFFFFEBEE);
   static const Color onError = Color(0xFFFFFFFF);
-  static const Color onErrorContainer = Color(0xFF93000A);
+  static const Color onErrorContainer = Color(0xFFB71C1C);
+
+  // Material 3 container & fixed tokens
+  static const Color onSecondaryContainer = Color(0xFFE65100);
+  static const Color onTertiaryContainer = Color(0xFF1B5E20);
+  static const Color onPrimaryFixed = Color(0xFFE65100);
+  static const Color onPrimaryFixedVariant = Color(0xFFBF360C);
+  static const Color secondaryFixed = Color(0xFFFFE082);
+  static const Color onSecondaryFixed = Color(0xFFE65100);
+  static const Color tertiaryFixed = Color(0xFFC8E6C9);
+  static const Color onTertiaryFixedVariant = Color(0xFF1B5E20);
 
   // Rating & Alerts
-  static const Color ratingStar = Color(0xFFF59E0B);
-  static const Color cardShadow = Color(0x0A000000);
+  static const Color ratingStar = Color(0xFFFFA000);
+  static const Color cardShadow = Color(0x0F000000);
 }
+

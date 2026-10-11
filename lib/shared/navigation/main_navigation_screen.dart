@@ -46,7 +46,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     // Screens that render their own AppBar (no DiuAppHeader needed)
-    final noHeaderTabs = {1, 3, 4}; // All Rides, Messages, and Profile have their own headers
+    final noHeaderTabs = {0, 1, 3, 4}; // Home, All Rides, Messages, and Profile have their own headers
 
     return Scaffold(
       backgroundColor: AppColors.surface,

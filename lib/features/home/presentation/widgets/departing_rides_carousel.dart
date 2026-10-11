@@ -86,7 +86,7 @@ class DepartingRidesCarousel extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.two_wheeler, size: 40, color: Color(0xFF007AFF)),
+                  const Icon(Icons.two_wheeler, size: 40, color: Color(0xFFE65100)),
                   const SizedBox(height: 8),
                   Text(
                     'No Peer Motorbikes Departing Soon',
@@ -122,7 +122,8 @@ class DepartingRidesCarousel extends StatelessWidget {
   }
 
   Widget _buildRideCard(BuildContext context, RideModel ride) {
-    const primaryColor = Color(0xFF007AFF);
+    const primaryAmber = Color(0xFFE65100);
+    const obsidianDark = Color(0xFF141416);
 
     return Container(
       width: 316,
@@ -133,7 +134,7 @@ class DepartingRidesCarousel extends StatelessWidget {
         border: Border.all(color: Colors.black.withOpacity(0.06)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withOpacity(0.05),
             blurRadius: 16,
             offset: const Offset(0, 5),
           ),
@@ -159,11 +160,11 @@ class DepartingRidesCarousel extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 20,
-                        backgroundColor: const Color(0xFFE3F2FD),
+                        backgroundColor: const Color(0xFFFFF3E0),
                         child: Text(
                           ride.driverName.substring(0, 1),
                           style: const TextStyle(
-                            color: Color(0xFF007AFF),
+                            color: primaryAmber,
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
@@ -176,7 +177,7 @@ class DepartingRidesCarousel extends StatelessWidget {
                           width: 13,
                           height: 13,
                           decoration: const BoxDecoration(
-                            color: Color(0xFF00C853),
+                            color: Color(0xFF2E7D32),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.check, size: 9, color: Colors.white),
@@ -194,14 +195,14 @@ class DepartingRidesCarousel extends StatelessWidget {
                             ride.driverName,
                             style: AppTypography.bodyMdMedium.copyWith(
                               fontWeight: FontWeight.w800,
-                              color: const Color(0xFF1C1C1E),
+                              color: const Color(0xFF141416),
                             ),
                           ),
                           const SizedBox(width: 5),
                           Text(
                             ride.driverDept,
                             style: const TextStyle(
-                              color: Color(0xFF007AFF),
+                              color: primaryAmber,
                               fontWeight: FontWeight.w700,
                               fontSize: 10,
                             ),
@@ -210,13 +211,13 @@ class DepartingRidesCarousel extends StatelessWidget {
                       ),
                       Row(
                         children: [
-                          const Icon(Icons.star, size: 13, color: Color(0xFFFF9500)),
+                          const Icon(Icons.star, size: 13, color: Color(0xFFFFA000)),
                           const SizedBox(width: 3),
                           Text(
                             ride.driverRating.toStringAsFixed(1),
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1C1C1E),
+                              color: Color(0xFF141416),
                               fontSize: 11,
                             ),
                           ),
@@ -242,7 +243,7 @@ class DepartingRidesCarousel extends StatelessWidget {
                   Text(
                     CurrencyFormatter.formatBdt(ride.farePerSeat),
                     style: const TextStyle(
-                      color: primaryColor,
+                      color: primaryAmber,
                       fontWeight: FontWeight.w900,
                       fontSize: 19,
                     ),
@@ -264,7 +265,7 @@ class DepartingRidesCarousel extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFF2F4F7),
+              color: const Color(0xFFF4F5F7),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Column(
@@ -275,7 +276,7 @@ class DepartingRidesCarousel extends StatelessWidget {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF00C853),
+                        color: Color(0xFF2E7D32),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -284,7 +285,7 @@ class DepartingRidesCarousel extends StatelessWidget {
                       child: Text(
                         ride.originName,
                         style: const TextStyle(
-                          color: Color(0xFF1C1C1E),
+                          color: Color(0xFF141416),
                           fontWeight: FontWeight.w600,
                           fontSize: 12,
                         ),
@@ -301,7 +302,7 @@ class DepartingRidesCarousel extends StatelessWidget {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF007AFF),
+                        color: primaryAmber,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -310,7 +311,7 @@ class DepartingRidesCarousel extends StatelessWidget {
                       child: Text(
                         ride.destinationName,
                         style: const TextStyle(
-                          color: Color(0xFF1C1C1E),
+                          color: Color(0xFF141416),
                           fontWeight: FontWeight.w700,
                           fontSize: 12,
                         ),
@@ -333,7 +334,7 @@ class DepartingRidesCarousel extends StatelessWidget {
                   const Icon(
                     Icons.two_wheeler,
                     size: 15,
-                    color: Color(0xFF007AFF),
+                    color: primaryAmber,
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -357,7 +358,7 @@ class DepartingRidesCarousel extends StatelessWidget {
                     child: const Text(
                       '🪖 Helmet',
                       style: TextStyle(
-                        color: Color(0xFFE65100),
+                        color: primaryAmber,
                         fontWeight: FontWeight.w700,
                         fontSize: 9.5,
                       ),
@@ -368,7 +369,7 @@ class DepartingRidesCarousel extends StatelessWidget {
                     DateTimeUtils.formatTime(ride.departureTime),
                     style: const TextStyle(
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF007AFF),
+                      color: obsidianDark,
                       fontSize: 11,
                     ),
                   ),
@@ -377,14 +378,14 @@ class DepartingRidesCarousel extends StatelessWidget {
             ],
           ),
 
-          // Request Seat CTA
+          // Request Seat CTA (Obsidian dark button matching Reference 2)
           ElevatedButton(
             onPressed: () => onRequestSeat(ride),
             style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
+              backgroundColor: obsidianDark,
               foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              elevation: 2,
+              padding: const EdgeInsets.symmetric(vertical: 11),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),

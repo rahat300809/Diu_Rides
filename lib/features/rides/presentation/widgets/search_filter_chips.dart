@@ -54,7 +54,7 @@ class SearchFilterChips extends StatelessWidget {
           _buildChip(
             label: 'Bikes Only',
             icon: Icons.two_wheeler,
-            iconColor: const Color(0xFF007AFF),
+            iconColor: const Color(0xFFE65100),
             isSelected: true,
             onTap: () {},
           ),
@@ -64,7 +64,7 @@ class SearchFilterChips extends StatelessWidget {
           _buildChip(
             label: 'Helmet Ready',
             icon: Icons.sports_motorsports,
-            iconColor: const Color(0xFF007AFF),
+            iconColor: const Color(0xFFE65100),
             isSelected: true,
             onTap: () {},
           ),

@@ -113,20 +113,20 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 3D Apple-Style Floating Search Bar
+          // 3D Apple-Style Floating Search Bar (Matching Reference Mockups)
           Container(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                color: hasText ? const Color(0xFF007AFF) : Colors.black.withOpacity(0.08),
+                color: hasText ? const Color(0xFFE65100) : Colors.black.withOpacity(0.08),
                 width: hasText ? 1.8 : 1.0,
               ),
               boxShadow: [
                 BoxShadow(
                   color: hasText
-                      ? const Color(0xFF007AFF).withOpacity(0.18)
-                      : Colors.black.withOpacity(0.06),
+                      ? const Color(0xFFE65100).withOpacity(0.20)
+                      : const Color(0x14000000),
                   blurRadius: 18,
                   offset: const Offset(0, 6),
                 ),
@@ -140,20 +140,20 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
             child: Row(
               children: [
-                // 3D Search Icon
+                // 3D Search Icon with Warm Sunset Amber Gradient
                 Container(
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF007AFF), Color(0xFF0051B3)],
+                      colors: [Color(0xFFFFA000), Color(0xFFE65100)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF007AFF).withOpacity(0.35),
+                        color: const Color(0xFFE65100).withOpacity(0.35),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -169,7 +169,7 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
                     controller: _controller,
                     focusNode: _focusNode,
                     style: AppTypography.bodyLgMedium.copyWith(
-                      color: const Color(0xFF1C1C1E),
+                      color: const Color(0xFF141416),
                       fontWeight: FontWeight.w600,
                     ),
                     decoration: InputDecoration(
@@ -194,7 +194,7 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
                   ),
                 ),
 
-                // Clear or Status button
+                // Clear or Status button (Matching Reference 1 "Now" badge)
                 if (hasText)
                   IconButton(
                     icon: const Icon(Icons.cancel, color: Color(0xFF8E8E93), size: 20),
@@ -208,22 +208,23 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
                   )
                 else
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF2F4F7),
-                      borderRadius: BorderRadius.circular(12),
+                      color: const Color(0xFFF4F5F7),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: Colors.black.withOpacity(0.06)),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.two_wheeler, size: 14, color: Color(0xFF007AFF)),
-                        SizedBox(width: 4),
+                        Icon(Icons.calendar_today, size: 13, color: Color(0xFF141416)),
+                        SizedBox(width: 5),
                         Text(
-                          'Moto',
+                          'Now',
                           style: TextStyle(
-                            color: Color(0xFF007AFF),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11,
+                            color: Color(0xFF141416),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 11.5,
                           ),
                         ),
                       ],
@@ -238,7 +239,7 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
             const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.auto_awesome, size: 13, color: Color(0xFF007AFF)),
+                const Icon(Icons.auto_awesome, size: 13, color: Color(0xFFFFA000)),
                 const SizedBox(width: 5),
                 Text(
                   hasText ? 'Suggested destination matches:' : 'Popular DIU commute hubs:',
@@ -275,18 +276,18 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
                       duration: const Duration(milliseconds: 180),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                       decoration: BoxDecoration(
-                        color: isSelected ? const Color(0xFF007AFF) : Colors.white,
+                        color: isSelected ? const Color(0xFFE65100) : Colors.white,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
                           color: isSelected
-                              ? const Color(0xFF007AFF)
+                              ? const Color(0xFFE65100)
                               : Colors.black.withOpacity(0.08),
                           width: 1,
                         ),
                         boxShadow: [
                           BoxShadow(
                             color: isSelected
-                                ? const Color(0xFF007AFF).withOpacity(0.3)
+                                ? const Color(0xFFE65100).withOpacity(0.3)
                                 : Colors.black.withOpacity(0.04),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
@@ -299,13 +300,13 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
                           Icon(
                             Icons.location_on,
                             size: 13,
-                            color: isSelected ? Colors.white : const Color(0xFF007AFF),
+                            color: isSelected ? Colors.white : const Color(0xFFE65100),
                           ),
                           const SizedBox(width: 6),
                           Text(
                             item,
                             style: TextStyle(
-                              color: isSelected ? Colors.white : const Color(0xFF1C1C1E),
+                              color: isSelected ? Colors.white : const Color(0xFF141416),
                               fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                               fontSize: 12,
                             ),

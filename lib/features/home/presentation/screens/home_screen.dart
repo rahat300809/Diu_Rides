@@ -45,7 +45,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               height: 34,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF007AFF), Color(0xFF0051B3)],
+                  colors: [Color(0xFFE65100), Color(0xFFF57C00)],
                 ),
                 shape: BoxShape.circle,
               ),
@@ -125,7 +125,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: RefreshIndicator(
-        color: const Color(0xFF007AFF),
+        color: const Color(0xFFE65100),
         onRefresh: () async {
           ref.invalidate(departingSoonRidesStreamProvider);
           ref.invalidate(departingSoonRidesProvider);
@@ -135,40 +135,61 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           padding: const EdgeInsets.only(bottom: 30),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Sleek Warm/Clean Mobile App Header (Inspired by reference images)
+              // 1. Radiant Sunset Amber Header (Directly Matching Reference Images)
               Container(
                 decoration: const BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
                     colors: [
-                      Color(0xFFFFF9F2), // Soft subtle warm tint
-                      Color(0xFFF8F9FA),
+                      Color(0xFFE65100), // Rich Sunset Amber
+                      Color(0xFFF57C00), // Vibrant Orange
+                      Color(0xFFFFB74D), // Golden Peach Glow
                     ],
                   ),
+                  borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x28E65100),
+                      blurRadius: 20,
+                      offset: Offset(0, 8),
+                    ),
+                  ],
                 ),
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  MediaQuery.of(context).padding.top + 10,
+                  20,
+                  22,
+                ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top Row: User Avatar, Name, Location & Active Status Pill
+                    // Top Row: User Avatar, Current Location & Glass Action Buttons
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
                           children: [
-                            CircleAvatar(
-                              radius: 22,
-                              backgroundColor: const Color(0xFF007AFF).withOpacity(0.12),
-                              child: Text(
-                                user?.name.isNotEmpty == true
-                                    ? user!.name[0].toUpperCase()
-                                    : 'S',
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF007AFF),
+                            Container(
+                              padding: const EdgeInsets.all(2.5),
+                              decoration: const BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                              ),
+                              child: CircleAvatar(
+                                radius: 21,
+                                backgroundColor: const Color(0xFF141416),
+                                child: Text(
+                                  user?.name.isNotEmpty == true
+                                      ? user!.name[0].toUpperCase()
+                                      : 'S',
+                                  style: const TextStyle(
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                             ),
@@ -177,24 +198,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Hello, ${user?.name.split(" ").first ?? "Student"}',
-                                  style: AppTypography.headlineSm.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF1C1C1E),
-                                    letterSpacing: -0.5,
+                                  'Current Location',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.white.withOpacity(0.85),
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                                Row(
+                                const Row(
                                   children: [
-                                    const Icon(Icons.location_on, size: 13, color: Color(0xFF007AFF)),
-                                    const SizedBox(width: 3),
                                     Text(
                                       'DIU Smart City, Ashulia',
-                                      style: AppTypography.labelSm.copyWith(
-                                        color: const Color(0xFF8E8E93),
-                                        fontWeight: FontWeight.w600,
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
                                       ),
                                     ),
+                                    SizedBox(width: 3),
+                                    Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.white),
                                   ],
                                 ),
                               ],
@@ -202,84 +224,92 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ],
                         ),
 
-                        // Active Ride Status Pill or Bikes Only Badge
-                        if (activeRide != null)
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => RideDetailsTrackingScreen(rideId: activeRide.id),
-                                ),
-                              );
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF34C759),
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF34C759).withOpacity(0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.directions_bike, size: 14, color: Colors.white),
-                                  SizedBox(width: 5),
-                                  Text(
-                                    'Active Ride',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
+                        // Notification Glass Bell & Active Ride Status Pill
+                        Row(
+                          children: [
+                            if (activeRide != null)
+                              GestureDetector(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => RideDetailsTrackingScreen(rideId: activeRide.id),
                                     ),
+                                  );
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 300),
+                                  margin: const EdgeInsets.only(right: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.12),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.two_wheeler, size: 14, color: Color(0xFFE65100)),
+                                      SizedBox(width: 5),
+                                      Text(
+                                        'Active Ride',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                          color: Color(0xFFE65100),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
+
+                            // Translucent Glass Notification Bell Button (Matching Reference 2)
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.24),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white.withOpacity(0.35)),
+                              ),
+                              child: const Icon(Icons.notifications_none, size: 20, color: Colors.white),
                             ),
-                          )
-                        else
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.black.withOpacity(0.06)),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.04),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.two_wheeler, size: 15, color: Color(0xFF007AFF)),
-                                SizedBox(width: 5),
-                                Text(
-                                  'Bikes Only',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w800,
-                                    color: Color(0xFF007AFF),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          ],
+                        ),
                       ],
+                    ),
+
+                    const SizedBox(height: 18),
+
+                    // Greeting Headline on Sunset Gradient
+                    Text(
+                      'Hello, ${user?.name.split(" ").first ?? "Student"}',
+                      style: const TextStyle(
+                        fontSize: 27,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: -0.6,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Explore Campus Comfortably',
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        color: Colors.white.withOpacity(0.92),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
 
                     const SizedBox(height: 16),
 
-                    // 2. Apple iOS 3D Top Destination Search Bar (With Real-Time Auto-Suggestions)
+                    // 2. Apple iOS 3D Floating Destination Search Bar
                     AppleIosDestinationSearch(
                       allRides: allRides,
                       currentQuery: _activeSearchQuery,
@@ -329,103 +359,133 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   },
                 ),
 
-              // 4. Quick Action Hub (Request Ride / Find Ride / Offer Bike)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                child: Row(
+              // 4. "Choose Your Ride" Segmented Dual-Pill Card (Directly Matching Reference 2)
+              Container(
+                margin: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFF0F0F2)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x0C000000),
+                      blurRadius: 16,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Find Ride Card
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => widget.onNavigateTab(1),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: Colors.black.withOpacity(0.06)),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.03),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF007AFF).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.search, size: 20, color: Color(0xFF007AFF)),
-                              ),
-                              const SizedBox(height: 10),
-                              const Text(
-                                'Find Shared Moto',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                              ),
-                              const SizedBox(height: 2),
-                              const Text(
-                                'View all peer rides',
-                                style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
-                              ),
-                            ],
-                          ),
-                        ),
+                    const Text(
+                      'Choose Your Ride',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF141416),
+                        letterSpacing: -0.3,
                       ),
                     ),
-                    const SizedBox(width: 12),
-
-                    // Post Ride Request Card (Passenger throws request)
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => PostRideRequestSheet.show(context),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF007AFF), Color(0xFF0051B3)],
+                    const SizedBox(height: 1),
+                    const Text(
+                      'Campus Peer Commute',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFF8E8E93),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        // Left: Ride (White pill with subtle border)
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => widget.onNavigateTab(1),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8F9FA),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFFE5E7EB)),
+                              ),
+                              child: const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Ride',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 14,
+                                          color: Color(0xFF141416),
+                                        ),
+                                      ),
+                                      Icon(Icons.two_wheeler, size: 20, color: Color(0xFFE65100)),
+                                    ],
+                                  ),
+                                  SizedBox(height: 6),
+                                  Text(
+                                    'Bikes arrive in 3-5m',
+                                    style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
+                                  ),
+                                ],
+                              ),
                             ),
-                            borderRadius: BorderRadius.circular(18),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF007AFF).withOpacity(0.25),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(Icons.add_location_alt, size: 20, color: Colors.white),
-                              ),
-                              const SizedBox(height: 10),
-                              const Text(
-                                'Request a Ride',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
-                              ),
-                              const SizedBox(height: 2),
-                              const Text(
-                                'Throw route to riders',
-                                style: TextStyle(fontSize: 11, color: Colors.white70),
-                              ),
-                            ],
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+
+                        // Right: Schedule / Request (Pitch obsidian black pill matching reference 2!)
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => PostRideRequestSheet.show(context),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF141416),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.2),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Schedule',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 14,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      Icon(Icons.calendar_today, size: 17, color: Color(0xFFFFA000)),
+                                    ],
+                                  ),
+                                  SizedBox(height: 6),
+                                  Text(
+                                    'Book / Throw request',
+                                    style: TextStyle(fontSize: 11, color: Colors.white70),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -441,7 +501,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       'Campus Moto Share',
                       style: AppTypography.headlineSm.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF1C1C1E),
+                        color: const Color(0xFF141416),
                       ),
                     ),
                     GestureDetector(
@@ -451,7 +511,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF007AFF),
+                          color: Color(0xFFE65100),
                         ),
                       ),
                     ),
@@ -468,7 +528,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       title: 'Standard Moto',
                       subtitle: '1 seat • Avg ৳35',
                       tag: 'Fastest',
-                      tagColor: const Color(0xFF34C759),
+                      tagColor: const Color(0xFF2E7D32),
                       onTap: () => widget.onNavigateTab(1),
                     ),
                     const SizedBox(width: 10),
@@ -477,7 +537,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       title: 'Helmet Ready',
                       subtitle: 'DOT clean helmet',
                       tag: 'Safety',
-                      tagColor: const Color(0xFF007AFF),
+                      tagColor: const Color(0xFFE65100),
                       onTap: () => widget.onNavigateTab(1),
                     ),
                   ],
@@ -529,7 +589,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 loading: () => const Center(
                   child: Padding(
                     padding: EdgeInsets.all(24.0),
-                    child: CircularProgressIndicator(color: Color(0xFF007AFF)),
+                    child: CircularProgressIndicator(color: Color(0xFFE65100)),
                   ),
                 ),
                 error: (err, _) => Padding(
