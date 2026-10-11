@@ -768,27 +768,18 @@ async def cancel_booking(booking_id: str):
 # REST Endpoints: Chat & Realtime Messaging
 # =====================================================================
 
-@app.get("/ride/api/messages")
-@app.get("/ride/api/chat/{ride_id}/messages")
-@app.get("/api/messages")
-@app.get("/api/chat/{ride_id}/messages")
-def get_chat_messages(ride_id: Optional[str] = Query(None)):
+def _fetch_messages(target_ride_id: Optional[str]):
     conn = get_db()
     cursor = conn.cursor()
-    if ride_id:
-        cursor.execute("SELECT * FROM messages WHERE ride_id = ? ORDER BY timestamp ASC", (ride_id,))
+    if target_ride_id:
+        cursor.execute("SELECT * FROM messages WHERE ride_id = ? ORDER BY timestamp ASC", (target_ride_id,))
     else:
         cursor.execute("SELECT * FROM messages ORDER BY timestamp ASC")
     rows = cursor.fetchall()
     conn.close()
     return [map_message(m) for m in rows]
 
-@app.post("/ride/api/messages")
-@app.post("/ride/api/chat/{ride_id}/messages")
-@app.post("/api/messages")
-@app.post("/api/chat/{ride_id}/messages")
-async def post_chat_message(msg_data: Dict[str, Any], ride_id: Optional[str] = None):
-    target_ride_id = ride_id or msg_data.get("rideId") or "ride_general"
+async def _save_and_broadcast_message(target_ride_id: str, msg_data: Dict[str, Any]):
     msg_id = msg_data.get("id") or f"msg_{int(datetime.utcnow().timestamp()*1000)}"
 
     conn = get_db()
@@ -817,9 +808,29 @@ async def post_chat_message(msg_data: Dict[str, Any], ride_id: Optional[str] = N
     conn.close()
 
     message = map_message(row)
-    # Broadcast to all active chat screens on mobile and web!
     await manager.broadcast("chat_message", message)
     return message
+
+@app.get("/ride/api/messages")
+@app.get("/api/messages")
+def get_chat_messages_query(ride_id: Optional[str] = None):
+    return _fetch_messages(ride_id)
+
+@app.get("/ride/api/chat/{ride_id}/messages")
+@app.get("/api/chat/{ride_id}/messages")
+def get_chat_messages_path(ride_id: str):
+    return _fetch_messages(ride_id)
+
+@app.post("/ride/api/messages")
+@app.post("/api/messages")
+async def post_chat_messages_body(msg_data: Dict[str, Any]):
+    target = msg_data.get("rideId") or "ride_general"
+    return await _save_and_broadcast_message(target, msg_data)
+
+@app.post("/ride/api/chat/{ride_id}/messages")
+@app.post("/api/chat/{ride_id}/messages")
+async def post_chat_messages_path(ride_id: str, msg_data: Dict[str, Any]):
+    return await _save_and_broadcast_message(ride_id, msg_data)
 
 # =====================================================================
 # REST Endpoints: Live Driver Location
