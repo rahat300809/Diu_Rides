@@ -4,13 +4,11 @@ import 'package:diu_ride/features/notifications/data/models/notification_model.d
 /// Global notification event bus — receives ride/booking lifecycle events
 /// and surfaces them in the notifications screen + badge count.
 class NotificationsNotifier extends StateNotifier<List<NotificationModel>> {
-  NotificationsNotifier() : super([]) {
-    _seedWelcomeNotification();
-  }
+  NotificationsNotifier() : super(_initialNotifications());
 
-  void _seedWelcomeNotification() {
+  static List<NotificationModel> _initialNotifications() {
     final now = DateTime.now();
-    state = [
+    return [
       NotificationModel(
         id: 'n_welcome',
         title: 'Welcome to DIU Ride 🎉',

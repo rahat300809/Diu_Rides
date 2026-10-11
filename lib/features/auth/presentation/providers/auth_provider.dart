@@ -92,9 +92,7 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthRepository _repository;
 
-  AuthNotifier(this._repository) : super(const AuthState()) {
-    checkSession();
-  }
+  AuthNotifier(this._repository) : super(const AuthState());
 
   void clearError() {
     state = state.copyWith(clearError: true);

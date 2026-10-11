@@ -38,8 +38,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
   final String _rideId;
 
   ChatNotifier(this._repository, this._ref, this._rideId) : super(const ChatState()) {
-    loadMessages();
-    _subscribe();
+    Future.microtask(() {
+      loadMessages();
+      _subscribe();
+    });
   }
 
   void loadMessages() async {
