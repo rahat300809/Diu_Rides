@@ -26,7 +26,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
   late TextEditingController _deptController;
-  String? _localPhotoPath;
   Uint8List? _photoBytes;
 
   @override
@@ -48,11 +47,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         setState(() => _photoBytes = decoded);
         return;
       } catch (_) {}
-    }
-    final path = prefs.getString('profile_photo_path');
-    if (path != null && !kIsWeb) {
-      setState(() => _localPhotoPath = path);
-      ref.read(_profilePhotoPathProvider.notifier).state = path;
     }
   }
 
@@ -102,7 +96,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     await prefs.setString('profile_photo_path', image.path);
     setState(() {
       _photoBytes = bytes;
-      _localPhotoPath = image.path;
     });
     ref.read(_profilePhotoPathProvider.notifier).state = image.path;
   }

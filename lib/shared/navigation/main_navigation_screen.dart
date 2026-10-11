@@ -64,10 +64,13 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
         // 1. Live rides updates (New ride published, booked, started, or completed)
         if (event == 'ride_created' ||
+            event == 'new_ride' ||
             event == 'ride_updated' ||
             event == 'ride_started' ||
             event == 'ride_completed' ||
-            event == 'ride_cancelled') {
+            event == 'ride_cancelled' ||
+            event == 'booking_created' ||
+            event == 'booking_status_updated') {
           debugPrint('[Live WS] Received $event - refreshing live rides cache');
           ref.invalidate(allAvailableRidesProvider);
           ref.invalidate(departingSoonRidesProvider);
@@ -75,6 +78,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
         // 2. Live student requests (Requested or accepted by biker)
         if (event == 'passenger_request_created' ||
+            event == 'new_passenger_request' ||
             event == 'passenger_request_accepted') {
           debugPrint('[Live WS] Received $event - refreshing passenger requests');
           ref.invalidate(passengerRequestsProvider);

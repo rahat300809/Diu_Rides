@@ -1263,6 +1263,63 @@ async def trigger_alert_ring(payload: Dict[str, Any]):
 # REST Endpoints: Bookings
 # =====================================================================
 
+@app.get("/ride/api/bookings")
+@app.get("/api/bookings")
+def get_bookings(
+    passenger_id: Optional[str] = Query(None),
+    ride_id: Optional[str] = Query(None),
+):
+    conn = get_db()
+    cursor = conn.cursor()
+    if passenger_id and ride_id:
+        cursor.execute("SELECT * FROM bookings WHERE passenger_id = ? AND ride_id = ? ORDER BY requested_at DESC", (passenger_id, ride_id))
+    elif passenger_id:
+        cursor.execute("SELECT * FROM bookings WHERE passenger_id = ? ORDER BY requested_at DESC", (passenger_id,))
+    elif ride_id:
+        cursor.execute("SELECT * FROM bookings WHERE ride_id = ? ORDER BY requested_at DESC", (ride_id,))
+    else:
+        cursor.execute("SELECT * FROM bookings ORDER BY requested_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [map_booking(b) for b in rows]
+
+@app.patch("/ride/api/bookings")
+@app.patch("/api/bookings")
+async def update_booking_patch(payload: Dict[str, Any]):
+    booking_id = payload.get("id")
+    status = payload.get("status", "accepted")
+    if not booking_id:
+        raise HTTPException(status_code=400, detail="Missing booking id")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM bookings WHERE id = ?", (booking_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    old_status = row["status"]
+    seats = row["seats_booked"]
+    ride_id = row["ride_id"]
+
+    cursor.execute("UPDATE bookings SET status = ? WHERE id = ?", (status, booking_id))
+    if status in ("cancelled", "rejected") and old_status not in ("cancelled", "rejected"):
+        cursor.execute("UPDATE rides SET available_seats = available_seats + ? WHERE id = ?", (seats, ride_id))
+    conn.commit()
+
+    cursor.execute("SELECT * FROM bookings WHERE id = ?", (booking_id,))
+    updated_row = cursor.fetchone()
+    cursor.execute("SELECT * FROM rides WHERE id = ?", (ride_id,))
+    ride_row = cursor.fetchone()
+    conn.close()
+
+    updated = map_booking(updated_row)
+    await manager.broadcast("booking_status_updated", updated)
+    if ride_row:
+        await manager.broadcast("ride_updated", map_ride(ride_row))
+    return updated
+
 @app.get("/ride/api/bookings/my-bookings")
 @app.get("/api/bookings/my-bookings")
 def get_my_bookings(user_id: Optional[str] = Query(None)):
