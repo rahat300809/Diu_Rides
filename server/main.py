@@ -1058,6 +1058,51 @@ def get_completed_rides(user_id: Optional[str] = None):
     conn.close()
     return [map_completed_ride(r) for r in rows]
 
+class CompletedRideCreate(BaseModel):
+    rideId: Optional[str] = ""
+    driverId: Optional[str] = ""
+    driverName: Optional[str] = ""
+    passengerId: Optional[str] = ""
+    passengerName: Optional[str] = ""
+    origin: Optional[str] = ""
+    destination: Optional[str] = ""
+    pickup: Optional[str] = ""
+    startLat: Optional[float] = None
+    startLng: Optional[float] = None
+    endLat: Optional[float] = None
+    endLng: Optional[float] = None
+    fare: Optional[float] = 50.0
+    rating: Optional[float] = 5.0
+
+@app.post("/ride/api/completed-rides")
+@app.post("/api/completed-rides")
+async def create_completed_ride(payload: CompletedRideCreate):
+    comp_id = f"comp_{int(datetime.utcnow().timestamp()*1000)}"
+    now = datetime.utcnow().isoformat()
+    origin_name = payload.origin or payload.pickup or "DIU Campus"
+    dest_name = payload.destination or "Destination"
+    start_maps = f"https://www.google.com/maps/search/?api=1&query={payload.startLat},{payload.startLng}" if payload.startLat and payload.startLng else ""
+    end_maps = f"https://www.google.com/maps/search/?api=1&query={payload.endLat},{payload.endLng}" if payload.endLat and payload.endLng else ""
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT INTO completed_rides (
+        id, ride_id, driver_id, driver_name, passenger_id, passenger_name,
+        origin_name, destination_name, start_time, completed_time, fare,
+        start_maps_link, end_maps_link, rating, created_at
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    """, (
+        comp_id, payload.rideId or comp_id, payload.driverId, payload.driverName,
+        payload.passengerId, payload.passengerName, origin_name, dest_name,
+        now, now, payload.fare or 50.0, start_maps, end_maps, payload.rating or 5.0, now
+    ))
+    conn.commit()
+    cursor.execute("SELECT * FROM completed_rides WHERE id = ?", (comp_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return map_completed_ride(row)
+
 # =====================================================================
 # REST Endpoints: Student Ride Requests (Throw / Post Request & Accept)
 # =====================================================================
