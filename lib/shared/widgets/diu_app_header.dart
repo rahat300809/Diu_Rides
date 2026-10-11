@@ -1,0 +1,259 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:diu_ride/core/constants/app_colors.dart';
+import 'package:diu_ride/core/theme/app_typography.dart';
+import 'package:diu_ride/features/notifications/presentation/providers/notifications_provider.dart';
+import 'package:diu_ride/features/chat/presentation/screens/campus_messages_screen.dart';
+
+class DiuAppHeader extends ConsumerWidget implements PreferredSizeWidget {
+  final String title;
+  final bool showBackButton;
+  final VoidCallback? onProfileTap;
+  final VoidCallback? onNotificationsTap;
+
+  const DiuAppHeader({
+    super.key,
+    required this.title,
+    this.showBackButton = false,
+    this.onProfileTap,
+    this.onNotificationsTap,
+  });
+
+  @override
+  Size get preferredSize => const Size.fromHeight(66);
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
+    final hasPendingRequests =
+        ref.watch(pendingRideRequestsProvider).isNotEmpty;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface.withOpacity(0.97),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0C000000),
+            blurRadius: 10,
+            offset: Offset(0, 1),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Left: Logo + Title
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (showBackButton)
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, color: AppColors.onSurface),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      onPressed: () => Navigator.of(context).pop(),
+                    )
+                  else ...[
+                    SvgPicture.asset(
+                      'assets/svg/diu_ride_logo.svg',
+                      height: 28,
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'DIU Ride',
+                        style: AppTypography.labelSm.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                        ),
+                      ),
+                      Text(
+                        title,
+                        style: AppTypography.headlineSm.copyWith(
+                          color: AppColors.onSurface,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 17,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+              // Right: Verified badge + Notification bell + Profile avatar
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // DIU Verified badge
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryFixed.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.verified,
+                          size: 13,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'DIU Verified',
+                          style: AppTypography.labelSm.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Notification Bell with animated badge
+                  GestureDetector(
+                    onTap: onNotificationsTap,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: hasPendingRequests
+                                ? const Color(0xFFFF9800).withOpacity(0.15)
+                                : AppColors.surfaceContainerLow,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            hasPendingRequests
+                                ? Icons.notifications_active
+                                : (unreadCount > 0
+                                    ? Icons.notifications
+                                    : Icons.notifications_none_outlined),
+                            size: 20,
+                            color: hasPendingRequests
+                                ? const Color(0xFFE65100)
+                                : (unreadCount > 0
+                                    ? AppColors.primary
+                                    : AppColors.onSurfaceVariant),
+                          ),
+                        ),
+                        if (unreadCount > 0)
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(3),
+                              constraints: const BoxConstraints(
+                                  minWidth: 16, minHeight: 16),
+                              decoration: BoxDecoration(
+                                color: hasPendingRequests
+                                    ? const Color(0xFFE65100)
+                                    : AppColors.error,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: AppColors.surface, width: 1.5),
+                              ),
+                              child: Text(
+                                unreadCount > 9 ? '9+' : '$unreadCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Campus Messages Button
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => CampusMessagesScreen(
+                            onExploreRides: () => Navigator.of(context).pop(),
+                          ),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: const BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.chat_bubble_outline,
+                        size: 19,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Avatar with live indicator
+                  GestureDetector(
+                    onTap: onProfileTap,
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border:
+                                Border.all(color: AppColors.surface, width: 2),
+                            color: AppColors.primaryContainer,
+                          ),
+                          child: const Center(
+                            child:
+                                Icon(Icons.person, color: Colors.white, size: 20),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 9,
+                            height: 9,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

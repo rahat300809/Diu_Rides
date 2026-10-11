@@ -1,0 +1,65 @@
+import 'package:flutter/foundation.dart';
+
+enum Environment { development, staging, production }
+
+class AppConfig {
+  final Environment environment;
+  final String apiBaseUrl;
+  final String wsBaseUrl;
+  final String googleMapsApiKey;
+  final bool useMockData;
+
+  const AppConfig({
+    required this.environment,
+    required this.apiBaseUrl,
+    required this.wsBaseUrl,
+    required this.googleMapsApiKey,
+    this.useMockData = false,
+  });
+
+  static late AppConfig current;
+
+  static void initialize({
+    Environment environment = Environment.production,
+    String? apiBaseUrl,
+    String? wsBaseUrl,
+    String? googleMapsApiKey,
+    bool useMockData = false,
+  }) {
+    current = AppConfig(
+      environment: environment,
+      apiBaseUrl: apiBaseUrl ?? defaultApiUrl,
+      wsBaseUrl: wsBaseUrl ?? defaultWsUrl,
+      googleMapsApiKey: googleMapsApiKey ?? 'AIzaSyDIU_CAMPUS_MAPS_KEY',
+      useMockData: useMockData,
+    );
+  }
+
+  static String get defaultApiUrl {
+    if (kIsWeb) {
+      final origin = Uri.base.origin;
+      return '$origin/ride/api';
+    }
+    // Mobile points directly to server on port 8080 or public domain
+    return 'http://192.168.0.114:8080/ride/api';
+  }
+
+  static String get fallbackApiUrl {
+    return 'https://servertest.eu.cc/ride/api';
+  }
+
+  static String get defaultWsUrl {
+    if (kIsWeb) {
+      final host = Uri.base.host;
+      final portStr = Uri.base.hasPort ? ':${Uri.base.port}' : '';
+      final isSecure = Uri.base.scheme == 'https';
+      final scheme = isSecure ? 'wss://' : 'ws://';
+      return '$scheme$host$portStr/ride/ws';
+    }
+    return 'ws://192.168.0.114:8080/ride/ws';
+  }
+
+  static String get fallbackWsUrl {
+    return 'wss://servertest.eu.cc/ride/ws';
+  }
+}
