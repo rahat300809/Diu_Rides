@@ -7,6 +7,7 @@ import 'package:diu_ride/core/config/app_config.dart';
 import 'package:diu_ride/core/storage/preferences_service.dart';
 import 'package:diu_ride/core/utils/h3_utils.dart';
 import 'package:diu_ride/features/rides/data/models/ride_model.dart';
+import 'package:diu_ride/features/rides/data/models/passenger_request_model.dart';
 import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
 import 'package:diu_ride/features/rides/data/repositories/rides_repository.dart';
 import 'package:diu_ride/features/rides/data/repositories/mock_rides_repository.dart';
@@ -325,5 +326,112 @@ class SharedSyncRidesRepository implements RidesRepository {
         await _dio.patch('$_apiBase/rides', data: {'id': rideId, 'availableSeats': newSeats});
       }
     } catch (_) {}
+  }
+
+  @override
+  Future<List<PassengerRequestModel>> getPassengerRequests() async {
+    try {
+      final res = await _dio.get('$_apiBase/passenger-requests');
+      if (res.data is List) {
+        return (res.data as List)
+            .map((e) => PassengerRequestModel.fromJson(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  @override
+  Future<PassengerRequestModel> createPassengerRequest({
+    required String passengerId,
+    required String passengerName,
+    required String passengerPhone,
+    required String pickup,
+    required String dropoff,
+    required String requestedTime,
+    double proposedFare = 50.0,
+    String notes = '',
+  }) async {
+    try {
+      final res = await _dio.post('$_apiBase/passenger-requests', data: {
+        'passengerId': passengerId,
+        'passengerName': passengerName,
+        'passengerPhone': passengerPhone,
+        'pickup': pickup,
+        'dropoff': dropoff,
+        'requestedTime': requestedTime,
+        'proposedFare': proposedFare,
+        'notes': notes,
+      });
+      return PassengerRequestModel.fromJson(Map<String, dynamic>.from(res.data));
+    } catch (_) {
+      return PassengerRequestModel(
+        id: 'preq_${DateTime.now().millisecondsSinceEpoch}',
+        passengerId: passengerId,
+        passengerName: passengerName,
+        passengerPhone: passengerPhone,
+        pickup: pickup,
+        dropoff: dropoff,
+        requestedTime: requestedTime,
+        proposedFare: proposedFare,
+        notes: notes,
+        createdAt: DateTime.now().toIso8601String(),
+      );
+    }
+  }
+
+  @override
+  Future<bool> acceptPassengerRequest({
+    required String requestId,
+    required String driverId,
+    required String driverName,
+    required String driverPhone,
+    required String driverBike,
+  }) async {
+    try {
+      final res = await _dio.post('$_apiBase/passenger-requests/$requestId/accept', data: {
+        'driverId': driverId,
+        'driverName': driverName,
+        'driverPhone': driverPhone,
+        'driverBike': driverBike,
+      });
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getCompletedRides({String? userId}) async {
+    try {
+      final url = userId != null
+          ? '$_apiBase/completed-rides?user_id=$userId'
+          : '$_apiBase/completed-rides';
+      final res = await _dio.get(url);
+      if (res.data is List) {
+        return List<Map<String, dynamic>>.from(res.data);
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  @override
+  Future<bool> triggerAlertRing({
+    required String targetUserId,
+    required String senderName,
+    required String rideId,
+    String? message,
+  }) async {
+    try {
+      final res = await _dio.post('$_apiBase/alert-ring', data: {
+        'targetUserId': targetUserId,
+        'senderName': senderName,
+        'rideId': rideId,
+        'message': message ?? '🔔 Alert: Please check your phone!',
+      });
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 }

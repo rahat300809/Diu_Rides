@@ -85,9 +85,67 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
                 ),
               ),
 
-              // 2. Official Campus Support Desk Tile
+              // 2. DIU Campus Rider Community Public Room (All Bikers & Commuters)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF007AFF), Color(0xFF0051B3)],
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF007AFF).withOpacity(0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: ListTile(
+                    leading: const CircleAvatar(
+                      backgroundColor: Colors.white,
+                      child: Icon(Icons.forum, color: Color(0xFF007AFF), size: 22),
+                    ),
+                    title: const Row(
+                      children: [
+                        Text('DIU Rider Community', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                        SizedBox(width: 6),
+                        Icon(Icons.stars, size: 16, color: Colors.amber),
+                      ],
+                    ),
+                    subtitle: const Text(
+                      'All Bikers & Commuters • Post ride asks & live updates',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text('Open Room', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ChatScreen(
+                            rideId: 'campus_community',
+                            driverName: 'DIU Rider Community',
+                            vehicleModel: 'All Bikers & Commuters',
+                            peerPhone: 'Public Campus Channel',
+                            peerRole: 'Community Group',
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              // 3. Official Campus Support Desk Tile
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Container(
                   decoration: BoxDecoration(
                     color: AppColors.surfaceContainerLowest,
@@ -235,6 +293,53 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
     );
   }
 
+  void _ringPeer(BuildContext context, String peerName, String rideId) async {
+    final currentUser = ref.read(authNotifierProvider).user?.name ?? 'Fellow Student';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF9500).withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.notifications_active, color: Color(0xFFFF9500), size: 30),
+            ),
+            const SizedBox(height: 12),
+            Text('Alert Ringing $peerName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 8),
+            Text(
+              'Sending urgent alert buzzer to $peerName\'s phone. Their device will vibrate and alert them immediately.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    try {
+      await ref.read(ridesRepositoryProvider).triggerAlertRing(
+        targetUserId: peerName,
+        senderName: currentUser,
+        rideId: rideId,
+        message: '🚨 Urgent: $currentUser is ringing you for pickup!',
+      );
+    } catch (_) {}
+  }
+
   Widget _buildPassengerConversationTile(BookingModel booking, RideModel ride) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -358,6 +463,16 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: () => _ringPeer(context, ride.driverName, booking.rideId),
+                icon: const Icon(Icons.notifications_active, color: Color(0xFFFF9500), size: 20),
+                tooltip: 'Alert Ring Driver (জরুরি রিং)',
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFF3E0),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
             ],
@@ -550,6 +665,61 @@ class _DriverRideConversationsSection extends ConsumerWidget {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        onPressed: () async {
+                          final currentUser = ref.read(authNotifierProvider).user?.name ?? 'Rider';
+                          showDialog(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              content: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 56,
+                                    height: 56,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFF9500).withOpacity(0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.notifications_active, color: Color(0xFFFF9500), size: 30),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text('Alert Ringing ${booking.passengerName}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Sending urgent alert buzzer to ${booking.passengerName}\'s phone for immediate pickup.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                  ),
+                                ],
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx),
+                                  child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          try {
+                            await ref.read(ridesRepositoryProvider).triggerAlertRing(
+                              targetUserId: booking.passengerName,
+                              senderName: currentUser,
+                              rideId: ride.id,
+                              message: '🚨 Urgent: Rider $currentUser is buzzing you for pickup!',
+                            );
+                          } catch (_) {}
+                        },
+                        icon: const Icon(Icons.notifications_active, color: Color(0xFFFF9500), size: 20),
+                        tooltip: 'Alert Ring Passenger (জরুরি রিং)',
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFFFFF3E0),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     ],

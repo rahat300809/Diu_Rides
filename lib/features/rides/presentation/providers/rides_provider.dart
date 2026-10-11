@@ -142,3 +142,13 @@ final searchRidesResultsProvider = FutureProvider<List<RideModel>>((ref) async {
     sortByLowestPrice: filter.sortByLowestPrice,
   );
 });
+
+final passengerRequestsProvider = FutureProvider<List<dynamic>>((ref) async {
+  final repo = ref.watch(ridesRepositoryProvider);
+  return repo.getPassengerRequests();
+});
+
+final completedRidesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final repo = ref.watch(ridesRepositoryProvider);
+  return repo.getCompletedRides();
+});

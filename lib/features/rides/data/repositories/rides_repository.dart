@@ -61,4 +61,30 @@ abstract class RidesRepository {
   });
 
   Future<void> updateRideSeats(String rideId, int seatsToDeduct);
+
+  Future<List<dynamic>> getPassengerRequests();
+  Future<dynamic> createPassengerRequest({
+    required String passengerId,
+    required String passengerName,
+    required String passengerPhone,
+    required String pickup,
+    required String dropoff,
+    required String requestedTime,
+    double proposedFare = 50.0,
+    String notes = '',
+  });
+  Future<bool> acceptPassengerRequest({
+    required String requestId,
+    required String driverId,
+    required String driverName,
+    required String driverPhone,
+    required String driverBike,
+  });
+  Future<List<Map<String, dynamic>>> getCompletedRides({String? userId});
+  Future<bool> triggerAlertRing({
+    required String targetUserId,
+    required String senderName,
+    required String rideId,
+    String? message,
+  });
 }

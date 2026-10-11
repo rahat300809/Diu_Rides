@@ -439,4 +439,57 @@ class MockRidesRepository implements RidesRepository {
       );
     }
   }
+
+  final List<dynamic> _passengerRequests = [];
+
+  @override
+  Future<List<dynamic>> getPassengerRequests() async => _passengerRequests;
+
+  @override
+  Future<dynamic> createPassengerRequest({
+    required String passengerId,
+    required String passengerName,
+    required String passengerPhone,
+    required String pickup,
+    required String dropoff,
+    required String requestedTime,
+    double proposedFare = 50.0,
+    String notes = '',
+  }) async {
+    final req = {
+      'id': 'preq_${DateTime.now().millisecondsSinceEpoch}',
+      'passengerId': passengerId,
+      'passengerName': passengerName,
+      'passengerPhone': passengerPhone,
+      'pickup': pickup,
+      'dropoff': dropoff,
+      'requestedTime': requestedTime,
+      'proposedFare': proposedFare,
+      'notes': notes,
+      'status': 'open',
+      'createdAt': DateTime.now().toIso8601String(),
+    };
+    _passengerRequests.add(req);
+    return req;
+  }
+
+  @override
+  Future<bool> acceptPassengerRequest({
+    required String requestId,
+    required String driverId,
+    required String driverName,
+    required String driverPhone,
+    required String driverBike,
+  }) async => true;
+
+  @override
+  Future<List<Map<String, dynamic>>> getCompletedRides({String? userId}) async => [];
+
+  @override
+  Future<bool> triggerAlertRing({
+    required String targetUserId,
+    required String senderName,
+    required String rideId,
+    String? message,
+  }) async => true;
 }

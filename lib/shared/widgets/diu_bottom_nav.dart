@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
-import 'package:diu_ride/features/notifications/presentation/providers/notifications_provider.dart';
 
 class DiuBottomNav extends ConsumerWidget {
   final int currentIndex;
@@ -18,9 +17,6 @@ class DiuBottomNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final unreadNotifications = ref.watch(unreadNotificationCountProvider);
-    final hasPendingRequests = ref.watch(pendingRideRequestsProvider).isNotEmpty;
-
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface.withOpacity(0.97),
@@ -47,29 +43,25 @@ class DiuBottomNav extends ConsumerWidget {
                 label: 'Home',
               ),
 
-              // 1. Find Ride
+              // 1. All Shared Rides
               _buildNavItem(
                 index: 1,
-                icon: Icons.search_outlined,
-                activeIcon: Icons.search,
-                label: 'Find Ride',
+                icon: Icons.two_wheeler_outlined,
+                activeIcon: Icons.two_wheeler,
+                label: 'All Rides',
               ),
 
               // 2. Offer Ride (Center Elevated Action)
               _buildCenterAction(),
 
-              // 3. Notifications with badge
+              // 3. Community SMS & Messages
               _buildNavItemWithBadge(
                 index: 3,
-                icon: hasPendingRequests
-                    ? Icons.notifications_active
-                    : Icons.notifications_none_outlined,
-                activeIcon: Icons.notifications,
-                label: 'Alerts',
-                badgeCount: unreadNotifications,
-                badgeColor: hasPendingRequests
-                    ? const Color(0xFFE65100)
-                    : AppColors.error,
+                icon: Icons.chat_bubble_outline,
+                activeIcon: Icons.chat_bubble,
+                label: 'Messages',
+                badgeCount: unreadChats,
+                badgeColor: const Color(0xFF007AFF),
               ),
 
               // 4. Profile

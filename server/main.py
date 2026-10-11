@@ -216,6 +216,50 @@ def init_db():
     );
     """)
 
+    # 8. Student Ride Requests
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS passenger_requests (
+        id TEXT PRIMARY KEY,
+        passenger_id TEXT NOT NULL,
+        passenger_name TEXT NOT NULL,
+        passenger_phone TEXT,
+        passenger_dept TEXT DEFAULT 'CSE',
+        pickup TEXT NOT NULL,
+        dropoff TEXT NOT NULL,
+        requested_time TEXT NOT NULL,
+        proposed_fare REAL DEFAULT 50.0,
+        notes TEXT,
+        status TEXT DEFAULT 'open',
+        accepted_by_driver_id TEXT,
+        accepted_by_driver_name TEXT,
+        accepted_by_driver_phone TEXT,
+        accepted_by_driver_bike TEXT,
+        created_at TEXT NOT NULL
+    );
+    """)
+
+    # 9. Completed Rides Historical Log
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS completed_rides (
+        id TEXT PRIMARY KEY,
+        ride_id TEXT NOT NULL,
+        driver_id TEXT NOT NULL,
+        driver_name TEXT NOT NULL,
+        passenger_id TEXT,
+        passenger_name TEXT,
+        origin_name TEXT NOT NULL,
+        destination_name TEXT NOT NULL,
+        start_time TEXT,
+        completed_time TEXT NOT NULL,
+        fare REAL NOT NULL,
+        start_maps_link TEXT,
+        end_maps_link TEXT,
+        rating REAL DEFAULT 5.0,
+        feedback TEXT,
+        created_at TEXT NOT NULL
+    );
+    """)
+
     # Seed Default Student Account if none exists
     cursor.execute("SELECT COUNT(*) FROM users")
     if cursor.fetchone()[0] == 0:
@@ -427,6 +471,46 @@ def map_message(row) -> Dict[str, Any]:
         "isLocationShare": bool(row["is_location_share"]),
         "sharedLat": row["shared_lat"],
         "sharedLng": row["shared_lng"],
+    }
+
+def map_passenger_request(row) -> Dict[str, Any]:
+    return {
+        "id": row["id"],
+        "passengerId": row["passenger_id"],
+        "passengerName": row["passenger_name"],
+        "passengerPhone": row["passenger_phone"] or "",
+        "passengerDept": row["passenger_dept"] or "DIU Student",
+        "pickup": row["pickup"],
+        "dropoff": row["dropoff"],
+        "requestedTime": row["requested_time"],
+        "proposedFare": float(row["proposed_fare"] or 50.0),
+        "notes": row["notes"] or "",
+        "status": row["status"],
+        "acceptedByDriverId": row["accepted_by_driver_id"],
+        "acceptedByDriverName": row["accepted_by_driver_name"],
+        "acceptedByDriverPhone": row["accepted_by_driver_phone"],
+        "acceptedByDriverBike": row["accepted_by_driver_bike"],
+        "createdAt": row["created_at"],
+    }
+
+def map_completed_ride(row) -> Dict[str, Any]:
+    return {
+        "id": row["id"],
+        "rideId": row["ride_id"],
+        "driverId": row["driver_id"],
+        "driverName": row["driver_name"],
+        "passengerId": row["passenger_id"] or "",
+        "passengerName": row["passenger_name"] or "",
+        "originName": row["origin_name"],
+        "destinationName": row["destination_name"],
+        "startTime": row["start_time"],
+        "completedTime": row["completed_time"],
+        "fare": float(row["fare"]),
+        "startMapsLink": row["start_maps_link"],
+        "endMapsLink": row["end_maps_link"],
+        "rating": float(row["rating"] or 5.0),
+        "feedback": row["feedback"] or "",
+        "createdAt": row["created_at"],
     }
 
 # =====================================================================
@@ -911,6 +995,29 @@ async def complete_ride(ride_id: str, payload: Optional[Dict[str, Any]] = None):
     conn.commit()
     cursor.execute("SELECT * FROM rides WHERE id = ?", (ride_id,))
     row = cursor.fetchone()
+
+    if row:
+        # Save into completed_rides historical table
+        comp_id = f"comp_{ride_id}_{int(datetime.utcnow().timestamp())}"
+        cursor.execute("SELECT passenger_id, passenger_name FROM bookings WHERE ride_id = ? AND status = 'accepted' LIMIT 1", (ride_id,))
+        b_row = cursor.fetchone()
+        p_id = b_row["passenger_id"] if b_row else ""
+        p_name = b_row["passenger_name"] if b_row else ""
+
+        cursor.execute("""
+        INSERT OR REPLACE INTO completed_rides (
+            id, ride_id, driver_id, driver_name, passenger_id, passenger_name,
+            origin_name, destination_name, start_time, completed_time, fare,
+            start_maps_link, end_maps_link, rating, created_at
+        ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            comp_id, ride_id, row["driver_id"], row["driver_name"], p_id, p_name,
+            row["origin_name"], row["destination_name"], row["start_time"], now,
+            float(row["fare_per_seat"]), row["start_maps_link"], row["end_maps_link"],
+            5.0, now
+        ))
+        conn.commit()
+
     conn.close()
     if row:
         updated = map_ride(row)
@@ -933,6 +1040,134 @@ async def cancel_ride(ride_id: str):
         await manager.broadcast("ride_updated", updated)
         return updated
     raise HTTPException(status_code=404, detail="Ride not found")
+
+@app.get("/ride/api/completed-rides")
+@app.get("/api/completed-rides")
+def get_completed_rides(user_id: Optional[str] = None):
+    conn = get_db()
+    cursor = conn.cursor()
+    if user_id:
+        cursor.execute("""
+            SELECT * FROM completed_rides 
+            WHERE driver_id = ? OR passenger_id = ? 
+            ORDER BY completed_time DESC
+        """, (user_id, user_id))
+    else:
+        cursor.execute("SELECT * FROM completed_rides ORDER BY completed_time DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [map_completed_ride(r) for r in rows]
+
+# =====================================================================
+# REST Endpoints: Student Ride Requests (Throw / Post Request & Accept)
+# =====================================================================
+
+class PassengerRequestPayload(BaseModel):
+    passengerId: str
+    passengerName: str
+    passengerPhone: Optional[str] = ""
+    passengerDept: Optional[str] = "CSE"
+    pickup: str
+    dropoff: str
+    requestedTime: str
+    proposedFare: Optional[float] = 50.0
+    notes: Optional[str] = ""
+
+@app.get("/ride/api/passenger-requests")
+@app.get("/api/passenger-requests")
+def get_passenger_requests(status: Optional[str] = "open"):
+    conn = get_db()
+    cursor = conn.cursor()
+    if status:
+        cursor.execute("SELECT * FROM passenger_requests WHERE status = ? ORDER BY created_at DESC", (status,))
+    else:
+        cursor.execute("SELECT * FROM passenger_requests ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [map_passenger_request(r) for r in rows]
+
+@app.post("/ride/api/passenger-requests")
+@app.post("/api/passenger-requests")
+async def create_passenger_request(payload: PassengerRequestPayload):
+    req_id = f"preq_{int(datetime.utcnow().timestamp()*1000)}"
+    now = datetime.utcnow().isoformat()
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT INTO passenger_requests (
+        id, passenger_id, passenger_name, passenger_phone, passenger_dept,
+        pickup, dropoff, requested_time, proposed_fare, notes, status, created_at
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,'open',?)
+    """, (
+        req_id, payload.passengerId, payload.passengerName, payload.passengerPhone,
+        payload.passengerDept, payload.pickup, payload.dropoff, payload.requestedTime,
+        payload.proposedFare, payload.notes, now
+    ))
+    conn.commit()
+    cursor.execute("SELECT * FROM passenger_requests WHERE id = ?", (req_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    created = map_passenger_request(row)
+    await manager.broadcast("new_passenger_request", created)
+    return created
+
+@app.post("/ride/api/passenger-requests/{request_id}/accept")
+@app.post("/api/passenger-requests/{request_id}/accept")
+async def accept_passenger_request(request_id: str, payload: Dict[str, Any]):
+    driver_id = payload.get("driverId", "drv_usr")
+    driver_name = payload.get("driverName", "DIU Rider")
+    driver_phone = payload.get("driverPhone", "01712345678")
+    driver_bike = payload.get("driverBike", "Yamaha FZ-S")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+    UPDATE passenger_requests SET 
+        status = 'accepted',
+        accepted_by_driver_id = ?,
+        accepted_by_driver_name = ?,
+        accepted_by_driver_phone = ?,
+        accepted_by_driver_bike = ?
+    WHERE id = ?
+    """, (driver_id, driver_name, driver_phone, driver_bike, request_id))
+    conn.commit()
+
+    cursor.execute("SELECT * FROM passenger_requests WHERE id = ?", (request_id,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    updated = map_passenger_request(row)
+    # Broadcast acceptance to passenger and all clients!
+    await manager.broadcast("passenger_request_accepted", updated)
+    return updated
+
+# =====================================================================
+# REST Endpoints: Alert Ring / Sound Trigger
+# =====================================================================
+
+@app.post("/ride/api/alert-ring")
+@app.post("/api/alert-ring")
+async def trigger_alert_ring(payload: Dict[str, Any]):
+    sender_name = payload.get("senderName", "Rider")
+    target_user_id = payload.get("targetUserId", "")
+    ride_id = payload.get("rideId", "")
+    message = payload.get("message", f"🔔 Alert from {sender_name}: Please check your phone!")
+    now = datetime.utcnow().isoformat()
+
+    event_data = {
+        "event": "alert_ring",
+        "senderName": sender_name,
+        "targetUserId": target_user_id,
+        "rideId": ride_id,
+        "message": message,
+        "timestamp": now,
+    }
+    await manager.broadcast("alert_ring", event_data)
+    return {"status": "sent", "data": event_data}
 
 # =====================================================================
 # REST Endpoints: Bookings

@@ -4,7 +4,9 @@ import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
 import 'package:diu_ride/core/utils/date_time_utils.dart';
 import 'package:diu_ride/core/utils/gps_location_service.dart';
+import 'package:diu_ride/features/auth/presentation/providers/auth_provider.dart';
 import 'package:diu_ride/features/chat/presentation/providers/chat_provider.dart';
+import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 import 'package:diu_ride/features/safety/presentation/widgets/campus_voice_call_dialog.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -34,6 +36,65 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+
+  Future<void> _triggerAlertRing() async {
+    final user = ref.read(authNotifierProvider).user;
+    final senderName = user?.name ?? 'Commuter';
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9500).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.notifications_active, color: Color(0xFFFF9500), size: 32),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Ringing ${widget.displayName}!',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'High-priority alert buzzer dispatched to their phone. They will receive an immediate pickup notification.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    try {
+      await ref.read(ridesRepositoryProvider).triggerAlertRing(
+        targetUserId: widget.displayName,
+        senderName: senderName,
+        rideId: widget.rideId,
+        message: '🚨 Urgent: $senderName is ringing you for pickup!',
+      );
+    } catch (_) {}
+
+    ref.read(chatNotifierProvider(widget.rideId).notifier).sendMessage(
+      '🚨 [Alert Ring] Sent urgent attention buzz to ${widget.displayName}',
+    );
+    _scrollToBottom();
+  }
 
   @override
   void dispose() {
@@ -122,6 +183,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_active, color: Color(0xFFFF9500)),
+            tooltip: 'Alert Ring (রিং বাজান)',
+            onPressed: _triggerAlertRing,
+          ),
           IconButton(
             icon: const Icon(Icons.call, color: AppColors.primary),
             tooltip: 'Campus Voice Call',

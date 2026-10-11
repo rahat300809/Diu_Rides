@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
-// Chat accessible from Profile or via deep link
+import 'package:diu_ride/features/chat/presentation/screens/campus_messages_screen.dart';
 import 'package:diu_ride/features/home/presentation/screens/home_screen.dart';
 import 'package:diu_ride/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:diu_ride/features/profile/presentation/screens/profile_screen.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
+import 'package:diu_ride/features/rides/presentation/screens/all_shared_rides_screen.dart';
 import 'package:diu_ride/features/rides/presentation/screens/offer_ride_screen.dart';
-import 'package:diu_ride/features/rides/presentation/screens/search_rides_screen.dart';
 import 'package:diu_ride/shared/widgets/diu_app_header.dart';
 import 'package:diu_ride/shared/widgets/diu_bottom_nav.dart';
 
@@ -24,19 +24,16 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
 
   // Tab index mapping:
   // 0 → Home
-  // 1 → Find Ride (Search)
-  // 2 → Offer Ride (Create)
-  // 3 → Notifications / Alerts  ← NEW (was Chats)
+  // 1 → All Shared Rides (Location filters, price sort, card details)
+  // 2 → Offer Ride (Create bike ride)
+  // 3 → Campus SMS & Community Messages
   // 4 → Profile
-
-  // Note: Chats is accessed from the profile or home, or can be moved back if needed.
-  // The notifications tab replaces Chats in the primary nav since it's mission-critical.
 
   final List<String> _titles = [
     'Home',
-    'Find Ride',
+    'All Shared Rides',
     'Offer Ride',
-    'Notifications',
+    'Campus Messages',
     'Profile',
   ];
 
@@ -49,7 +46,7 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     // Screens that render their own AppBar (no DiuAppHeader needed)
-    final noHeaderTabs = {4}; // Profile has its own header
+    final noHeaderTabs = {1, 3, 4}; // All Rides, Messages, and Profile have their own headers
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -58,7 +55,11 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
           : DiuAppHeader(
               title: _titles[_currentTab],
               onProfileTap: () => _onTabSelected(4),
-              onNotificationsTap: () => _onTabSelected(3),
+              onNotificationsTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                );
+              },
             ),
       body: IndexedStack(
         index: _currentTab,
@@ -71,18 +72,20 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             },
           ),
 
-          // 1. Search / Find Ride Screen
-          const SearchRidesScreen(),
+          // 1. All Shared Rides Screen
+          const AllSharedRidesScreen(),
 
           // 2. Offer / Create Ride Screen
           OfferRideScreen(
             onRidePublished: () {
-              _onTabSelected(0); // Jump back to home after publishing
+              _onTabSelected(1); // Jump to All Rides after publishing
             },
           ),
 
-          // 3. Notifications / Alerts Screen (was Chats — now mission-critical alerts)
-          const NotificationsScreen(),
+          // 3. Campus SMS & Direct Messages
+          CampusMessagesScreen(
+            onExploreRides: () => _onTabSelected(1),
+          ),
 
           // 4. Student Profile
           const ProfileScreen(),
