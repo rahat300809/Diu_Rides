@@ -1622,20 +1622,61 @@ async def websocket_endpoint(websocket: WebSocket):
 # Static Web App Hosting for Flutter Web
 # =====================================================================
 
-web_dir = os.path.join(os.path.dirname(__file__), "..", "web_build")
+# Check server/web_build first (deployed bundle), then fallback to parent web_build
+web_dir = os.path.join(os.path.dirname(__file__), "web_build")
 if not os.path.exists(web_dir):
-    web_dir = os.path.join(os.path.dirname(__file__), "web_build")
+    web_dir = os.path.join(os.path.dirname(__file__), "..", "web_build")
 
-if os.path.exists(web_dir):
-    app.mount("/ride", StaticFiles(directory=web_dir, html=True), name="ride_web")
+def _no_cache_response(file_path: str):
+    response = FileResponse(file_path)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+@app.get("/ride")
+@app.get("/ride/")
+def serve_ride_root():
+    if os.path.exists(web_dir):
+        index_file = os.path.join(web_dir, "index.html")
+        if os.path.isfile(index_file):
+            return _no_cache_response(index_file)
+    return JSONResponse({"status": "running", "service": "DIU Ride"})
+
+@app.get("/ride/flutter_bootstrap.js")
+def serve_bootstrap():
+    f = os.path.join(web_dir, "flutter_bootstrap.js")
+    if os.path.isfile(f):
+        return _no_cache_response(f)
+    raise HTTPException(status_code=404, detail="Not found")
+
+@app.get("/ride/flutter_service_worker.js")
+def serve_sw():
+    f = os.path.join(web_dir, "flutter_service_worker.js")
+    if os.path.isfile(f):
+        return _no_cache_response(f)
+    raise HTTPException(status_code=404, detail="Not found")
+
+@app.get("/ride/main.dart.js")
+def serve_main_dart():
+    f = os.path.join(web_dir, "main.dart.js")
+    if os.path.isfile(f):
+        return _no_cache_response(f)
+    raise HTTPException(status_code=404, detail="Not found")
 
 @app.get("/ride/{full_path:path}")
 def serve_spa(full_path: str):
     if os.path.exists(web_dir):
         file_path = os.path.join(web_dir, full_path)
         if os.path.isfile(file_path):
+            if full_path.endswith((".html", ".js", ".json")):
+                return _no_cache_response(file_path)
             return FileResponse(file_path)
         index_file = os.path.join(web_dir, "index.html")
         if os.path.isfile(index_file):
-            return FileResponse(index_file)
+            return _no_cache_response(index_file)
     return JSONResponse({"status": "running", "service": "DIU Ride", "path": full_path})
+
+if os.path.exists(web_dir):
+    app.mount("/ride", StaticFiles(directory=web_dir, html=True), name="ride_web")
+
