@@ -562,10 +562,29 @@ def auth_verify_email(req: Dict[str, Any]):
 
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("""
-        SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR student_id = ?
-    """, (email, student_id))
-    row = cursor.fetchone()
+    row = None
+
+    if email or student_id:
+        cursor.execute("""
+            SELECT * FROM users 
+            WHERE (LOWER(email) = LOWER(?) AND email != '') 
+               OR (student_id = ? AND student_id != '')
+            ORDER BY created_at DESC LIMIT 1
+        """, (email, student_id))
+        row = cursor.fetchone()
+
+    # Fallback: Look up user by unique generated OTP if email was omitted by client
+    if not row and otp:
+        cursor.execute("SELECT identifier FROM email_otps WHERE otp = ? ORDER BY created_at DESC LIMIT 1", (otp,))
+        otp_match = cursor.fetchone()
+        if otp_match:
+            ident = otp_match[0]
+            cursor.execute("SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR student_id = ? ORDER BY created_at DESC LIMIT 1", (ident, ident))
+            row = cursor.fetchone()
+
+    if not row and otp:
+        cursor.execute("SELECT * FROM users WHERE otp_code = ? ORDER BY created_at DESC LIMIT 1", (otp,))
+        row = cursor.fetchone()
 
     if not row:
         conn.close()
@@ -573,12 +592,13 @@ def auth_verify_email(req: Dict[str, Any]):
 
     stored_otp = row["otp_code"]
     cursor.execute("SELECT otp FROM email_otps WHERE identifier = ? OR identifier = ?", (row["email"], row["student_id"]))
-    otp_row = cursor.fetchone()
+    otp_rows = cursor.fetchall()
     valid_otps = {"123456"}
     if stored_otp:
         valid_otps.add(stored_otp)
-    if otp_row:
-        valid_otps.add(otp_row[0])
+    for r in otp_rows:
+        if r[0]:
+            valid_otps.add(str(r[0]).strip())
 
     if otp not in valid_otps:
         conn.close()

@@ -330,6 +330,7 @@ class MockAuthRepository implements AuthRepository {
       'phone': phone.trim(),
       'password': password,
     };
+    await preferences.savePendingRegistration(jsonEncode(_pendingRegistration));
 
     final randomCode = (100000 + Random().nextInt(900000)).toString();
     _activeRegistrationOtp = randomCode;
@@ -342,8 +343,17 @@ class MockAuthRepository implements AuthRepository {
   Future<UserModel> verifyAndCompleteRegistration({
     required String otp,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 400));
-    final pending = _pendingRegistration;
+    await Future.delayed(const Duration(milliseconds: 300));
+    var pending = _pendingRegistration;
+    if (pending == null) {
+      final saved = preferences.getPendingRegistration();
+      if (saved != null) {
+        try {
+          pending = jsonDecode(saved) as Map<String, dynamic>;
+          _pendingRegistration = pending;
+        } catch (_) {}
+      }
+    }
     if (pending == null) {
       throw Exception('No pending registration found. Please submit the registration form again.');
     }

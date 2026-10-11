@@ -226,14 +226,33 @@ class SharedSyncAuthRepository implements AuthRepository {
     required String phone,
     required String password,
   }) async {
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanId = studentId.trim();
+    final cleanName = name.trim();
+    final cleanPhone = phone.trim();
+
+    final pendingMap = {
+      'name': cleanName,
+      'studentId': cleanId,
+      'email': cleanEmail,
+      'phone': cleanPhone,
+      'password': password,
+    };
+    await preferences.savePendingRegistration(jsonEncode(pendingMap));
+
+    // Also prime fallback so it has pending data
     try {
-      final res = await _dio.post('$_apiBase/auth/register', data: {
-        'name': name.trim(),
-        'studentId': studentId.trim(),
-        'email': email.trim().toLowerCase(),
-        'phone': phone.trim(),
-        'password': password,
-      });
+      await _fallback.registerWithDiuEmail(
+        name: cleanName,
+        studentId: cleanId,
+        email: cleanEmail,
+        phone: cleanPhone,
+        password: password,
+      );
+    } catch (_) {}
+
+    try {
+      final res = await _dio.post('$_apiBase/auth/register', data: pendingMap);
       if (res.statusCode == 200 && res.data != null && res.data['otp'] != null) {
         return res.data['otp'].toString();
       }
@@ -242,10 +261,10 @@ class SharedSyncAuthRepository implements AuthRepository {
     }
 
     return await _fallback.registerWithDiuEmail(
-      name: name,
-      studentId: studentId,
-      email: email,
-      phone: phone,
+      name: cleanName,
+      studentId: cleanId,
+      email: cleanEmail,
+      phone: cleanPhone,
       password: password,
     );
   }
@@ -254,21 +273,50 @@ class SharedSyncAuthRepository implements AuthRepository {
   Future<UserModel> verifyAndCompleteRegistration({
     required String otp,
   }) async {
-    final pendingEmail = _fallback.pendingRegistrationEmail ?? '';
+    String pendingEmail = _fallback.pendingRegistrationEmail ?? '';
+    String pendingStudentId = '';
+
+    final savedPending = preferences.getPendingRegistration();
+    if (savedPending != null) {
+      try {
+        final decoded = jsonDecode(savedPending) as Map<String, dynamic>;
+        if (pendingEmail.isEmpty) {
+          pendingEmail = decoded['email'] as String? ?? '';
+        }
+        pendingStudentId = decoded['studentId'] as String? ?? '';
+        if (_fallback.pendingRegistrationEmail == null) {
+          try {
+            await _fallback.registerWithDiuEmail(
+              name: decoded['name'] as String? ?? 'DIU Student',
+              studentId: pendingStudentId,
+              email: pendingEmail,
+              phone: decoded['phone'] as String? ?? '01712345678',
+              password: decoded['password'] as String? ?? 'password123',
+            );
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
     try {
       final res = await _dio.post('$_apiBase/auth/verify-registration', data: {
         'email': pendingEmail,
-        'otp': otp,
+        'studentId': pendingStudentId,
+        'otp': otp.trim(),
       });
       if (res.statusCode == 200 && res.data != null && res.data['user'] != null) {
         final user = UserModel.fromJson(Map<String, dynamic>.from(res.data['user'] as Map));
         await _persistUser(user);
+        await preferences.clearPendingRegistration();
         return user;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Server verify note: $e');
+    }
 
     final user = await _fallback.verifyAndCompleteRegistration(otp: otp);
     await _persistUser(user);
+    await preferences.clearPendingRegistration();
     return user;
   }
 

@@ -296,7 +296,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<bool> verifyOtp(String otp) async {
     // If pending registration exists, delegate to verifyAndCompleteRegistration
-    if (state.pendingPassword != null) {
+    if (state.pendingPassword != null || state.isOtpSent || state.pendingEmail != null) {
       return await verifyAndCompleteRegistration(otp);
     }
 

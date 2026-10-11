@@ -33,6 +33,18 @@ class PreferencesService {
     return _prefs.getString('account_$studentId');
   }
 
+  Future<void> savePendingRegistration(String jsonStr) async {
+    await _prefs.setString('pending_registration_data', jsonStr);
+  }
+
+  String? getPendingRegistration() {
+    return _prefs.getString('pending_registration_data');
+  }
+
+  Future<void> clearPendingRegistration() async {
+    await _prefs.remove('pending_registration_data');
+  }
+
   // --- Account & Credential Management for ID / Password & Email Verification ---
 
   Future<void> saveStudentAccount({
