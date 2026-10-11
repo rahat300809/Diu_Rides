@@ -86,15 +86,15 @@ class DepartingRidesCarousel extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  const Icon(Icons.directions_car_outlined, size: 40, color: AppColors.primary),
+                  const Icon(Icons.two_wheeler, size: 40, color: Color(0xFF007AFF)),
                   const SizedBox(height: 8),
                   Text(
-                    'No Active Rides Departing Soon',
+                    'No Peer Motorbikes Departing Soon',
                     style: AppTypography.bodyLgMedium.copyWith(fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Be the first student to offer a ride or check Search for upcoming trips.',
+                    'Be the first student to offer a motorbike ride or check Search for upcoming trips.',
                     textAlign: TextAlign.center,
                     style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
                   ),

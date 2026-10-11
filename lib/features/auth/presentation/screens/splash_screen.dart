@@ -24,8 +24,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   void _checkAuth() async {
-    await ref.read(authNotifierProvider.notifier).checkSession();
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      await ref
+          .read(authNotifierProvider.notifier)
+          .checkSession()
+          .timeout(const Duration(milliseconds: 1200));
+    } catch (_) {}
     if (!mounted) return;
 
     final authState = ref.read(authNotifierProvider);
@@ -43,7 +47,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: Colors.white,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -62,7 +66,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Peer Carpool & Bike Share for DIU Students',
+              'Verified Student Motorbike Share • Bikes Only',
               style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
             ),
             const SizedBox(height: 36),

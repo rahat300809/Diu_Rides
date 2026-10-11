@@ -6,15 +6,12 @@ import 'package:diu_ride/features/booking/presentation/widgets/booking_confirmat
 import 'package:diu_ride/features/rides/data/models/ride_model.dart';
 import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
-import 'package:diu_ride/features/safety/presentation/widgets/campus_sos_dialog.dart';
 import 'package:diu_ride/features/home/presentation/widgets/apple_ios_destination_search.dart';
 import 'package:diu_ride/features/home/presentation/widgets/campus_category_grid.dart';
 import 'package:diu_ride/features/home/presentation/widgets/campus_security_strip.dart';
-import 'package:diu_ride/features/home/presentation/widgets/community_trust_sos_card.dart';
 import 'package:diu_ride/features/home/presentation/widgets/default_commute_address_card.dart';
 import 'package:diu_ride/features/home/presentation/widgets/departing_rides_carousel.dart';
 import 'package:diu_ride/features/home/presentation/widgets/destination_matching_bikes_view.dart';
-import 'package:diu_ride/features/webview/presentation/screens/campus_webview_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final Function(int tabIndex) onNavigateTab;
@@ -110,18 +107,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _showToast(
           'Moto Seat Requested!',
           'Booking sent to ${ride.driverName} • Fare: ৳${ride.farePerSeat.toInt()} (1 seat)',
-        );
-      },
-    );
-  }
-
-  void _triggerSos() {
-    CampusSosDialog.show(
-      context: context,
-      onConfirmed: () {
-        _showToast(
-          'Campus SOS Triggered',
-          'DIU Security informed of your live Ashulia coordinates.',
         );
       },
     );
@@ -342,107 +327,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
-              // 8. Community Trust & Campus SOS Card
-              CommunityTrustSosCard(
-                onTriggerSos: _triggerSos,
-                onCallControl: () {
-                  _showToast('Calling Control Desk', 'DIU DSC Security: Ext. 4410');
-                },
-              ),
-
-              // 9. Campus Web Portals (DIU Portal & Self-Hosted Web App)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.black.withOpacity(0.06)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF007AFF).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(Icons.language, size: 16, color: Color(0xFF007AFF)),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Campus Web & Online Portals',
-                            style: AppTypography.titleSm.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: const Color(0xFF1C1C1E),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const CampusWebViewScreen(
-                                      title: 'DIU Student Portal',
-                                      initialUrl: 'https://studentportal.diu.edu.bd',
-                                    ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.school, size: 16),
-                              label: const Text('DIU Portal', style: TextStyle(fontSize: 12)),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => const CampusWebViewScreen(
-                                      title: 'DIU Ride Web Portal',
-                                      initialUrl: 'https://servertest.eu.cc/ride/',
-                                    ),
-                                  ),
-                                );
-                              },
-                              icon: const Icon(Icons.public, size: 16),
-                              label: const Text('DIU Ride Web', style: TextStyle(fontSize: 12)),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF007AFF),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              const SizedBox(height: 16),
             ],
           ),
         ),

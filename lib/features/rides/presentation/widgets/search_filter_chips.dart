@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
-import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 
 class SearchFilterChips extends StatelessWidget {
@@ -51,23 +50,23 @@ class SearchFilterChips extends StatelessWidget {
           ),
           const SizedBox(width: 8),
 
-          // Bikes
+          // Bikes Only
           _buildChip(
-            label: 'Bikes',
+            label: 'Bikes Only',
             icon: Icons.two_wheeler,
-            iconColor: AppColors.primary,
-            isSelected: filterState.vehicleType == VehicleType.bike,
-            onTap: () => notifier.toggleVehicleType(VehicleType.bike),
+            iconColor: const Color(0xFF007AFF),
+            isSelected: true,
+            onTap: () {},
           ),
           const SizedBox(width: 8),
 
-          // Cars
+          // Helmet Ready
           _buildChip(
-            label: 'Cars',
-            icon: Icons.directions_car,
-            iconColor: AppColors.primary,
-            isSelected: filterState.vehicleType == VehicleType.car,
-            onTap: () => notifier.toggleVehicleType(VehicleType.car),
+            label: 'Helmet Ready',
+            icon: Icons.sports_motorsports,
+            iconColor: const Color(0xFF007AFF),
+            isSelected: true,
+            onTap: () {},
           ),
           const SizedBox(width: 8),
 

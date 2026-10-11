@@ -296,7 +296,7 @@ class _SearchRouteCardState extends State<SearchRouteCard> with SingleTickerProv
                   ),
                   const SizedBox(width: 8),
 
-                  // Seat Stepper Pill
+                  // Fixed 1 Moto Seat Pill
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -309,48 +309,28 @@ class _SearchRouteCardState extends State<SearchRouteCard> with SingleTickerProv
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.person, size: 18, color: AppColors.primary),
+                              const Icon(Icons.two_wheeler, size: 18, color: AppColors.primary),
                               const SizedBox(width: 6),
                               Text(
-                                '${widget.seats} Seat${widget.seats > 1 ? 's' : ''}',
-                                style: AppTypography.labelLg.copyWith(fontSize: 13),
+                                '1 Moto Seat',
+                                style: AppTypography.labelLg.copyWith(fontSize: 12.5, fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
-                          Row(
-                            children: [
-                              InkWell(
-                                onTap: widget.seats > 1
-                                    ? () => widget.onSeatsChanged(widget.seats - 1)
-                                    : null,
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  width: 26,
-                                  height: 26,
-                                  decoration: const BoxDecoration(
-                                    color: Colors.white,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.remove, size: 14),
-                                ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'Fixed',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
                               ),
-                              const SizedBox(width: 6),
-                              InkWell(
-                                onTap: widget.seats < 6
-                                    ? () => widget.onSeatsChanged(widget.seats + 1)
-                                    : null,
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  width: 26,
-                                  height: 26,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.primaryContainer,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(Icons.add, size: 14, color: Colors.white),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ],
                       ),

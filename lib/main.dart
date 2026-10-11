@@ -10,30 +10,42 @@ import 'package:diu_ride/features/auth/presentation/screens/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize App Configuration pointing to self-hosted API & WebSockets
-  AppConfig.initialize(
-    environment: Environment.production,
-    useMockData: false,
-  );
+  try {
+    // Initialize App Configuration pointing to self-hosted API & WebSockets
+    AppConfig.initialize(
+      environment: Environment.production,
+      useMockData: false,
+    );
+  } catch (e) {
+    debugPrint('AppConfig init error: $e');
+  }
 
-  // Initialize SharedPreferences (keeps login persistent until manual logout)
-  final preferencesService = await PreferencesService.init();
-  await preferencesService.seedDefaultAccounts();
+  PreferencesService? preferencesService;
+  try {
+    // Initialize SharedPreferences (keeps login persistent until manual logout)
+    preferencesService = await PreferencesService.init();
+    await preferencesService.seedDefaultAccounts();
+  } catch (e) {
+    debugPrint('PreferencesService init error: $e');
+  }
 
-  // Set transparent system navigation & status bars
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ),
-  );
+  try {
+    // Set transparent system navigation & status bars
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
+  } catch (_) {}
 
   runApp(
     ProviderScope(
       overrides: [
-        preferencesProvider.overrideWithValue(preferencesService),
+        if (preferencesService != null)
+          preferencesProvider.overrideWithValue(preferencesService),
       ],
       child: const DiuRideApp(),
     ),

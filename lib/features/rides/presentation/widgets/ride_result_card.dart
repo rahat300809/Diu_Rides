@@ -174,31 +174,20 @@ class RideResultCard extends StatelessWidget {
                       ),
                       Row(
                         children: [
-                          if (isBike) ...[
-                            const Icon(
-                              Icons.sports_motorsports,
-                              size: 14,
-                              color: AppColors.primary,
+                          const Icon(
+                            Icons.sports_motorsports,
+                            size: 14,
+                            color: Color(0xFF007AFF),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            ride.vehicle.hasPassengerHelmet ? 'Passenger Helmet Ready' : 'Motorbike Seat (1/1)',
+                            style: AppTypography.labelSm.copyWith(
+                              color: const Color(0xFF007AFF),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10.5,
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Passenger Helmet Ready',
-                              style: AppTypography.labelSm.copyWith(
-                                color: AppColors.primary,
-                                fontSize: 10.5,
-                              ),
-                            ),
-                          ] else ...[
-                            const Icon(Icons.ac_unit, size: 14, color: AppColors.secondary),
-                            const SizedBox(width: 4),
-                            Text(
-                              'AC Sedan Comfort',
-                              style: AppTypography.labelSm.copyWith(
-                                color: AppColors.secondary,
-                                fontSize: 10.5,
-                              ),
-                            ),
-                          ],
+                          ),
                         ],
                       ),
                     ],

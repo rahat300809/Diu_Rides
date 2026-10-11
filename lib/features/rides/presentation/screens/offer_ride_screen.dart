@@ -28,10 +28,22 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
   bool _isWaypointOpen = false;
   int _selectedDateIndex = 0; // 0: Today, 1: Tomorrow, 2: Custom
   TimeOfDay _departureTime = const TimeOfDay(hour: 16, minute: 30);
-  VehicleType _vehicleType = VehicleType.car;
-  int _seats = 3;
+  final VehicleType _vehicleType = VehicleType.bike; // Strictly motorbikes only
+  final int _seats = 1; // 1 passenger seat for bikes
+  String _bikeModel = 'Yamaha FZ-X';
+  bool _hasPassengerHelmet = true;
   bool _isFemaleOnly = false;
   bool _isPublishing = false;
+
+  final List<String> _availableBikes = [
+    'Yamaha FZ-X',
+    'Yamaha FZ-S V3',
+    'Honda CB Shine',
+    'Honda X-Blade',
+    'Suzuki Gixxer SF',
+    'Bajaj Pulsar NS160',
+    'TVS Apache RTR 4V',
+  ];
 
   @override
   void dispose() {
@@ -48,21 +60,6 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
     if (totalMinutes >= 1440) totalMinutes -= 1440;
     setState(() {
       _departureTime = TimeOfDay(hour: totalMinutes ~/ 60, minute: totalMinutes % 60);
-    });
-  }
-
-  void _adjustSeats(int delta) {
-    setState(() {
-      final maxSeats = _vehicleType == VehicleType.bike ? 1 : (_vehicleType == VehicleType.car ? 4 : 8);
-      _seats = (_seats + delta).clamp(1, maxSeats);
-    });
-  }
-
-  void _selectVehicle(VehicleType type, int defaultSeats, String defaultFare) {
-    setState(() {
-      _vehicleType = type;
-      _seats = defaultSeats;
-      _fareController.text = defaultFare;
     });
   }
 
@@ -83,16 +80,14 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
     final vehicle = VehicleModel(
       id: 'v_user_offered',
       type: _vehicleType,
-      modelName: _vehicleType == VehicleType.bike
-          ? 'Yamaha FZ-X'
-          : (_vehicleType == VehicleType.car ? 'Toyota Corolla Axio (AC)' : 'Toyota HiAce Microbus'),
-      color: 'Silver Metallic',
-      licensePlate: 'Dhaka Metro-GA 24-8891',
-      hasAc: _vehicleType != VehicleType.bike,
-      hasPassengerHelmet: _vehicleType == VehicleType.bike,
+      modelName: _bikeModel,
+      color: 'Matte Blue Metallic',
+      licensePlate: 'Dhaka Metro-HA 24-8891',
+      hasAc: false,
+      hasPassengerHelmet: _hasPassengerHelmet,
       isSmokeFree: true,
       hasPhoneCharger: true,
-      hasLuggageSpace: _vehicleType != VehicleType.bike,
+      hasLuggageSpace: false,
     );
 
     final now = DateTime.now();
@@ -216,65 +211,7 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                 'Share empty seats, offset fuel costs, and support your DIU peers traveling safely between campus and Dhaka.',
                 style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
               ),
-              const SizedBox(height: 16),
-
-              // Live Corridor Mini Map Banner
-              Container(
-                height: 100,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1E3A2F), Color(0xFF0F261E)],
-                  ),
-                ),
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppColors.tertiaryFixed,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Ashulia Highway Corridor Active',
-                          style: AppTypography.labelSm.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Campus to Dhaka Transit',
-                          style: AppTypography.labelSm.copyWith(color: AppColors.outlineVariant),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '18 Students looking for rides',
-                            style: AppTypography.labelSm.copyWith(color: Colors.white, fontSize: 10),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // STEP 1: ROUTE SETUP CARD
               _buildSectionCard(
@@ -455,70 +392,167 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
               ),
               const SizedBox(height: 16),
 
-              // STEP 3: VEHICLE & SEATS CARD
+              // STEP 3: MOTORBIKE & HELMET CARD
               _buildSectionCard(
                 stepNum: '3',
-                title: 'Vehicle & Seats',
-                extraTag: 'DIU Sticker Reg.',
+                title: 'Motorbike & Helmet',
+                extraTag: '1 Passenger Seat',
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 3 Vehicle Options
-                    Row(
-                      children: [
-                        _buildVehicleButton(
-                          type: VehicleType.bike,
-                          title: 'Motorbike',
-                          subtitle: '1 Helm. Seat',
-                          icon: Icons.two_wheeler,
-                          onTap: () => _selectVehicle(VehicleType.bike, 1, '40'),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildVehicleButton(
-                          type: VehicleType.car,
-                          title: 'Sedan Car',
-                          subtitle: '3-4 Seats (AC)',
-                          icon: Icons.directions_car,
-                          onTap: () => _selectVehicle(VehicleType.car, 3, '50'),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildVehicleButton(
-                          type: VehicleType.microbus,
-                          title: 'Microbus',
-                          subtitle: '6-7 Seats',
-                          icon: Icons.airport_shuttle,
-                          onTap: () => _selectVehicle(VehicleType.microbus, 6, '45'),
-                        ),
-                      ],
+                    // Motorbike Model Chips
+                    Text('Your Motorcycle Model', style: AppTypography.labelSm),
+                    const SizedBox(height: 8),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      child: Row(
+                        children: _availableBikes.map((bike) {
+                          final isSelected = _bikeModel == bike;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: InkWell(
+                              onTap: () => setState(() => _bikeModel = bike),
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? const Color(0xFF007AFF) : Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isSelected ? const Color(0xFF007AFF) : const Color(0xFFE5E5EA),
+                                    width: isSelected ? 1.5 : 1.0,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: isSelected
+                                          ? const Color(0xFF007AFF).withOpacity(0.2)
+                                          : Colors.black.withOpacity(0.03),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.two_wheeler,
+                                      size: 16,
+                                      color: isSelected ? Colors.white : const Color(0xFF1C1C1E),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      bike,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: isSelected ? Colors.white : const Color(0xFF1C1C1E),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
                     const SizedBox(height: 14),
 
-                    // Available Seats Counter
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Available Seats', style: AppTypography.bodyMdMedium),
-                            Text('Excluding driver seat', style: AppTypography.labelSm),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            _buildStepBtn(Icons.remove, () => _adjustSeats(-1)),
-                            const SizedBox(width: 14),
-                            Text(
-                              '$_seats',
-                              style: AppTypography.headlineSm.copyWith(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.bold,
+                    // Fixed Seat Capacity (1 Passenger Seat)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF2F2F7),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.person, size: 18, color: Color(0xFF007AFF)),
+                              ),
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '1 Passenger Seat Available',
+                                    style: AppTypography.bodyMdMedium.copyWith(fontWeight: FontWeight.w700),
+                                  ),
+                                  Text(
+                                    'Fixed standard motorcycle capacity',
+                                    style: AppTypography.labelSm.copyWith(color: const Color(0xFF8E8E93)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF007AFF).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              '1 Seat',
+                              style: TextStyle(
+                                color: Color(0xFF007AFF),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12,
                               ),
                             ),
-                            const SizedBox(width: 14),
-                            _buildStepBtn(Icons.add, () => _adjustSeats(1)),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Helmet Checkbox
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFE5E5EA)),
+                      ),
+                      child: Row(
+                        children: [
+                          Checkbox(
+                            value: _hasPassengerHelmet,
+                            activeColor: const Color(0xFF007AFF),
+                            onChanged: (val) => setState(() => _hasPassengerHelmet = val ?? true),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.sports_motorsports, size: 16, color: Color(0xFF007AFF)),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Clean Passenger Helmet Provided',
+                                      style: AppTypography.bodyMdMedium.copyWith(fontWeight: FontWeight.w700),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  'DOT / BSTI certified helmet for your passenger',
+                                  style: AppTypography.labelSm.copyWith(fontSize: 10.5, color: const Color(0xFF8E8E93)),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
 
@@ -821,48 +855,6 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
     );
   }
 
-  Widget _buildVehicleButton({
-    required VehicleType type,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    final isSelected = _vehicleType == type;
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryContainer : AppColors.surfaceContainer,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: isSelected ? Colors.white : AppColors.onSurfaceVariant, size: 24),
-              const SizedBox(height: 4),
-              Text(
-                title,
-                style: AppTypography.labelSm.copyWith(
-                  color: isSelected ? Colors.white : AppColors.onSurface,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              Text(
-                subtitle,
-                style: AppTypography.labelSm.copyWith(
-                  color: isSelected ? Colors.white70 : AppColors.onSurfaceVariant,
-                  fontSize: 9.5,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildQuickFare(String label, String value) {
     final isSelected = _fareController.text == value;
