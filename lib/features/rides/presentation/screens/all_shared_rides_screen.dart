@@ -401,7 +401,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  'Women Safe',
+                                  'Women Only',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: _femaleOnly ? FontWeight.w700 : FontWeight.w600,

@@ -204,34 +204,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       ),
       body: Column(
         children: [
-          // Connection & Safety Strip
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            color: AppColors.primaryFixed.withOpacity(0.3),
-            child: Row(
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Realtime encrypted campus chat • Zero spam policy',
-                    style: AppTypography.labelSm.copyWith(
-                      color: AppColors.onPrimaryFixedVariant,
-                      fontSize: 11,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
           // Messages list
           Expanded(
             child: chatState.isLoading

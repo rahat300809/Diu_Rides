@@ -159,10 +159,10 @@ class _CampusVoiceCallDialogState extends State<CampusVoiceCallDialog>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.lock_outline, size: 14, color: AppColors.primary),
+                const Icon(Icons.call, size: 14, color: AppColors.primary),
                 const SizedBox(width: 6),
                 Text(
-                  'End-to-End Encrypted Campus Voice Call',
+                  'Direct Campus Peer Voice Call',
                   style: AppTypography.labelSm.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.bold,

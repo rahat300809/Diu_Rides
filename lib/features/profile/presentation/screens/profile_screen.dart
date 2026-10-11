@@ -189,7 +189,7 @@ class ProfileScreen extends ConsumerWidget {
                   _buildMenuTile(
                     icon: Icons.chat_bubble_outline,
                     title: 'Campus Messages & Peer Calls',
-                    subtitle: 'Real-time encrypted chats & voice calls with ride partners',
+                    subtitle: 'Real-time chats & voice calls with ride partners',
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(

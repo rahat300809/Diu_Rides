@@ -645,11 +645,11 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: [
-                        _buildTrustBadge(Icons.school, 'DIU Registered 2021', AppColors.primary),
+                        _buildTrustBadge(Icons.school, 'DIU Batch Verified', AppColors.primary),
                         const SizedBox(width: 8),
-                        _buildTrustBadge(Icons.verified_user, 'Safety Protocol Certified', AppColors.tertiary),
+                        _buildTrustBadge(Icons.verified, 'Campus Commuter', AppColors.tertiary),
                         const SizedBox(width: 8),
-                        _buildTrustBadge(Icons.health_and_safety, 'Fully Vaccinated', AppColors.secondary),
+                        _buildTrustBadge(Icons.sports_motorsports, 'Helmet Ready', AppColors.secondary),
                       ],
                     ),
                   ),

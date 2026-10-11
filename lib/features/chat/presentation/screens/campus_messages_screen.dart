@@ -58,34 +58,9 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
             setState(() {});
           },
           child: ListView(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: const EdgeInsets.only(bottom: 24, top: 8),
             children: [
-              // 1. Campus security strip
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryFixed.withOpacity(0.35),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.security, size: 20, color: AppColors.primary),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'End-to-end encrypted peer chat & voice calls for verified DIU carpoolers.',
-                        style: AppTypography.labelSm.copyWith(
-                          color: AppColors.onSurface,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // 2. DIU Campus Rider Community Public Room (All Bikers & Commuters)
+              // 1. DIU Campus Rider Community Public Room (All Bikers & Commuters)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 child: Container(

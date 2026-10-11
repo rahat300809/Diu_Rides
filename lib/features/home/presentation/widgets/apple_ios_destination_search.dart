@@ -109,7 +109,7 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
     final hasText = _controller.text.trim().isNotEmpty;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.only(top: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -234,17 +234,17 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
             ),
           ),
 
-          // Auto-Suggestions (Apple iOS 3D Chips / Pills)
-          if (_suggestions.isNotEmpty) ...[
+          // Auto-Suggestions (Apple iOS 3D Chips / Pills) - Only shown when user is searching
+          if (hasText && _suggestions.isNotEmpty) ...[
             const SizedBox(height: 10),
             Row(
               children: [
                 const Icon(Icons.auto_awesome, size: 13, color: Color(0xFFFFA000)),
                 const SizedBox(width: 5),
                 Text(
-                  hasText ? 'Suggested destination matches:' : 'Popular DIU commute hubs:',
+                  'Suggested destination matches:',
                   style: AppTypography.labelSm.copyWith(
-                    color: const Color(0xFF8E8E93),
+                    color: Colors.white.withOpacity(0.95),
                     fontWeight: FontWeight.w600,
                     fontSize: 11,
                   ),

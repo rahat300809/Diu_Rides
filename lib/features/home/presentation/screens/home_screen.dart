@@ -533,10 +533,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     const SizedBox(width: 10),
                     _buildServiceCard(
-                      icon: Icons.shield,
+                      icon: Icons.sports_motorsports,
                       title: 'Helmet Ready',
-                      subtitle: 'DOT clean helmet',
-                      tag: 'Safety',
+                      subtitle: 'Clean helmet provided',
+                      tag: 'Helmet',
                       tagColor: const Color(0xFFE65100),
                       onTap: () => widget.onNavigateTab(1),
                     ),
@@ -551,8 +551,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     _buildServiceCard(
                       icon: Icons.female,
                       title: 'Female Moto',
-                      subtitle: 'Women safe peer',
-                      tag: 'Verified',
+                      subtitle: 'Female peer commute',
+                      tag: 'Reserved',
                       tagColor: const Color(0xFFE91E63),
                       onTap: () {
                         ref.read(rideSearchFilterProvider.notifier).toggleFemaleOnly();

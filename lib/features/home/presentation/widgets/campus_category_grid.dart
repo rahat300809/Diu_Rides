@@ -69,20 +69,7 @@ class CampusCategoryGrid extends StatelessWidget {
                   ),
                 ],
               ),
-              InkWell(
-                onTap: () => _showGuidelinesSheet(context),
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: Text(
-                    'Moto Safety',
-                    style: AppTypography.labelSm.copyWith(
-                      color: const Color(0xFFE65100),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
+              const SizedBox.shrink(),
             ],
           ),
           const SizedBox(height: 12),
@@ -113,8 +100,8 @@ class CampusCategoryGrid extends StatelessWidget {
               // 2. Helmet Provided Moto
               _buildCategoryCard(
                 title: 'Helmet Ready',
-                subtitle: 'DOT clean helmet',
-                badgeText: '🪖 Safety',
+                subtitle: 'Clean helmet provided',
+                badgeText: '🪖 Helmet',
                 badgeBg: const Color(0xFFFFF3E0),
                 badgeColor: const Color(0xFFE65100),
                 icon: Icons.sports_motorsports,
@@ -128,7 +115,7 @@ class CampusCategoryGrid extends StatelessWidget {
               _buildCategoryCard(
                 title: 'Female Moto',
                 subtitle: 'Peer-to-peer verified',
-                badgeText: 'Women Safe',
+                badgeText: 'Women Only',
                 badgeBg: const Color(0xFFFCE4EC),
                 badgeColor: const Color(0xFFC2185B),
                 icon: Icons.female,
@@ -256,57 +243,6 @@ class CampusCategoryGrid extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showGuidelinesSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text('DIU Campus Moto Sharing Rules', style: AppTypography.headlineSm.copyWith(fontWeight: FontWeight.w800)),
-            const SizedBox(height: 12),
-            Text(
-              '1. Moto peer rides are strictly for 1 verified DIU student passenger.\n'
-              '2. All riders must provide a clean passenger safety helmet.\n'
-              '3. Cost sharing is non-commercial (peer fuel split avg ৳30-৳50).\n'
-              '4. Female peer rides connect female riders with female students.\n'
-              '5. Dial Campus Security (Ext. 4410) in any emergency.',
-              style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant, height: 1.6),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF141416),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              child: const Text('Understood'),
             ),
           ],
         ),
