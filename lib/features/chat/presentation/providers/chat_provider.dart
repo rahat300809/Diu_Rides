@@ -5,7 +5,8 @@ import 'package:diu_ride/features/chat/data/repositories/chat_repository.dart';
 import 'package:diu_ride/features/chat/data/repositories/shared_sync_chat_repository.dart';
 
 final chatRepositoryProvider = Provider<ChatRepository>((ref) {
-  return SharedSyncChatRepository();
+  final prefs = ref.watch(preferencesProvider);
+  return SharedSyncChatRepository(preferences: prefs);
 });
 
 class ChatState {

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:diu_ride/core/config/app_config.dart';
+import 'package:diu_ride/core/services/firebase_auth_service.dart';
 import 'package:diu_ride/core/storage/preferences_service.dart';
 import 'package:diu_ride/core/storage/secure_storage_service.dart';
 import 'package:diu_ride/features/auth/data/models/user_model.dart';
@@ -251,6 +252,16 @@ class SharedSyncAuthRepository implements AuthRepository {
       );
     } catch (_) {}
 
+    // Dispatch official verification email to DIU student inbox via Firebase
+    try {
+      FirebaseAuthService.dispatchVerificationEmail(
+        email: cleanEmail,
+        password: password,
+      );
+    } catch (e) {
+      debugPrint('Firebase email dispatch note: $e');
+    }
+
     try {
       final res = await _dio.post('$_apiBase/auth/register', data: pendingMap);
       if (res.statusCode == 200 && res.data != null && res.data['otp'] != null) {
@@ -298,11 +309,18 @@ class SharedSyncAuthRepository implements AuthRepository {
       } catch (_) {}
     }
 
+    // Check if student confirmed via Firebase verification link in email
+    bool isFirebaseVerified = false;
+    try {
+      isFirebaseVerified = await FirebaseAuthService.isEmailVerified();
+    } catch (_) {}
+
     try {
       final res = await _dio.post('$_apiBase/auth/verify-registration', data: {
         'email': pendingEmail,
         'studentId': pendingStudentId,
         'otp': otp.trim(),
+        'firebaseVerified': isFirebaseVerified,
       });
       if (res.statusCode == 200 && res.data != null && res.data['user'] != null) {
         final user = UserModel.fromJson(Map<String, dynamic>.from(res.data['user'] as Map));

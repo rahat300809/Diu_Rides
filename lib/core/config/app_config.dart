@@ -38,10 +38,13 @@ class AppConfig {
   static String get defaultApiUrl {
     if (kIsWeb) {
       final origin = Uri.base.origin;
+      if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
+        return 'https://servertest.eu.cc/ride/api';
+      }
       return '$origin/ride/api';
     }
-    // Mobile points directly to server on port 8080 or public domain
-    return 'http://192.168.0.114:8080/ride/api';
+    // Mobile points directly to the production Ubuntu server
+    return 'https://servertest.eu.cc/ride/api';
   }
 
   static String get fallbackApiUrl {
@@ -51,12 +54,15 @@ class AppConfig {
   static String get defaultWsUrl {
     if (kIsWeb) {
       final host = Uri.base.host;
+      if (host == 'localhost' || host == '127.0.0.1') {
+        return 'wss://servertest.eu.cc/ride/ws';
+      }
       final portStr = Uri.base.hasPort ? ':${Uri.base.port}' : '';
       final isSecure = Uri.base.scheme == 'https';
       final scheme = isSecure ? 'wss://' : 'ws://';
       return '$scheme$host$portStr/ride/ws';
     }
-    return 'ws://192.168.0.114:8080/ride/ws';
+    return 'wss://servertest.eu.cc/ride/ws';
   }
 
   static String get fallbackWsUrl {

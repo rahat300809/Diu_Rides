@@ -29,39 +29,55 @@ class FirebaseAuthService {
     }
   }
 
-  /// Sign up with email & password via Firebase
-  static Future<UserCredential?> signUpWithEmail({
-    required String email,
-    required String password,
-  }) async {
+  /// Check if student email has been verified via Firebase link/code
+  static Future<bool> isEmailVerified() async {
     try {
-      final cred = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      if (cred.user != null && !cred.user!.emailVerified) {
-        await cred.user!.sendEmailVerification();
-      }
-      return cred;
+      final user = _auth.currentUser;
+      if (user == null) return false;
+      await user.reload();
+      final updated = _auth.currentUser;
+      return updated?.emailVerified ?? false;
     } catch (e) {
-      debugPrint('[Firebase Auth] signUpWithEmail error: $e');
-      return null;
+      debugPrint('[Firebase Auth] isEmailVerified check error: $e');
+      return false;
     }
   }
 
-  /// Sign in with email & password via Firebase
-  static Future<UserCredential?> signInWithEmail({
+  /// Sign up or sign in with student email, then dispatch Firebase verification email
+  static Future<bool> dispatchVerificationEmail({
     required String email,
     required String password,
   }) async {
     try {
-      return await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      UserCredential? cred;
+      try {
+        cred = await _auth.createUserWithEmailAndPassword(
+          email: email.trim(),
+          password: password.trim(),
+        );
+      } on FirebaseAuthException catch (authErr) {
+        if (authErr.code == 'email-already-in-use') {
+          debugPrint('[Firebase Auth] Account already exists in Firebase, signing in to send verification email');
+          cred = await _auth.signInWithEmailAndPassword(
+            email: email.trim(),
+            password: password.trim(),
+          );
+        } else {
+          rethrow;
+        }
+      }
+
+      final user = cred.user ?? _auth.currentUser;
+      if (user == null) return false;
+      if (!user.emailVerified) {
+        await user.sendEmailVerification();
+        debugPrint('[Firebase Auth] Student verification email sent to $email');
+        return true;
+      }
+      return user.emailVerified;
     } catch (e) {
-      debugPrint('[Firebase Auth] signInWithEmail error: $e');
-      return null;
+      debugPrint('[Firebase Auth] dispatchVerificationEmail note: $e');
+      return false;
     }
   }
 

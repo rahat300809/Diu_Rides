@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
 import 'package:diu_ride/core/utils/validators.dart';
+import 'package:diu_ride/core/services/firebase_auth_service.dart';
 import 'package:diu_ride/features/auth/presentation/providers/auth_provider.dart';
 import 'package:diu_ride/features/webview/presentation/screens/campus_webview_screen.dart';
 import 'package:diu_ride/shared/navigation/main_navigation_screen.dart';
@@ -84,6 +85,24 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
           (route) => false,
+        );
+      }
+    }
+  }
+
+  void _checkFirebaseVerification() async {
+    final verified = await FirebaseAuthService.isEmailVerified();
+    if (verified) {
+      final lastOtp = ref.read(authNotifierProvider).lastGeneratedOtp ?? '123456';
+      _otpController.text = lastOtp;
+      _verify();
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Firebase verification link not clicked yet. Please check your DIU student email or use the 6-digit code above.'),
+            duration: Duration(seconds: 4),
+          ),
         );
       }
     }
@@ -344,7 +363,19 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _checkFirebaseVerification,
+                  icon: const Icon(Icons.mark_email_read, size: 18, color: Color(0xFF2E7D32)),
+                  label: const Text('I Clicked Verification Link in DIU Email'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF2E7D32),
+                    side: const BorderSide(color: Color(0xFF2E7D32), width: 1.2),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
                 const Divider(),
                 const SizedBox(height: 16),
 

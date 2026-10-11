@@ -2,12 +2,15 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
+import 'dart:convert';
 import 'package:diu_ride/core/config/app_config.dart';
+import 'package:diu_ride/core/storage/preferences_service.dart';
 import 'package:diu_ride/features/chat/data/models/chat_message.dart';
 import 'package:diu_ride/features/chat/data/repositories/chat_repository.dart';
 import 'package:diu_ride/features/chat/data/repositories/mock_chat_repository.dart';
 
 class SharedSyncChatRepository implements ChatRepository {
+  final PreferencesService? preferences;
   final MockChatRepository _localFallback = MockChatRepository();
   final _streamController = StreamController<ChatMessage>.broadcast();
   final Map<String, List<ChatMessage>> _cache = {};
@@ -18,8 +21,19 @@ class SharedSyncChatRepository implements ChatRepository {
     receiveTimeout: const Duration(seconds: 4),
   ));
 
-  SharedSyncChatRepository() {
+  SharedSyncChatRepository({this.preferences}) {
     _startPolling();
+  }
+
+  String get _currentUserId {
+    final cached = preferences?.getUserJson();
+    if (cached != null) {
+      try {
+        final decoded = jsonDecode(cached) as Map<String, dynamic>;
+        return decoded['id']?.toString() ?? 'usr_current';
+      } catch (_) {}
+    }
+    return 'usr_current';
   }
 
   String get _apiBase {
@@ -37,7 +51,7 @@ class SharedSyncChatRepository implements ChatRepository {
           final res = await _dio.get('$_apiBase/messages?ride_id=$rideId');
           if (res.statusCode == 200 && res.data is List) {
             final serverMsgs = (res.data as List)
-                .map((m) => ChatMessage.fromJson(Map<String, dynamic>.from(m as Map), 'current_user'))
+                .map((m) => ChatMessage.fromJson(Map<String, dynamic>.from(m as Map), _currentUserId))
                 .toList();
 
             final currentKnown = _cache[rideId] ?? [];
@@ -59,7 +73,7 @@ class SharedSyncChatRepository implements ChatRepository {
       final response = await _dio.get('$_apiBase/messages?ride_id=$rideId');
       if (response.statusCode == 200 && response.data is List) {
         final list = (response.data as List)
-            .map((item) => ChatMessage.fromJson(Map<String, dynamic>.from(item as Map), 'current_user'))
+            .map((item) => ChatMessage.fromJson(Map<String, dynamic>.from(item as Map), _currentUserId))
             .toList();
 
         if (list.isNotEmpty) {
