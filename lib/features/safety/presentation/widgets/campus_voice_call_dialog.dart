@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
 
@@ -124,6 +125,20 @@ class _CampusVoiceCallDialogState extends State<CampusVoiceCallDialog>
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  Future<void> _dialPhone() async {
+    final cleanPhone = widget.peerPhone.replaceAll(RegExp(r'[^\d+]'), '');
+    final uri = Uri.parse('tel:$cleanPhone');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      _copyPhone();
+    }
   }
 
   @override
@@ -268,26 +283,57 @@ class _CampusVoiceCallDialogState extends State<CampusVoiceCallDialog>
           ),
 
           // Direct Phone Quick Trigger
-          const SizedBox(height: 10),
-          InkWell(
-            onTap: _copyPhone,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.phone_android, size: 16, color: Colors.white54),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Cell: ${widget.peerPhone}',
-                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              InkWell(
+                onTap: _dialPhone,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF34C759).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF34C759).withOpacity(0.5)),
                   ),
-                  const SizedBox(width: 6),
-                  const Icon(Icons.copy, size: 13, color: Colors.white38),
-                ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.phone, size: 14, color: Color(0xFF34C759)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Call ${widget.peerPhone}',
+                        style: const TextStyle(color: Color(0xFF34C759), fontSize: 12, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: _copyPhone,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.white12,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.copy, size: 13, color: Colors.white70),
+                      SizedBox(width: 4),
+                      Text(
+                        'Copy',
+                        style: TextStyle(color: Colors.white70, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
 
           const Spacer(),

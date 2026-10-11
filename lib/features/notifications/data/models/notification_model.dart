@@ -8,6 +8,7 @@ enum NotificationType {
   rideCompleted,
   chatMessage,
   safetyAlert,
+  ridePublished,
 }
 
 class NotificationModel {

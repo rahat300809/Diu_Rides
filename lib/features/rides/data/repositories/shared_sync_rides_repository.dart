@@ -100,15 +100,24 @@ class SharedSyncRidesRepository implements RidesRepository {
 
     if (generalQuery != null && generalQuery.trim().isNotEmpty) {
       final g = generalQuery.trim().toLowerCase();
-      results = results.where((r) =>
-          r.originName.toLowerCase().contains(g) ||
+      final isAb4 = g.contains('ab4') || g.contains('ab 4') || g.contains('ab-4');
+      results = results.where((r) {
+        final ab4Match = isAb4 && (
+          r.originName.toLowerCase().contains('academic building 4') ||
+          (r.originSubtitle?.toLowerCase().contains('academic building 4') ?? false) ||
+          r.destinationName.toLowerCase().contains('academic building 4') ||
+          (r.destinationSubtitle?.toLowerCase().contains('academic building 4') ?? false)
+        );
+        return r.originName.toLowerCase().contains(g) ||
           (r.originSubtitle?.toLowerCase().contains(g) ?? false) ||
           r.destinationName.toLowerCase().contains(g) ||
           (r.destinationSubtitle?.toLowerCase().contains(g) ?? false) ||
           r.driverName.toLowerCase().contains(g) ||
           r.driverDept.toLowerCase().contains(g) ||
           r.routeCorridor.toLowerCase().contains(g) ||
-          r.vehicle.modelName.toLowerCase().contains(g)).toList();
+          r.vehicle.modelName.toLowerCase().contains(g) ||
+          ab4Match;
+      }).toList();
     }
 
     if (pickupQuery != null && pickupQuery.trim().isNotEmpty) {

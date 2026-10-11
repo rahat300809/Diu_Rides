@@ -25,6 +25,26 @@ class NotificationsNotifier extends StateNotifier<List<NotificationModel>> {
   // PUBLIC API — called by BookingProvider / RideProvider after events
   // ---------------------------------------------------------------------------
 
+  /// Driver/user publishes a ride — creates in-app notification confirming ride status & visibility
+  void onRidePublishedByMe({
+    required String rideId,
+    required String origin,
+    required String destination,
+    required DateTime departureTime,
+    required double fare,
+  }) {
+    _add(NotificationModel(
+      id: 'n_pub_${rideId}_${DateTime.now().millisecondsSinceEpoch}',
+      title: '🏍️ Your Ride is LIVE!',
+      body:
+          'Your ride $origin → $destination (৳${fare.toInt()}) is live. DIU passengers can view and book.',
+      type: NotificationType.ridePublished,
+      timestamp: DateTime.now(),
+      isRead: false,
+      relatedRideId: rideId,
+    ));
+  }
+
   /// Driver receives a new booking request from a passenger
   void onRideRequested({
     required String bookingId,

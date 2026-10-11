@@ -59,9 +59,18 @@ class DiuAppHeader extends ConsumerWidget implements PreferredSizeWidget {
                       onPressed: () => Navigator.of(context).pop(),
                     )
                   else ...[
-                    SvgPicture.asset(
-                      'assets/svg/diu_ride_logo.svg',
-                      height: 28,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.asset(
+                        'assets/images/diu_ride_logo.jpg',
+                        height: 32,
+                        width: 32,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => SvgPicture.asset(
+                          'assets/svg/diu_ride_logo.svg',
+                          height: 28,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 8),
                   ],
@@ -90,40 +99,10 @@ class DiuAppHeader extends ConsumerWidget implements PreferredSizeWidget {
                 ],
               ),
 
-              // Right: Verified badge + Notification bell + Profile avatar
+              // Right: Notification bell + Messages + Profile avatar
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // DIU Verified badge
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryFixed.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.verified,
-                          size: 13,
-                          color: AppColors.primary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'DIU Verified',
-                          style: AppTypography.labelSm.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-
                   // Notification Bell with animated badge
                   GestureDetector(
                     onTap: onNotificationsTap,

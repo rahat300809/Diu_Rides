@@ -821,7 +821,7 @@ def get_rides(
     dropoff: Optional[str] = None,
     destination: Optional[str] = None,
     query: Optional[str] = None,
-    vehicle_type: Optional[str] = "bike",
+    vehicle_type: Optional[str] = None,
     female_only: Optional[bool] = None,
 ):
     conn = get_db()
@@ -829,23 +829,47 @@ def get_rides(
     sql = "SELECT * FROM rides WHERE 1=1"
     params = []
 
-    # Enforce Motorbike only!
-    sql += " AND vehicle_type = 'bike'"
+    if vehicle_type and vehicle_type.lower() != "all":
+        sql += " AND LOWER(vehicle_type) = ?"
+        params.append(vehicle_type.lower())
 
     if status:
         sql += " AND status = ?"
         params.append(status)
 
-    target_dest = destination or dropoff or query
-    if target_dest and target_dest.strip():
-        sql += " AND (LOWER(destination_name) LIKE ? OR LOWER(destination_subtitle) LIKE ? OR LOWER(route_corridor) LIKE ?)"
-        d_val = f"%{target_dest.strip().lower()}%"
-        params.extend([d_val, d_val, d_val])
+    target_query = (query or "").strip()
+    if target_query:
+        q_val = f"%{target_query.lower()}%"
+        is_ab4 = "ab4" in target_query.lower() or "ab 4" in target_query.lower() or "ab-4" in target_query.lower()
+        if is_ab4:
+            ab4_val = "%academic building 4%"
+            sql += """ AND (
+                LOWER(destination_name) LIKE ? OR LOWER(destination_subtitle) LIKE ? 
+                OR LOWER(origin_name) LIKE ? OR LOWER(origin_subtitle) LIKE ? 
+                OR LOWER(route_corridor) LIKE ? OR LOWER(waypoint_name) LIKE ?
+                OR LOWER(driver_name) LIKE ? OR LOWER(origin_name) LIKE ?
+                OR LOWER(destination_name) LIKE ?
+            )"""
+            params.extend([q_val, q_val, q_val, q_val, q_val, q_val, q_val, ab4_val, ab4_val])
+        else:
+            sql += """ AND (
+                LOWER(destination_name) LIKE ? OR LOWER(destination_subtitle) LIKE ? 
+                OR LOWER(origin_name) LIKE ? OR LOWER(origin_subtitle) LIKE ? 
+                OR LOWER(route_corridor) LIKE ? OR LOWER(waypoint_name) LIKE ?
+                OR LOWER(driver_name) LIKE ?
+            )"""
+            params.extend([q_val, q_val, q_val, q_val, q_val, q_val, q_val])
+    else:
+        target_dest = (destination or dropoff or "").strip()
+        if target_dest:
+            d_val = f"%{target_dest.lower()}%"
+            sql += " AND (LOWER(destination_name) LIKE ? OR LOWER(destination_subtitle) LIKE ? OR LOWER(route_corridor) LIKE ?)"
+            params.extend([d_val, d_val, d_val])
 
-    if pickup and pickup.strip():
-        sql += " AND (LOWER(origin_name) LIKE ? OR LOWER(origin_subtitle) LIKE ?)"
-        p_val = f"%{pickup.strip().lower()}%"
-        params.extend([p_val, p_val])
+        if pickup and pickup.strip():
+            p_val = f"%{pickup.strip().lower()}%"
+            sql += " AND (LOWER(origin_name) LIKE ? OR LOWER(origin_subtitle) LIKE ?)"
+            params.extend([p_val, p_val])
 
     if female_only is not None:
         sql += " AND is_female_only = ?"
@@ -858,11 +882,26 @@ def get_rides(
 
     rides = [map_ride(r) for r in rows]
     return rides
-    rows = cursor.fetchall()
-    conn.close()
 
-    rides = [map_ride(r) for r in rows]
-    return rides
+@app.post("/ride/api/alert-ring")
+@app.post("/api/alert-ring")
+async def alert_ring(payload: Dict[str, Any]):
+    target_user_id = str(payload.get("targetUserId", "")).strip()
+    sender_name = str(payload.get("senderName", "")).strip()
+    ride_id = str(payload.get("rideId", "")).strip()
+    message = str(payload.get("message", "🚨 Alert: Please check your phone!")).strip()
+
+    ring_event = {
+        "type": "alert_ring",
+        "targetUserId": target_user_id,
+        "senderName": sender_name,
+        "rideId": ride_id,
+        "message": message,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+    await manager.broadcast("alert_ring", ring_event)
+    print(f"[ALERT-RING] Dispatched buzzer from {sender_name} to {target_user_id} for ride {ride_id}")
+    return {"status": "success", "message": "Alert ring buzzer dispatched successfully"}
 
 @app.post("/ride/api/rides")
 @app.post("/api/rides")

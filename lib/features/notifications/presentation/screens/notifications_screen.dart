@@ -391,6 +391,8 @@ class _NotificationCard extends ConsumerWidget {
         return Icons.shield_outlined;
       case NotificationType.rideRequest:
         return Icons.person_add_alt_1_outlined;
+      case NotificationType.ridePublished:
+        return Icons.campaign_outlined;
     }
   }
 
@@ -410,6 +412,7 @@ class _NotificationCard extends ConsumerWidget {
       case NotificationType.safetyAlert:
         return AppColors.tertiary;
       case NotificationType.rideRequest:
+      case NotificationType.ridePublished:
         return const Color(0xFFE65100);
     }
   }

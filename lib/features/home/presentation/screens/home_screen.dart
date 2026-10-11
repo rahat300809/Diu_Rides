@@ -11,6 +11,11 @@ import 'package:diu_ride/features/home/presentation/widgets/apple_ios_destinatio
 import 'package:diu_ride/features/home/presentation/widgets/destination_matching_bikes_view.dart';
 import 'package:diu_ride/features/home/presentation/widgets/departing_rides_carousel.dart';
 import 'package:diu_ride/features/tracking/presentation/screens/ride_details_tracking_screen.dart';
+import 'package:diu_ride/features/notifications/presentation/screens/notifications_screen.dart';
+import 'package:diu_ride/features/notifications/presentation/providers/notifications_provider.dart';
+import 'package:diu_ride/features/chat/presentation/screens/campus_messages_screen.dart';
+import 'package:diu_ride/features/profile/presentation/screens/profile_screen.dart';
+import 'package:diu_ride/core/constants/campus_locations.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final Function(int tabIndex) onNavigateTab;
@@ -28,6 +33,70 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _activeSearchQuery = '';
+  String _currentLocation = 'DIU Smart City, Ashulia';
+
+  void _showLocationPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Select Campus Pickup Location',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Choose your current boarding spot on DIU Campus',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            ...CampusLocations.allCampusSpots.map((spot) => ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3E0),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.place, color: Color(0xFFE65100), size: 20),
+              ),
+              title: Text(spot.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+              subtitle: Text(spot.subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
+              trailing: _currentLocation == spot.name
+                  ? const Icon(Icons.check_circle, color: Color(0xFFE65100))
+                  : null,
+              onTap: () {
+                setState(() => _currentLocation = spot.name);
+                Navigator.pop(ctx);
+                _showToast('Location Updated', 'Pickup set to ${spot.name}');
+              },
+            )),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
 
   void _showToast(String title, String subtitle) {
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -99,21 +168,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final allRidesAsync = ref.watch(allAvailableRidesProvider);
     final List<RideModel> allRides = allRidesAsync.value ?? [];
 
-    // Filter matching rides if searching
+    final unreadNotificationCount = ref.watch(unreadNotificationCountProvider);
+
+    // Filter matching rides if searching (supports AB4, both From & To)
     final trimmedQuery = _activeSearchQuery.trim().toLowerCase();
+    final isAb4Query = trimmedQuery.contains('ab4') || trimmedQuery.contains('ab 4') || trimmedQuery.contains('ab-4');
     final List<RideModel> matchingBikes = trimmedQuery.isEmpty
         ? []
         : allRides.where((r) {
-            final isBike = r.vehicle.type == VehicleType.bike;
-            if (!isBike) return false;
-
             final destMatch = r.destinationName.toLowerCase().contains(trimmedQuery) ||
                 (r.destinationSubtitle?.toLowerCase().contains(trimmedQuery) ?? false);
             final originMatch = r.originName.toLowerCase().contains(trimmedQuery) ||
                 (r.originSubtitle?.toLowerCase().contains(trimmedQuery) ?? false);
             final corridorMatch = r.routeCorridor.toLowerCase().contains(trimmedQuery);
+            final driverMatch = r.driverName.toLowerCase().contains(trimmedQuery);
 
-            return destMatch || originMatch || corridorMatch;
+            final ab4Match = isAb4Query && (
+              r.originName.toLowerCase().contains('academic building 4') ||
+              r.destinationName.toLowerCase().contains('academic building 4') ||
+              r.originName.toLowerCase().contains('ab4') ||
+              r.destinationName.toLowerCase().contains('ab4')
+            );
+
+            return destMatch || originMatch || corridorMatch || driverMatch || ab4Match;
           }).toList();
 
     // Check if user has an active ride (either as driver or recent ride)
@@ -172,59 +249,74 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       children: [
                         Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(2.5),
-                              decoration: const BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                              ),
-                              child: CircleAvatar(
-                                radius: 21,
-                                backgroundColor: const Color(0xFF141416),
-                                child: Text(
-                                  user?.name.isNotEmpty == true
-                                      ? user!.name[0].toUpperCase()
-                                      : 'S',
-                                  style: const TextStyle(
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => const ProfileScreen()),
+                                );
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(2.5),
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: CircleAvatar(
+                                  radius: 21,
+                                  backgroundColor: const Color(0xFF141416),
+                                  child: Text(
+                                    user?.name.isNotEmpty == true
+                                        ? user!.name[0].toUpperCase()
+                                        : 'S',
+                                    style: const TextStyle(
+                                      fontSize: 17,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                             const SizedBox(width: 12),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Current Location',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Colors.white.withOpacity(0.85),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const Row(
-                                  children: [
-                                    Text(
-                                      'DIU Smart City, Ashulia',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w800,
-                                        color: Colors.white,
-                                      ),
+                            GestureDetector(
+                              onTap: _showLocationPicker,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Current Location',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.white.withOpacity(0.85),
+                                      fontWeight: FontWeight.w500,
                                     ),
-                                    SizedBox(width: 3),
-                                    Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.white),
-                                  ],
-                                ),
-                              ],
+                                  ),
+                                  Row(
+                                    children: [
+                                      ConstrainedBox(
+                                        constraints: const BoxConstraints(maxWidth: 160),
+                                        child: Text(
+                                          _currentLocation,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.white),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
 
-                        // Notification Glass Bell & Active Ride Status Pill
+                        // Notification Glass Bell, Messages & Active Ride Status Pill
                         Row(
                           children: [
                             if (activeRide != null)
@@ -269,16 +361,68 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 ),
                               ),
 
-                            // Translucent Glass Notification Bell Button (Matching Reference 2)
-                            Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.24),
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white.withOpacity(0.35)),
+                            // Messages Button
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => CampusMessagesScreen(
+                                      onExploreRides: () {
+                                        Navigator.of(context).pop();
+                                        widget.onNavigateTab(1);
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                width: 38,
+                                height: 38,
+                                margin: const EdgeInsets.only(right: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.24),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white.withOpacity(0.35)),
+                                ),
+                                child: const Icon(Icons.chat_bubble_outline, size: 19, color: Colors.white),
                               ),
-                              child: const Icon(Icons.notifications_none, size: 20, color: Colors.white),
+                            ),
+
+                            // Translucent Glass Notification Bell Button with badge
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                                );
+                              },
+                              child: Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.24),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white.withOpacity(0.35)),
+                                ),
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    const Icon(Icons.notifications_none, size: 20, color: Colors.white),
+                                    if (unreadNotificationCount > 0)
+                                      Positioned(
+                                        top: 6,
+                                        right: 6,
+                                        child: Container(
+                                          width: 9,
+                                          height: 9,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFFFF3B30),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ],
                         ),

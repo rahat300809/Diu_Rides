@@ -27,17 +27,15 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
   final FocusNode _focusNode = FocusNode();
   List<String> _suggestions = [];
 
-  // Core DIU Hubs
+  // Core DIU Hubs & Campus Spots
   static const List<String> _commonHubs = [
+    'AB4 (Academic Building 4)',
+    'DIU Main Gate 1',
+    'Transport Terminal (Bus Bay)',
     'Uttara Sector 11 (House Building)',
     'Uttara North Metro Station (Diabari)',
-    'Uttara Sector 3 (Rajlakshmi)',
-    'Uttara Azampur Bus Stand',
     'Mirpur 10 Roundabout',
-    'Mirpur 12 Metro Station',
-    'Mirpur 1 Bus Stand',
     'Dhanmondi 32 (Metro Station)',
-    'Dhanmondi 27 / Rapa Plaza',
     'Birulia Bridge Stand',
     'Savar City Centre',
     'Gazipur Chowrasta',
@@ -71,8 +69,12 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
     final query = text.trim().toLowerCase();
     final Set<String> pooled = {};
 
-    // Pool from active rides
+    // Pool from active rides: BOTH Origin (From) AND Destination (To)
     for (final r in widget.allRides) {
+      if (r.originName.isNotEmpty) pooled.add(r.originName);
+      if (r.originSubtitle != null && r.originSubtitle!.isNotEmpty) {
+        pooled.add(r.originSubtitle!);
+      }
       if (r.destinationName.isNotEmpty) pooled.add(r.destinationName);
       if (r.destinationSubtitle != null && r.destinationSubtitle!.isNotEmpty) {
         pooled.add(r.destinationSubtitle!);
@@ -82,16 +84,27 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
     pooled.addAll(_commonHubs);
 
     if (query.isEmpty) {
-      // Suggest top 4 common hubs
+      // Suggest top campus hubs & destinations
       setState(() {
-        _suggestions = _commonHubs.take(4).toList();
+        _suggestions = _commonHubs.take(5).toList();
       });
     } else {
-      // Filter dynamically
+      // If query mentions ab4, ensure AB4 is right at top
+      final isAb4 = query.contains('ab4') || query.contains('ab 4') || query.contains('ab-4');
+
+      // Filter dynamically across both From and To
       final matches = pooled
-          .where((place) => place.toLowerCase().contains(query))
+          .where((place) {
+            final p = place.toLowerCase();
+            if (isAb4 && (p.contains('ab4') || p.contains('academic building 4'))) return true;
+            return p.contains(query);
+          })
           .take(6)
           .toList();
+
+      if (isAb4 && !matches.any((m) => m.toLowerCase().contains('ab4'))) {
+        matches.insert(0, 'AB4 (Academic Building 4)');
+      }
 
       // If no exact substring in pooled, still include query
       if (matches.isEmpty && query.length >= 2) {
@@ -173,7 +186,7 @@ class _AppleIosDestinationSearchState extends State<AppleIosDestinationSearch> {
                       fontWeight: FontWeight.w600,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'Where to? (e.g. Uttara, Mirpur 10)...',
+                      hintText: 'Search From / To (e.g. AB4, Uttara, Mirpur)...',
                       hintStyle: AppTypography.bodyMd.copyWith(
                         color: const Color(0xFF8E8E93),
                         fontWeight: FontWeight.w400,

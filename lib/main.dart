@@ -6,9 +6,19 @@ import 'package:diu_ride/core/storage/preferences_service.dart';
 import 'package:diu_ride/core/theme/app_theme.dart';
 import 'package:diu_ride/features/auth/presentation/providers/auth_provider.dart';
 import 'package:diu_ride/features/auth/presentation/screens/splash_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e) {
+    debugPrint('Firebase init fallback: $e');
+  }
 
   try {
     // Initialize App Configuration pointing to self-hosted API & WebSockets
