@@ -230,9 +230,9 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
         ),
         title: Row(
           children: [
-            const Icon(Icons.directions_car, color: AppColors.primary, size: 20),
+            const Icon(Icons.two_wheeler, color: AppColors.primary, size: 20),
             const SizedBox(width: 8),
-            Text('Details', style: AppTypography.headlineSm),
+            Text('Moto Ride Details', style: AppTypography.headlineSm),
           ],
         ),
         actions: [
@@ -389,7 +389,7 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                                 BoxShadow(color: Colors.black26, blurRadius: 6),
                               ],
                             ),
-                            child: const Icon(Icons.directions_car, color: Colors.white, size: 18),
+                            child: const Icon(Icons.two_wheeler, color: Colors.white, size: 18),
                           ),
                         ),
                       ),
@@ -680,7 +680,7 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                               color: AppColors.secondaryFixed,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(Icons.directions_car, color: AppColors.onSecondaryFixed, size: 22),
+                            child: const Icon(Icons.two_wheeler, color: AppColors.onSecondaryFixed, size: 22),
                           ),
                           const SizedBox(width: 10),
                           Column(

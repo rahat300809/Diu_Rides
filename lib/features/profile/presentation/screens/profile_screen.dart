@@ -131,16 +131,16 @@ class ProfileScreen extends ConsumerWidget {
                       color: AppColors.secondaryFixed,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.directions_car, color: AppColors.onSecondaryFixed, size: 24),
+                    child: const Icon(Icons.two_wheeler, color: AppColors.onSecondaryFixed, size: 24),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Registered Vehicle', style: AppTypography.bodyLgMedium),
+                        Text('Registered Motorcycle', style: AppTypography.bodyLgMedium),
                         Text(
-                          user?.vehicleInfo ?? 'None (Offer a ride to register vehicle)',
+                          user?.vehicleInfo ?? 'None (Offer a ride to register bike)',
                           style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
                         ),
                       ],

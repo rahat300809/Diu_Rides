@@ -382,7 +382,7 @@ class _NotificationCard extends ConsumerWidget {
       case NotificationType.driverArriving:
         return Icons.near_me_outlined;
       case NotificationType.rideStarted:
-        return Icons.directions_car_outlined;
+        return Icons.two_wheeler_outlined;
       case NotificationType.rideCompleted:
         return Icons.flag_outlined;
       case NotificationType.chatMessage:

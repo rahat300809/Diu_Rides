@@ -161,7 +161,7 @@ class RideResultCard extends StatelessWidget {
                       Row(
                         children: [
                           Icon(
-                            isBike ? Icons.two_wheeler : Icons.directions_car,
+                            Icons.two_wheeler,
                             size: 16,
                             color: primaryColor,
                           ),

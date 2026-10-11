@@ -112,13 +112,13 @@ class _SearchRidesScreenState extends ConsumerState<SearchRidesScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
-                                Icons.explore,
+                                Icons.two_wheeler,
                                 size: 16,
                                 color: filterState.isAllRidesMode ? AppColors.primary : AppColors.outline,
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                'All Campus Rides',
+                                'All Moto Rides',
                                 style: AppTypography.labelMd.copyWith(
                                   fontWeight: filterState.isAllRidesMode ? FontWeight.bold : FontWeight.w500,
                                   color: filterState.isAllRidesMode ? AppColors.primary : AppColors.onSurfaceVariant,
@@ -160,7 +160,7 @@ class _SearchRidesScreenState extends ConsumerState<SearchRidesScreen> {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                'Route Planner',
+                                'Bike Route',
                                 style: AppTypography.labelMd.copyWith(
                                   fontWeight: !filterState.isAllRidesMode ? FontWeight.bold : FontWeight.w500,
                                   color: !filterState.isAllRidesMode ? AppColors.primary : AppColors.onSurfaceVariant,

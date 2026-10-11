@@ -9,7 +9,6 @@ import 'package:diu_ride/features/booking/data/models/booking_model.dart';
 import 'package:diu_ride/features/booking/presentation/providers/booking_provider.dart';
 import 'package:diu_ride/features/notifications/presentation/providers/notifications_provider.dart';
 import 'package:diu_ride/features/rides/data/models/ride_model.dart';
-import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 import 'package:diu_ride/features/tracking/presentation/screens/ride_details_tracking_screen.dart';
 import 'package:diu_ride/features/chat/presentation/screens/chat_screen.dart';
@@ -158,7 +157,7 @@ class _MyRidesDashboardScreenState
         final myRides = snapshot.data ?? [];
         if (myRides.isEmpty) {
           return _buildEmptyState(
-            icon: Icons.directions_car_outlined,
+            icon: Icons.two_wheeler_outlined,
             title: 'No Offered Rides',
             subtitle: 'Offer a ride to help DIU peers commute.',
           );
@@ -689,8 +688,8 @@ class _DriverRideCard extends ConsumerWidget {
             // Vehicle and Time Info
             Row(
               children: [
-                Icon(
-                  ride.vehicle.type == VehicleType.bike ? Icons.two_wheeler : Icons.directions_car,
+                const Icon(
+                  Icons.two_wheeler,
                   size: 13,
                   color: AppColors.outline,
                 ),
@@ -700,10 +699,10 @@ class _DriverRideCard extends ConsumerWidget {
                   style: AppTypography.labelSm.copyWith(color: AppColors.outline),
                 ),
                 const SizedBox(width: 10),
-                const Icon(Icons.event_seat_outlined, size: 13, color: AppColors.outline),
+                const Icon(Icons.two_wheeler, size: 13, color: AppColors.outline),
                 const SizedBox(width: 4),
                 Text(
-                  '${ride.availableSeats}/${ride.totalSeats} seats',
+                  '${ride.availableSeats} moto seat',
                   style: AppTypography.labelSm.copyWith(color: AppColors.outline),
                 ),
                 const SizedBox(width: 10),
