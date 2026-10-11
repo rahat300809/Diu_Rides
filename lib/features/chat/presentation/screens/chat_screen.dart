@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
 import 'package:diu_ride/core/utils/date_time_utils.dart';
+import 'package:diu_ride/core/utils/gps_location_service.dart';
 import 'package:diu_ride/features/chat/presentation/providers/chat_provider.dart';
 import 'package:diu_ride/features/safety/presentation/widgets/campus_voice_call_dialog.dart';
 
@@ -49,8 +50,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _scrollToBottom();
   }
 
-  void _shareLocation() {
-    ref.read(chatNotifierProvider(widget.rideId).notifier).shareLocation(23.8775, 90.3201);
+  Future<void> _shareLocation() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Acquiring device GPS coordinates...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+    final pos = await GpsLocationService.getCurrentLocation();
+    final lat = pos?.latitude ?? 23.8765;
+    final lng = pos?.longitude ?? 90.3204;
+    if (!mounted) return;
+    ref.read(chatNotifierProvider(widget.rideId).notifier).shareLocation(lat, lng);
     _scrollToBottom();
   }
 
@@ -193,25 +204,85 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                             crossAxisAlignment:
                                 msg.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                             children: [
-                              if (msg.isLocationShare)
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.location_on,
-                                      size: 16,
-                                      color: msg.isMe ? AppColors.primaryFixed : AppColors.primary,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      'Campus Location',
-                                      style: AppTypography.labelSm.copyWith(
-                                        color: msg.isMe ? AppColors.primaryFixed : AppColors.primary,
-                                        fontWeight: FontWeight.bold,
+                              if (msg.isLocationShare || msg.text.contains('google.com/maps')) ...[
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 6),
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: msg.isMe ? Colors.white.withOpacity(0.18) : AppColors.surfaceContainerHigh,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.location_on,
+                                            size: 16,
+                                            color: msg.isMe ? AppColors.primaryFixed : AppColors.primary,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'Live GPS Location',
+                                            style: AppTypography.labelSm.copyWith(
+                                              color: msg.isMe ? AppColors.primaryFixed : AppColors.primary,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ),
-                                  ],
+                                      if (msg.sharedLat != null && msg.sharedLng != null) ...[
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Lat: ${msg.sharedLat!.toStringAsFixed(4)}, Lng: ${msg.sharedLng!.toStringAsFixed(4)}',
+                                          style: AppTypography.labelSm.copyWith(
+                                            color: msg.isMe ? Colors.white70 : AppColors.outline,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ],
+                                      const SizedBox(height: 6),
+                                      InkWell(
+                                        onTap: () {
+                                          final lat = msg.sharedLat ?? 23.8765;
+                                          final lng = msg.sharedLng ?? 90.3204;
+                                          final url = GpsLocationService.getGoogleMapsLocationUrl(lat, lng);
+                                          GpsLocationService.openGoogleMaps(url);
+                                        },
+                                        borderRadius: BorderRadius.circular(6),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                          decoration: BoxDecoration(
+                                            color: msg.isMe ? Colors.white : AppColors.primary,
+                                            borderRadius: BorderRadius.circular(6),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.map,
+                                                size: 14,
+                                                color: msg.isMe ? AppColors.primary : Colors.white,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                'Open in Google Maps',
+                                                style: TextStyle(
+                                                  color: msg.isMe ? AppColors.primary : Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
+                              ],
                               if (!msg.isMe && msg.senderName.isNotEmpty) ...[
                                 Text(
                                   msg.senderName,

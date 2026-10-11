@@ -384,23 +384,54 @@ class MockRidesRepository implements RidesRepository {
   }
 
   @override
-  Future<bool> startRide(String rideId) async {
+  Future<bool> startRide(String rideId, {double? startLat, double? startLng}) async {
     final idx = _rides.indexWhere((r) => r.id == rideId);
     if (idx != -1) {
-      _rides[idx] = _rides[idx].copyWith(status: RideStatus.active);
+      final sLat = startLat ?? _rides[idx].originLat;
+      final sLng = startLng ?? _rides[idx].originLng;
+      _rides[idx] = _rides[idx].copyWith(
+        status: RideStatus.active,
+        startLat: sLat,
+        startLng: sLng,
+        startTime: DateTime.now(),
+        startMapsLink: 'https://www.google.com/maps/search/?api=1&query=$sLat,$sLng',
+      );
       return true;
     }
     return false;
   }
 
   @override
-  Future<bool> completeRide(String rideId) async {
+  Future<bool> completeRide(String rideId, {double? endLat, double? endLng}) async {
     final idx = _rides.indexWhere((r) => r.id == rideId);
     if (idx != -1) {
-      _rides[idx] = _rides[idx].copyWith(status: RideStatus.completed);
+      final eLat = endLat ?? _rides[idx].destinationLat;
+      final eLng = endLng ?? _rides[idx].destinationLng;
+      final sLat = _rides[idx].startLat ?? _rides[idx].originLat;
+      final sLng = _rides[idx].startLng ?? _rides[idx].originLng;
+      _rides[idx] = _rides[idx].copyWith(
+        status: RideStatus.completed,
+        endLat: eLat,
+        endLng: eLng,
+        endTime: DateTime.now(),
+        endMapsLink: 'https://www.google.com/maps/search/?api=1&query=$eLat,$eLng',
+        routeMapsLink: 'https://www.google.com/maps/dir/?api=1&origin=$sLat,$sLng&destination=$eLat,$eLng&travelmode=driving',
+      );
       return true;
     }
     return false;
+  }
+
+  @override
+  Future<bool> shareLiveLocation({
+    required String rideId,
+    required String userId,
+    required String userName,
+    required String role,
+    required double latitude,
+    required double longitude,
+  }) async {
+    return true;
   }
 
   @override

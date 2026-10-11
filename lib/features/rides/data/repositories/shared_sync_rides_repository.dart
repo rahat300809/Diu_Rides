@@ -260,19 +260,60 @@ class SharedSyncRidesRepository implements RidesRepository {
   }
 
   @override
-  Future<bool> startRide(String rideId) async {
+  Future<bool> startRide(String rideId, {double? startLat, double? startLng}) async {
     try {
-      await _dio.patch('$_apiBase/rides', data: {'id': rideId, 'status': 'active'});
-    } catch (_) {}
+      await _dio.post('$_apiBase/rides/$rideId/start', data: {
+        'latitude': startLat,
+        'longitude': startLng,
+      });
+    } catch (_) {
+      try {
+        await _dio.patch('$_apiBase/rides', data: {'id': rideId, 'status': 'active'});
+      } catch (_) {}
+    }
+    await _localFallback.startRide(rideId, startLat: startLat, startLng: startLng);
     return true;
   }
 
   @override
-  Future<bool> completeRide(String rideId) async {
+  Future<bool> completeRide(String rideId, {double? endLat, double? endLng}) async {
     try {
-      await _dio.patch('$_apiBase/rides', data: {'id': rideId, 'status': 'completed'});
-    } catch (_) {}
+      await _dio.post('$_apiBase/rides/$rideId/complete', data: {
+        'latitude': endLat,
+        'longitude': endLng,
+      });
+    } catch (_) {
+      try {
+        await _dio.patch('$_apiBase/rides', data: {'id': rideId, 'status': 'completed'});
+      } catch (_) {}
+    }
+    await _localFallback.completeRide(rideId, endLat: endLat, endLng: endLng);
     return true;
+  }
+
+  @override
+  Future<bool> shareLiveLocation({
+    required String rideId,
+    required String userId,
+    required String userName,
+    required String role,
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      await _dio.post('$_apiBase/location/share', data: {
+        'rideId': rideId,
+        'userId': userId,
+        'userName': userName,
+        'role': role,
+        'latitude': latitude,
+        'longitude': longitude,
+      });
+      return true;
+    } catch (e) {
+      debugPrint('shareLiveLocation error: $e');
+      return false;
+    }
   }
 
   @override

@@ -1,3 +1,4 @@
+import 'package:diu_ride/core/utils/gps_location_service.dart';
 import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
 
 enum RideStatus { published, active, completed, cancelled }
@@ -33,6 +34,17 @@ class RideModel {
   final double distanceKm;
   final int durationMinutes;
 
+  // Realtime GPS Trace Fields (Start & End GPS)
+  final double? startLat;
+  final double? startLng;
+  final DateTime? startTime;
+  final String? startMapsLink;
+  final double? endLat;
+  final double? endLng;
+  final DateTime? endTime;
+  final String? endMapsLink;
+  final String? routeMapsLink;
+
   const RideModel({
     required this.id,
     required this.driverId,
@@ -63,7 +75,52 @@ class RideModel {
     this.routeCorridor = 'Ashulia Highway Corridor',
     this.distanceKm = 14.0,
     this.durationMinutes = 30,
+    this.startLat,
+    this.startLng,
+    this.startTime,
+    this.startMapsLink,
+    this.endLat,
+    this.endLng,
+    this.endTime,
+    this.endMapsLink,
+    this.routeMapsLink,
   });
+
+  String get googleMapsRouteUrl {
+    if (routeMapsLink != null && routeMapsLink!.isNotEmpty) {
+      return routeMapsLink!;
+    }
+    final oLat = startLat ?? originLat;
+    final oLng = startLng ?? originLng;
+    final dLat = endLat ?? destinationLat;
+    final dLng = endLng ?? destinationLng;
+    return GpsLocationService.getGoogleMapsRouteUrl(
+      originLat: oLat,
+      originLng: oLng,
+      destLat: dLat,
+      destLng: dLng,
+    );
+  }
+
+  String get googleMapsStartUrl {
+    if (startMapsLink != null && startMapsLink!.isNotEmpty) {
+      return startMapsLink!;
+    }
+    return GpsLocationService.getGoogleMapsLocationUrl(
+      startLat ?? originLat,
+      startLng ?? originLng,
+    );
+  }
+
+  String get googleMapsEndUrl {
+    if (endMapsLink != null && endMapsLink!.isNotEmpty) {
+      return endMapsLink!;
+    }
+    return GpsLocationService.getGoogleMapsLocationUrl(
+      endLat ?? destinationLat,
+      endLng ?? destinationLng,
+    );
+  }
 
   factory RideModel.fromJson(Map<String, dynamic> json) {
     return RideModel(
@@ -99,6 +156,15 @@ class RideModel {
       routeCorridor: json['routeCorridor'] as String? ?? 'Ashulia Highway Corridor',
       distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 14.0,
       durationMinutes: json['durationMinutes'] as int? ?? 30,
+      startLat: (json['startLat'] as num?)?.toDouble(),
+      startLng: (json['startLng'] as num?)?.toDouble(),
+      startTime: json['startTime'] != null ? DateTime.tryParse(json['startTime'] as String) : null,
+      startMapsLink: json['startMapsLink'] as String?,
+      endLat: (json['endLat'] as num?)?.toDouble(),
+      endLng: (json['endLng'] as num?)?.toDouble(),
+      endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'] as String) : null,
+      endMapsLink: json['endMapsLink'] as String?,
+      routeMapsLink: json['routeMapsLink'] as String?,
     );
   }
 
@@ -133,6 +199,15 @@ class RideModel {
       'routeCorridor': routeCorridor,
       'distanceKm': distanceKm,
       'durationMinutes': durationMinutes,
+      'startLat': startLat,
+      'startLng': startLng,
+      'startTime': startTime?.toIso8601String(),
+      'startMapsLink': startMapsLink,
+      'endLat': endLat,
+      'endLng': endLng,
+      'endTime': endTime?.toIso8601String(),
+      'endMapsLink': endMapsLink,
+      'routeMapsLink': routeMapsLink,
     };
   }
 
@@ -140,6 +215,15 @@ class RideModel {
     int? availableSeats,
     RideStatus? status,
     String? driverPhone,
+    double? startLat,
+    double? startLng,
+    DateTime? startTime,
+    String? startMapsLink,
+    double? endLat,
+    double? endLng,
+    DateTime? endTime,
+    String? endMapsLink,
+    String? routeMapsLink,
   }) {
     return RideModel(
       id: id,
@@ -171,6 +255,15 @@ class RideModel {
       routeCorridor: routeCorridor,
       distanceKm: distanceKm,
       durationMinutes: durationMinutes,
+      startLat: startLat ?? this.startLat,
+      startLng: startLng ?? this.startLng,
+      startTime: startTime ?? this.startTime,
+      startMapsLink: startMapsLink ?? this.startMapsLink,
+      endLat: endLat ?? this.endLat,
+      endLng: endLng ?? this.endLng,
+      endTime: endTime ?? this.endTime,
+      endMapsLink: endMapsLink ?? this.endMapsLink,
+      routeMapsLink: routeMapsLink ?? this.routeMapsLink,
     );
   }
 }

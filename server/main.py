@@ -89,9 +89,35 @@ def init_db():
         route_corridor TEXT DEFAULT 'Ashulia Highway Corridor',
         distance_km REAL DEFAULT 14.0,
         duration_minutes INTEGER DEFAULT 30,
+        start_lat REAL,
+        start_lng REAL,
+        start_time TEXT,
+        start_maps_link TEXT,
+        end_lat REAL,
+        end_lng REAL,
+        end_time TEXT,
+        end_maps_link TEXT,
+        route_maps_link TEXT,
         created_at TEXT NOT NULL
     );
     """)
+
+    # Schema migration for existing databases
+    for col, c_type in [
+        ("start_lat", "REAL"),
+        ("start_lng", "REAL"),
+        ("start_time", "TEXT"),
+        ("start_maps_link", "TEXT"),
+        ("end_lat", "REAL"),
+        ("end_lng", "REAL"),
+        ("end_time", "TEXT"),
+        ("end_maps_link", "TEXT"),
+        ("route_maps_link", "TEXT"),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE rides ADD COLUMN {col} {c_type}")
+        except Exception:
+            pass
 
     # 3. Bookings
     cursor.execute("""
@@ -128,7 +154,22 @@ def init_db():
     );
     """)
 
-    # 5. Live Driver Locations
+    # 5. Shared Locations (Rider & Passenger GPS Sharing with Google Maps)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS shared_locations (
+        id TEXT PRIMARY KEY,
+        ride_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        user_name TEXT NOT NULL,
+        role TEXT NOT NULL,
+        latitude REAL NOT NULL,
+        longitude REAL NOT NULL,
+        maps_link TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
+    """)
+
+    # 6. Live Driver Locations
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS driver_locations (
         driver_id TEXT PRIMARY KEY,
@@ -143,7 +184,7 @@ def init_db():
     );
     """)
 
-    # 6. SOS Emergency Alerts
+    # 7. SOS Emergency Alerts
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS sos_alerts (
         id TEXT PRIMARY KEY,
@@ -304,6 +345,15 @@ def map_ride(row) -> Dict[str, Any]:
         "routeCorridor": row["route_corridor"] or "Ashulia Highway Corridor",
         "distanceKm": float(row["distance_km"] or 14.0),
         "durationMinutes": int(row["duration_minutes"] or 30),
+        "startLat": float(row["start_lat"]) if ("start_lat" in row.keys() and row["start_lat"] is not None) else None,
+        "startLng": float(row["start_lng"]) if ("start_lng" in row.keys() and row["start_lng"] is not None) else None,
+        "startTime": row["start_time"] if ("start_time" in row.keys() and row["start_time"] is not None) else None,
+        "startMapsLink": row["start_maps_link"] if ("start_maps_link" in row.keys() and row["start_maps_link"] is not None) else None,
+        "endLat": float(row["end_lat"]) if ("end_lat" in row.keys() and row["end_lat"] is not None) else None,
+        "endLng": float(row["end_lng"]) if ("end_lng" in row.keys() and row["end_lng"] is not None) else None,
+        "endTime": row["end_time"] if ("end_time" in row.keys() and row["end_time"] is not None) else None,
+        "endMapsLink": row["end_maps_link"] if ("end_maps_link" in row.keys() and row["end_maps_link"] is not None) else None,
+        "routeMapsLink": row["route_maps_link"] if ("route_maps_link" in row.keys() and row["route_maps_link"] is not None) else None,
     }
 
 def map_booking(row) -> Dict[str, Any]:
@@ -579,10 +629,21 @@ def get_ride_by_id(ride_id: str):
 
 @app.post("/ride/api/rides/{ride_id}/start")
 @app.post("/api/rides/{ride_id}/start")
-async def start_ride(ride_id: str):
+async def start_ride(ride_id: str, payload: Optional[Dict[str, Any]] = None):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("UPDATE rides SET status = 'active' WHERE id = ?", (ride_id,))
+    now = datetime.utcnow().isoformat()
+    lat = payload.get("latitude") if payload else None
+    lng = payload.get("longitude") if payload else None
+
+    if lat is not None and lng is not None:
+        start_maps_link = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+        cursor.execute("""
+        UPDATE rides SET status = 'active', start_lat = ?, start_lng = ?, start_time = ?, start_maps_link = ? WHERE id = ?
+        """, (float(lat), float(lng), now, start_maps_link, ride_id))
+    else:
+        cursor.execute("UPDATE rides SET status = 'active', start_time = ? WHERE id = ?", (now, ride_id))
+
     conn.commit()
     cursor.execute("SELECT * FROM rides WHERE id = ?", (ride_id,))
     row = cursor.fetchone()
@@ -595,10 +656,32 @@ async def start_ride(ride_id: str):
 
 @app.post("/ride/api/rides/{ride_id}/complete")
 @app.post("/api/rides/{ride_id}/complete")
-async def complete_ride(ride_id: str):
+async def complete_ride(ride_id: str, payload: Optional[Dict[str, Any]] = None):
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("UPDATE rides SET status = 'completed' WHERE id = ?", (ride_id,))
+    now = datetime.utcnow().isoformat()
+    lat = payload.get("latitude") if payload else None
+    lng = payload.get("longitude") if payload else None
+
+    # Check origin or start GPS to generate full route directions link
+    cursor.execute("SELECT start_lat, start_lng, origin_lat, origin_lng FROM rides WHERE id = ?", (ride_id,))
+    ride_info = cursor.fetchone()
+    route_maps_link = None
+    end_maps_link = None
+
+    if lat is not None and lng is not None:
+        end_maps_link = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+        if ride_info:
+            o_lat = ride_info["start_lat"] if ride_info["start_lat"] is not None else ride_info["origin_lat"]
+            o_lng = ride_info["start_lng"] if ride_info["start_lng"] is not None else ride_info["origin_lng"]
+            route_maps_link = f"https://www.google.com/maps/dir/?api=1&origin={o_lat},{o_lng}&destination={lat},{lng}&travelmode=driving"
+
+        cursor.execute("""
+        UPDATE rides SET status = 'completed', end_lat = ?, end_lng = ?, end_time = ?, end_maps_link = ?, route_maps_link = ? WHERE id = ?
+        """, (float(lat), float(lng), now, end_maps_link, route_maps_link, ride_id))
+    else:
+        cursor.execute("UPDATE rides SET status = 'completed', end_time = ? WHERE id = ?", (now, ride_id))
+
     conn.commit()
     cursor.execute("SELECT * FROM rides WHERE id = ?", (ride_id,))
     row = cursor.fetchone()
@@ -781,6 +864,16 @@ def _fetch_messages(target_ride_id: Optional[str]):
 
 async def _save_and_broadcast_message(target_ride_id: str, msg_data: Dict[str, Any]):
     msg_id = msg_data.get("id") or f"msg_{int(datetime.utcnow().timestamp()*1000)}"
+    text = msg_data.get("text", "")
+    is_loc = bool(msg_data.get("isLocationShare", False))
+    shared_lat = msg_data.get("sharedLat")
+    shared_lng = msg_data.get("sharedLng")
+
+    # If sharing location, automatically ensure Google Maps link is included in text if not present
+    if is_loc and shared_lat is not None and shared_lng is not None:
+        maps_url = f"https://www.google.com/maps/search/?api=1&query={shared_lat},{shared_lng}"
+        if "google.com/maps" not in text and "maps.google.com" not in text:
+            text = f"📍 Shared Live GPS Location: {maps_url}"
 
     conn = get_db()
     cursor = conn.cursor()
@@ -794,12 +887,12 @@ async def _save_and_broadcast_message(target_ride_id: str, msg_data: Dict[str, A
         target_ride_id,
         msg_data.get("senderId", "usr_anonymous"),
         msg_data.get("senderName", "DIU Student"),
-        msg_data.get("text", ""),
+        text,
         msg_data.get("timestamp", datetime.utcnow().isoformat()),
         1 if msg_data.get("isRead", True) else 0,
-        1 if msg_data.get("isLocationShare", False) else 0,
-        msg_data.get("sharedLat"),
-        msg_data.get("sharedLng"),
+        1 if is_loc else 0,
+        shared_lat,
+        shared_lng,
     ))
     conn.commit()
 
@@ -831,6 +924,71 @@ async def post_chat_messages_body(msg_data: Dict[str, Any]):
 @app.post("/api/chat/{ride_id}/messages")
 async def post_chat_messages_path(ride_id: str, msg_data: Dict[str, Any]):
     return await _save_and_broadcast_message(ride_id, msg_data)
+
+# =====================================================================
+# REST Endpoints: Live Location Sharing (Driver & Passenger GPS + Google Maps)
+# =====================================================================
+
+@app.post("/ride/api/location/share")
+@app.post("/api/location/share")
+async def share_user_location(payload: Dict[str, Any]):
+    ride_id = payload.get("rideId", "ride_default")
+    user_id = payload.get("userId", "usr_peer")
+    user_name = payload.get("userName", "DIU Commuter")
+    role = payload.get("role", "passenger") # passenger or driver
+    lat = float(payload.get("latitude", 23.8765))
+    lng = float(payload.get("longitude", 90.3204))
+    now = datetime.utcnow().isoformat()
+    loc_id = f"loc_{ride_id}_{user_id}"
+    maps_link = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT OR REPLACE INTO shared_locations (
+        id, ride_id, user_id, user_name, role, latitude, longitude, maps_link, updated_at
+    ) VALUES (?,?,?,?,?,?,?,?,?)
+    """, (loc_id, ride_id, user_id, user_name, role, lat, lng, maps_link, now))
+    conn.commit()
+    conn.close()
+
+    event_data = {
+        "id": loc_id,
+        "rideId": ride_id,
+        "userId": user_id,
+        "userName": user_name,
+        "role": role,
+        "latitude": lat,
+        "longitude": lng,
+        "mapsLink": maps_link,
+        "updatedAt": now,
+    }
+    # Broadcast to all connected clients over WebSocket
+    await manager.broadcast("location_shared", event_data)
+    return {"status": "ok", "data": event_data}
+
+@app.get("/ride/api/rides/{ride_id}/shared-locations")
+@app.get("/api/rides/{ride_id}/shared-locations")
+def get_shared_locations(ride_id: str):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM shared_locations WHERE ride_id = ? ORDER BY updated_at DESC", (ride_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [
+        {
+            "id": r["id"],
+            "rideId": r["ride_id"],
+            "userId": r["user_id"],
+            "userName": r["user_name"],
+            "role": r["role"],
+            "latitude": float(r["latitude"]),
+            "longitude": float(r["longitude"]),
+            "mapsLink": r["maps_link"],
+            "updatedAt": r["updated_at"],
+        }
+        for r in rows
+    ]
 
 # =====================================================================
 # REST Endpoints: Live Driver Location

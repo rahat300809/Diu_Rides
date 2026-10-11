@@ -47,9 +47,18 @@ abstract class RidesRepository {
 
   Future<bool> deleteRide(String rideId);
 
-  Future<bool> startRide(String rideId);
+  Future<bool> startRide(String rideId, {double? startLat, double? startLng});
 
-  Future<bool> completeRide(String rideId);
+  Future<bool> completeRide(String rideId, {double? endLat, double? endLng});
+
+  Future<bool> shareLiveLocation({
+    required String rideId,
+    required String userId,
+    required String userName,
+    required String role,
+    required double latitude,
+    required double longitude,
+  });
 
   Future<void> updateRideSeats(String rideId, int seatsToDeduct);
 }

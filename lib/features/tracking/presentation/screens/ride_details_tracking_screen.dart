@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/network/websocket_client.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
+import 'package:diu_ride/core/utils/gps_location_service.dart';
+import 'package:diu_ride/features/auth/presentation/providers/auth_provider.dart';
 import 'package:diu_ride/features/chat/presentation/screens/chat_screen.dart';
 import 'package:diu_ride/features/rating/presentation/widgets/rate_ride_sheet.dart';
 import 'package:diu_ride/features/rides/data/models/ride_model.dart';
@@ -11,7 +13,6 @@ import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 import 'package:diu_ride/features/safety/presentation/widgets/campus_sos_dialog.dart';
 import 'package:diu_ride/features/safety/presentation/widgets/campus_voice_call_dialog.dart';
-
 
 class RideDetailsTrackingScreen extends ConsumerStatefulWidget {
   final String rideId;
@@ -37,6 +38,20 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
   double _distanceKm = 1.2;
   final String _roadInfo = 'Cruising along Birulia - Ashulia Road';
 
+  // Real-time GPS Location Sharing & Start/End Tracing
+  bool _isSharingLocation = false;
+  double? _mySharedLat;
+  double? _mySharedLng;
+  String? _mySharedMapsLink;
+
+  double? _peerSharedLat;
+  double? _peerSharedLng;
+  String? _peerSharedName;
+  String? _peerSharedRole;
+  String? _peerSharedMapsLink;
+
+  RideModel? _updatedRide;
+
   @override
   void initState() {
     super.initState();
@@ -56,6 +71,35 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
             _etaMinutes = data['etaMinutes'] as int? ?? _etaMinutes;
             _distanceKm = (data['distanceRemainingKm'] as num?)?.toDouble() ?? _distanceKm;
           });
+        }
+      } else if (msg['event'] == 'location_shared') {
+        final data = msg['data'] as Map<String, dynamic>;
+        if (data['rideId'] == widget.rideId && mounted) {
+          final currentUserId = ref.read(authNotifierProvider).user?.id;
+          final senderId = data['userId'];
+          final lat = (data['latitude'] as num).toDouble();
+          final lng = (data['longitude'] as num).toDouble();
+          final mapsLink = data['mapsLink'] as String? ?? GpsLocationService.getGoogleMapsLocationUrl(lat, lng);
+          if (senderId != currentUserId) {
+            setState(() {
+              _peerSharedLat = lat;
+              _peerSharedLng = lng;
+              _peerSharedName = data['userName'] as String? ?? 'Peer';
+              _peerSharedRole = data['role'] as String? ?? 'Rider';
+              _peerSharedMapsLink = mapsLink;
+            });
+            _showToast('${data['userName']} shared their live GPS location with Google Maps!');
+          }
+        }
+      } else if (msg['event'] == 'ride_updated') {
+        final data = msg['data'] as Map<String, dynamic>;
+        if (data['id'] == widget.rideId && mounted) {
+          try {
+            final updated = RideModel.fromJson(data);
+            setState(() {
+              _updatedRide = updated;
+            });
+          } catch (_) {}
         }
       }
     });
@@ -91,10 +135,79 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
     );
   }
 
+  Future<void> _shareMyLocation(RideModel ride) async {
+    setState(() => _isSharingLocation = true);
+    _showToast('Fetching device GPS coordinates...');
+    final pos = await GpsLocationService.getCurrentLocation();
+    final lat = pos?.latitude ?? GpsLocationService.defaultCampusLat;
+    final lng = pos?.longitude ?? GpsLocationService.defaultCampusLng;
+    final mapsLink = GpsLocationService.getGoogleMapsLocationUrl(lat, lng);
+
+    final user = ref.read(authNotifierProvider).user;
+    final userId = user?.id ?? 'usr_current';
+    final userName = user?.name ?? 'DIU Student';
+    final role = (user?.id == ride.driverId) ? 'Driver' : 'Passenger';
+
+    await ref.read(ridesRepositoryProvider).shareLiveLocation(
+      rideId: ride.id,
+      userId: userId,
+      userName: userName,
+      role: role,
+      latitude: lat,
+      longitude: lng,
+    );
+
+    if (mounted) {
+      setState(() {
+        _isSharingLocation = false;
+        _mySharedLat = lat;
+        _mySharedLng = lng;
+        _mySharedMapsLink = mapsLink;
+      });
+      _showToast('GPS Location shared with Google Maps link!');
+    }
+  }
+
+  Future<void> _startRideWithGps(RideModel ride) async {
+    _showToast('Starting ride and recording GPS start point...');
+    final pos = await GpsLocationService.getCurrentLocation();
+    final lat = pos?.latitude ?? ride.originLat;
+    final lng = pos?.longitude ?? ride.originLng;
+
+    await ref.read(ridesRepositoryProvider).startRide(
+      ride.id,
+      startLat: lat,
+      startLng: lng,
+    );
+
+    if (mounted) {
+      _showToast('Ride Started! Start GPS & Google Maps link recorded.');
+      ref.invalidate(searchRidesResultsProvider);
+    }
+  }
+
+  Future<void> _completeRideWithGps(RideModel ride) async {
+    _showToast('Completing ride and recording GPS end point...');
+    final pos = await GpsLocationService.getCurrentLocation();
+    final lat = pos?.latitude ?? ride.destinationLat;
+    final lng = pos?.longitude ?? ride.destinationLng;
+
+    await ref.read(ridesRepositoryProvider).completeRide(
+      ride.id,
+      endLat: lat,
+      endLng: lng,
+    );
+
+    if (mounted) {
+      _showToast('Ride Completed! End GPS & full route link saved.');
+      ref.invalidate(searchRidesResultsProvider);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ridesAsync = ref.watch(searchRidesResultsProvider);
-    final RideModel ride = ridesAsync.maybeWhen(
+    final RideModel ride = _updatedRide ?? ridesAsync.maybeWhen(
       data: (list) {
         for (final r in list) {
           if (r.id == widget.rideId) return r;
@@ -615,6 +728,14 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
             ),
             const SizedBox(height: 14),
 
+            // LIVE GPS LOCATION SHARING CARD (ORDER CONFIRMED / RIDER & PASSENGER)
+            _buildLiveLocationSharingCard(ride),
+            const SizedBox(height: 14),
+
+            // RIDE GPS START & END TRACE + GOOGLE MAPS ROUTE CARD
+            _buildGpsTraceAndRouteCard(ride),
+            const SizedBox(height: 14),
+
             // 4. COMMUTE ITINERARY SCHEDULE TIMELINE
             Container(
               padding: const EdgeInsets.all(16),
@@ -1074,6 +1195,407 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
       ],
     );
   }
+
+  Widget _buildLiveLocationSharingCard(RideModel ride) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 6, offset: Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryFixed,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.share_location, color: AppColors.primary, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Live GPS Location Sharing', style: AppTypography.headlineSm),
+                      Text('Google Maps link for rider & passenger', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Order Active',
+                  style: AppTypography.labelSm.copyWith(
+                    color: const Color(0xFF2E7D32),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Both rider (driver) and passenger can share their current GPS mobile location in real-time. Click to view on Google Maps instantly.',
+            style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant, fontSize: 12.5),
+          ),
+          const SizedBox(height: 12),
+
+          // Primary Share Action Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isSharingLocation ? null : () => _shareMyLocation(ride),
+              icon: _isSharingLocation
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Icon(Icons.my_location, size: 18),
+              label: Text(_isSharingLocation ? 'Acquiring GPS...' : 'Share My Current GPS Location'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ),
+
+          // My shared location details
+          if (_mySharedLat != null && _mySharedLng != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F8F4),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.pin_drop, color: AppColors.primary, size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Your Shared Location', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                        Text('Lat: ${_mySharedLat!.toStringAsFixed(5)}, Lng: ${_mySharedLng!.toStringAsFixed(5)}', style: AppTypography.labelSm),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      if (_mySharedMapsLink != null) {
+                        GpsLocationService.openGoogleMaps(_mySharedMapsLink!);
+                      }
+                    },
+                    icon: const Icon(Icons.open_in_new, size: 14),
+                    label: const Text('Google Maps', style: TextStyle(fontSize: 11)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E7D32),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Peer shared location details
+          if (_peerSharedLat != null && _peerSharedLng != null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEBF3FB),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF1976D2).withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.person_pin_circle, color: Color(0xFF1976D2), size: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${_peerSharedName ?? "Peer"} (${_peerSharedRole ?? "Rider"}) Location',
+                          style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold, color: const Color(0xFF1976D2)),
+                        ),
+                        Text('Lat: ${_peerSharedLat!.toStringAsFixed(5)}, Lng: ${_peerSharedLng!.toStringAsFixed(5)}', style: AppTypography.labelSm),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      if (_peerSharedMapsLink != null) {
+                        GpsLocationService.openGoogleMaps(_peerSharedMapsLink!);
+                      }
+                    },
+                    icon: const Icon(Icons.map, size: 14),
+                    label: const Text('View Maps', style: TextStyle(fontSize: 11)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1976D2),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGpsTraceAndRouteCard(RideModel ride) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 6, offset: Offset(0, 2))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.secondaryFixed,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.alt_route, color: AppColors.onSecondaryFixed, size: 20),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Ride GPS Route & Tracing', style: AppTypography.headlineSm),
+                      Text('Recorded start point, end point & route', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  ride.status.name.toUpperCase(),
+                  style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold, fontSize: 10),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Start Point GPS Trace
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF2E7D32),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.play_arrow, color: Colors.white, size: 18),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Start Point Trace', style: AppTypography.bodyMdMedium.copyWith(fontWeight: FontWeight.bold)),
+                      if (ride.startLat != null && ride.startLng != null) ...[
+                        Text(
+                          'GPS: ${ride.startLat!.toStringAsFixed(5)}, ${ride.startLng!.toStringAsFixed(5)}',
+                          style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
+                        ),
+                        if (ride.startTime != null)
+                          Text(
+                            'Started: ${ride.startTime!.toLocal().toString().split('.')[0]}',
+                            style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 10),
+                          ),
+                      ] else ...[
+                        Text('Origin: ${ride.originName}', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                        Text('GPS: ${ride.originLat.toStringAsFixed(4)}, ${ride.originLng.toStringAsFixed(4)}', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 10)),
+                      ],
+                    ],
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    final url = ride.googleMapsStartUrl;
+                    GpsLocationService.openGoogleMaps(url);
+                  },
+                  icon: const Icon(Icons.map, size: 14),
+                  label: const Text('Maps', style: TextStyle(fontSize: 11)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF2E7D32),
+                    side: const BorderSide(color: Color(0xFF2E7D32)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // End Point GPS Trace
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE65100),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.flag, color: Colors.white, size: 18),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('End Point Trace', style: AppTypography.bodyMdMedium.copyWith(fontWeight: FontWeight.bold)),
+                      if (ride.endLat != null && ride.endLng != null) ...[
+                        Text(
+                          'GPS: ${ride.endLat!.toStringAsFixed(5)}, ${ride.endLng!.toStringAsFixed(5)}',
+                          style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
+                        ),
+                        if (ride.endTime != null)
+                          Text(
+                            'Completed: ${ride.endTime!.toLocal().toString().split('.')[0]}',
+                            style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 10),
+                          ),
+                      ] else ...[
+                        Text('Destination: ${ride.destinationName}', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                        Text('GPS: ${ride.destinationLat.toStringAsFixed(4)}, ${ride.destinationLng.toStringAsFixed(4)}', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 10)),
+                      ],
+                    ],
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    final url = ride.googleMapsEndUrl;
+                    GpsLocationService.openGoogleMaps(url);
+                  },
+                  icon: const Icon(Icons.map, size: 14),
+                  label: const Text('Maps', style: TextStyle(fontSize: 11)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFE65100),
+                    side: const BorderSide(color: Color(0xFFE65100)),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Complete Driving Route on Google Maps
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                GpsLocationService.openGoogleMaps(ride.googleMapsRouteUrl);
+              },
+              icon: const Icon(Icons.navigation, size: 18),
+              label: const Text('Open Complete Route in Google Maps'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.secondary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+            ),
+          ),
+
+          // Driver Trip Management Buttons (Start Ride / Complete Ride)
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              if (ride.status == RideStatus.published)
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _startRideWithGps(ride),
+                    icon: const Icon(Icons.play_circle_outline, size: 16),
+                    label: const Text('Start Ride (GPS)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2E7D32),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              if (ride.status == RideStatus.active)
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _completeRideWithGps(ride),
+                    icon: const Icon(Icons.check_circle_outline, size: 16),
+                    label: const Text('Complete Ride (GPS)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE65100),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   static RideModel _defaultRide(String rideId) => RideModel(
     id: rideId,
     driverId: '',
