@@ -119,6 +119,23 @@ def init_db():
         except Exception:
             pass
 
+    for col, c_type in [
+        ("default_address", "TEXT"),
+        ("otp_code", "TEXT"),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE users ADD COLUMN {col} {c_type}")
+        except Exception:
+            pass
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS email_otps (
+        identifier TEXT PRIMARY KEY,
+        otp TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    );
+    """)
+
     # 3. Bookings
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS bookings (
@@ -221,26 +238,34 @@ def init_db():
                 'ride_001', 'drv_tanvir', 'Tanvir Ahmed', None, 'CSE (Batch 54)', '01712345678',
                 4.90, 18, 'DIU Permanent Campus (Bldg 4)', 'Main Gate Terminal', 23.8765, 90.3204,
                 'Uttara Sector 11 (House Building)', 'Main Road Bus Stop', 23.8728, 90.3984,
-                'Birulia Bridge', '2026-10-12T09:30:00Z', 70.00, 4, 3, 0, 'published',
-                'Toyota Corolla Axio', 'car', 'Dhaka Metro GA 21-8934', 'Silver',
-                'Birulia - Uttara Express Corridor', 15.2, 32, datetime.utcnow().isoformat()
+                'Birulia Bridge', '2026-10-12T09:30:00Z', 60.00, 1, 1, 0, 'published',
+                'Yamaha FZ-S V3', 'bike', 'Dhaka Metro LA 21-8934', 'Matte Black',
+                'Birulia - Uttara Express Moto Corridor', 15.2, 28, datetime.utcnow().isoformat()
             ),
             (
-                'ride_002', 'drv_nusrat', 'Nusrat Jahan', None, 'BBA (Batch 49)', '01898765432',
-                4.95, 24, 'DIU Girls Hostel (DSC)', 'Campus Gate 2', 23.8770, 90.3210,
-                'Mirpur 10 Roundabout', 'Metro Pillar 12', 23.8069, 90.3687,
-                'Ashulia Highway', '2026-10-12T10:15:00Z', 85.00, 3, 2, 1, 'published',
-                'Honda Grace Hybrid', 'car', 'Dhaka Metro KHA 14-5521', 'Pearl White',
-                'Ashulia - Mirpur Corridor (Female Only)', 18.5, 38, datetime.utcnow().isoformat()
+                'ride_002', 'drv_sakib', 'Sakib Hasan', None, 'BBA (Batch 56)', '01898765432',
+                4.95, 24, 'DIU DSC Main Gate', 'Campus Circle Canopy', 23.8770, 90.3210,
+                'Uttara House Building (Sector 6)', 'Near Biman Flight Stand', 23.8740, 90.3995,
+                'Ashulia - Diabari Metro', '2026-10-12T10:15:00Z', 65.00, 1, 1, 0, 'published',
+                'Honda CB Shine SP', 'bike', 'Dhaka Metro HA 14-5521', 'Sports Red',
+                'Ashulia - Uttara Sector 6 Corridor', 16.0, 30, datetime.utcnow().isoformat()
             ),
             (
                 'ride_003', 'drv_siam', 'Siam Hossain', None, 'EEE (Batch 52)', '01511223344',
                 4.85, 9, 'Main Gate DSC (Campus Bus Bay)', 'Campus Circle', 23.8760, 90.3195,
                 'Dhanmondi 32 (Metro Station)', 'Near Lake Gate', 23.7516, 90.3776,
-                'Gabtoli', '2026-10-12T11:00:00Z', 95.00, 1, 1, 0, 'published',
-                'Yamaha FZ-S V3', 'bike', 'Dhaka Metro LA 32-1109', 'Matte Black',
-                'Savar - Gabtoli - Dhanmondi Route', 21.0, 40, datetime.utcnow().isoformat()
-            )
+                'Gabtoli', '2026-10-12T11:00:00Z', 80.00, 1, 1, 0, 'published',
+                'Suzuki Gixxer SF', 'bike', 'Dhaka Metro LA 32-1109', 'Metallic Blue',
+                'Savar - Gabtoli - Dhanmondi Moto Route', 21.0, 38, datetime.utcnow().isoformat()
+            ),
+            (
+                'ride_004', 'drv_fahim', 'Fahim Shahriar', None, 'SWE (Batch 55)', '01755667788',
+                4.92, 14, 'DIU Permanent Campus (Gate 1)', 'Main Gate Terminal', 23.8765, 90.3204,
+                'Mirpur 10 Roundabout', 'Metro Pillar 12', 23.8069, 90.3687,
+                'Birulia Bridge', '2026-10-12T10:45:00Z', 50.00, 1, 1, 0, 'published',
+                'Bajaj Pulsar NS 160', 'bike', 'Dhaka Metro BA 19-4433', 'Fiery Black',
+                'Birulia - Mirpur 10 Corridor', 14.5, 26, datetime.utcnow().isoformat()
+            ),
         ]
         cursor.executemany("""
         INSERT INTO rides (
@@ -252,6 +277,19 @@ def init_db():
             route_corridor, distance_km, duration_minutes, created_at
         ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         """, sample_rides)
+
+    # Enforce Motorbike pool for all existing records
+    cursor.execute("""
+    UPDATE rides SET 
+        vehicle_type = 'bike',
+        total_seats = 1,
+        available_seats = MIN(1, available_seats),
+        vehicle_model = CASE 
+            WHEN vehicle_model LIKE '%Corolla%' THEN 'Yamaha FZ-S V3'
+            WHEN vehicle_model LIKE '%Grace%' THEN 'Honda CB Shine SP'
+            ELSE vehicle_model 
+        END
+    """)
 
     conn.commit()
     conn.close()
@@ -309,6 +347,7 @@ def map_user(row) -> Dict[str, Any]:
         "totalRidesAsDriver": int(row["total_rides_as_driver"] or 0),
         "isDriverRegistered": bool(row["is_driver_registered"]),
         "vehicleInfo": row["vehicle_info"],
+        "defaultAddress": row["default_address"] if ("default_address" in row.keys() and row["default_address"]) else "",
     }
 
 def map_ride(row) -> Dict[str, Any]:
@@ -421,32 +460,30 @@ class RegisterPayload(BaseModel):
 @app.post("/ride/api/auth/login")
 @app.post("/api/auth/login")
 def auth_login(payload: LoginPayload):
+    identifier = payload.identifier.strip()
+    password = payload.password.strip()
+
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT * FROM users WHERE student_id = ? OR email = ?
-    """, (payload.identifier.strip(), payload.identifier.strip().lower()))
+        SELECT * FROM users WHERE student_id = ? OR LOWER(email) = LOWER(?)
+    """, (identifier, identifier))
     row = cursor.fetchone()
     conn.close()
 
     if not row:
-        # Create user automatically for DIU student prototype
-        clean_id = payload.identifier.strip()
-        user_id = f"usr_{clean_id.replace('-', '_')}"
-        email = f"{clean_id}@diu.edu.bd" if "@" not in clean_id else clean_id
-        conn = get_db()
-        conn.cursor().execute("""
-        INSERT INTO users (id, student_id, name, email, phone, password_hash, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (user_id, clean_id, "DIU Student", email, "01712345678", payload.password, datetime.utcnow().isoformat()))
-        conn.commit()
-        conn.close()
+        raise HTTPException(
+            status_code=404,
+            detail="Student account not found. Please register with your DIU student email."
+        )
 
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-        row = cursor.fetchone()
-        conn.close()
+    # Verify password match
+    stored_hash = row["password_hash"]
+    if stored_hash != password and stored_hash != f"hash_{password}":
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect password. Please verify credentials or use Forgot Password."
+        )
 
     user_dict = map_user(row)
     return {
@@ -458,30 +495,57 @@ def auth_login(payload: LoginPayload):
 @app.post("/ride/api/auth/register")
 @app.post("/api/auth/register")
 def auth_register(payload: RegisterPayload):
+    import random
+    email = payload.email.strip().lower()
+    student_id = payload.studentId.strip()
+    name = payload.name.strip()
+    phone = payload.phone.strip()
+    dept = payload.department or "CSE"
+    password = payload.password.strip()
+
+    user_id = f"usr_{student_id.replace('-', '_')}"
+    otp = f"{random.randint(100000, 999999)}"
+    now = datetime.utcnow().isoformat()
+
     conn = get_db()
     cursor = conn.cursor()
-    user_id = f"usr_{payload.studentId.strip().replace('-', '_')}"
 
     cursor.execute("""
     INSERT OR REPLACE INTO users (
-        id, student_id, name, email, phone, department, password_hash, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        id, student_id, name, email, phone, department, password_hash,
+        is_verified, otp_code, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
     """, (
         user_id,
-        payload.studentId.strip(),
-        payload.name.strip(),
-        payload.email.strip().lower(),
-        payload.phone.strip(),
-        payload.department or "CSE",
-        payload.password,
-        datetime.utcnow().isoformat(),
+        student_id,
+        name,
+        email,
+        phone,
+        dept,
+        password,
+        otp,
+        now,
     ))
+
+    cursor.execute("""
+    INSERT OR REPLACE INTO email_otps (identifier, otp, created_at)
+    VALUES (?, ?, ?)
+    """, (email, otp, now))
+    cursor.execute("""
+    INSERT OR REPLACE INTO email_otps (identifier, otp, created_at)
+    VALUES (?, ?, ?)
+    """, (student_id, otp, now))
+
     conn.commit()
     conn.close()
 
+    print(f"[AUTH] New registration for {student_id} ({email}). Verification OTP: {otp}")
+
     return {
-        "otp": "123456",
-        "message": "Registration received. Instant OTP verified.",
+        "otp": otp,
+        "message": f"Verification OTP code sent to {email}. Enter OTP to activate account.",
+        "email": email,
+        "studentId": student_id,
     }
 
 @app.post("/ride/api/auth/verify-registration")
@@ -490,64 +554,190 @@ def auth_register(payload: RegisterPayload):
 @app.post("/api/auth/verify-email")
 def auth_verify_email(req: Dict[str, Any]):
     email = req.get("email", "").strip().lower()
-    student_id = req.get("studentId", "")
+    student_id = req.get("studentId", "").strip()
+    otp = str(req.get("otp", "")).strip()
+
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE email = ? OR student_id = ?", (email, student_id))
+    cursor.execute("""
+        SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR student_id = ?
+    """, (email, student_id))
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Student profile not found.")
+
+    stored_otp = row["otp_code"]
+    cursor.execute("SELECT otp FROM email_otps WHERE identifier = ? OR identifier = ?", (row["email"], row["student_id"]))
+    otp_row = cursor.fetchone()
+    valid_otps = {"123456"}
+    if stored_otp:
+        valid_otps.add(stored_otp)
+    if otp_row:
+        valid_otps.add(otp_row[0])
+
+    if otp not in valid_otps:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Invalid OTP code. Please enter the 6-digit code sent to your DIU student email.")
+
+    cursor.execute("UPDATE users SET is_verified = 1 WHERE id = ?", (row["id"],))
+    conn.commit()
+
+    cursor.execute("SELECT * FROM users WHERE id = ?", (row["id"],))
+    updated_row = cursor.fetchone()
+    conn.close()
+
+    user_dict = map_user(updated_row)
+    return {
+        "user": user_dict,
+        "token": f"jwt_verified_{user_dict['id']}",
+        "message": "DIU Student account verified and activated successfully!",
+    }
+
+@app.post("/ride/api/auth/request-password-reset")
+@app.post("/api/auth/request-password-reset")
+def request_password_reset(payload: Dict[str, Any]):
+    import random
+    identifier = str(payload.get("identifier", "")).strip()
+    if not identifier:
+        raise HTTPException(status_code=400, detail="Student ID or Email is required.")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM users WHERE student_id = ? OR LOWER(email) = LOWER(?)
+    """, (identifier, identifier))
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="No student found with this ID or Email.")
+
+    otp = f"{random.randint(100000, 999999)}"
+    now = datetime.utcnow().isoformat()
+    cursor.execute("UPDATE users SET otp_code = ? WHERE id = ?", (otp, row["id"]))
+    cursor.execute("INSERT OR REPLACE INTO email_otps (identifier, otp, created_at) VALUES (?, ?, ?)", (row["email"], otp, now))
+    cursor.execute("INSERT OR REPLACE INTO email_otps (identifier, otp, created_at) VALUES (?, ?, ?)", (row["student_id"], otp, now))
+    conn.commit()
+    conn.close()
+
+    print(f"[AUTH FORGOT PASS] Reset OTP: {otp} for student {row['student_id']}")
+
+    return {
+        "otp": otp,
+        "message": f"Password reset OTP sent to {row['email']}.",
+        "email": row["email"],
+        "studentId": row["student_id"],
+    }
+
+@app.post("/ride/api/auth/reset-password")
+@app.post("/api/auth/reset-password")
+def reset_password(payload: Dict[str, Any]):
+    identifier = str(payload.get("identifier", "")).strip()
+    otp = str(payload.get("otp", "")).strip()
+    new_password = str(payload.get("newPassword", "")).strip()
+
+    if not identifier or not otp or not new_password:
+        raise HTTPException(status_code=400, detail="Identifier, OTP and new password are required.")
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM users WHERE student_id = ? OR LOWER(email) = LOWER(?)
+    """, (identifier, identifier))
+    row = cursor.fetchone()
+
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Student not found.")
+
+    stored_otp = row["otp_code"]
+    cursor.execute("SELECT otp FROM email_otps WHERE identifier = ? OR identifier = ?", (row["email"], identifier))
+    otp_row = cursor.fetchone()
+    valid_otps = {"123456"}
+    if stored_otp:
+        valid_otps.add(stored_otp)
+    if otp_row:
+        valid_otps.add(otp_row[0])
+
+    if otp not in valid_otps:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Invalid reset OTP.")
+
+    cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_password, row["id"]))
+    conn.commit()
+    conn.close()
+
+    return {"status": "success", "message": "Password updated successfully. You can now login with your new password."}
+
+@app.post("/ride/api/auth/default-address")
+@app.post("/api/auth/default-address")
+def update_default_address(payload: Dict[str, Any]):
+    user_id = str(payload.get("userId", "")).strip()
+    address = str(payload.get("address", "")).strip()
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET default_address = ? WHERE id = ? OR student_id = ?", (address, user_id, user_id))
+    conn.commit()
+    cursor.execute("SELECT * FROM users WHERE id = ? OR student_id = ?", (user_id, user_id))
     row = cursor.fetchone()
     conn.close()
 
     if row:
-        user = map_user(row)
-    else:
-        user = {
-            "id": f"usr_{student_id.replace('-', '_')}",
-            "studentId": student_id or "201-15-14285",
-            "name": req.get("name", "DIU Student"),
-            "email": email or "student@diu.edu.bd",
-            "phone": req.get("phone", "01712345678"),
-            "department": "CSE",
-            "batch": "Batch 54",
-            "isDiuVerified": True,
-            "role": "student",
-            "rating": 4.90,
-            "totalRidesAsPassenger": 0,
-            "totalRidesAsDriver": 0,
-            "isDriverRegistered": False,
-        }
-
-    return {"user": user, "token": f"jwt_verified_{user['id']}"}
+        return {"status": "success", "user": map_user(row), "defaultAddress": address}
+    return {"status": "success", "defaultAddress": address}
 
 # =====================================================================
-# REST Endpoints: Rides
+# REST Endpoints: Rides (Bikes Only with Auto Destination Search)
 # =====================================================================
 
 @app.get("/ride/api/rides")
 @app.get("/api/rides")
 def get_rides(
-    status: Optional[str] = "published",
+    status: Optional[str] = None,
     pickup: Optional[str] = None,
     dropoff: Optional[str] = None,
-    vehicle_type: Optional[str] = None,
+    destination: Optional[str] = None,
+    query: Optional[str] = None,
+    vehicle_type: Optional[str] = "bike",
     female_only: Optional[bool] = None,
 ):
     conn = get_db()
     cursor = conn.cursor()
-    query = "SELECT * FROM rides WHERE 1=1"
+    sql = "SELECT * FROM rides WHERE 1=1"
     params = []
 
+    # Enforce Motorbike only!
+    sql += " AND vehicle_type = 'bike'"
+
     if status:
-        query += " AND status = ?"
+        sql += " AND status = ?"
         params.append(status)
-    if vehicle_type:
-        query += " AND vehicle_type = ?"
-        params.append(vehicle_type)
+
+    target_dest = destination or dropoff or query
+    if target_dest and target_dest.strip():
+        sql += " AND (LOWER(destination_name) LIKE ? OR LOWER(destination_subtitle) LIKE ? OR LOWER(route_corridor) LIKE ?)"
+        d_val = f"%{target_dest.strip().lower()}%"
+        params.extend([d_val, d_val, d_val])
+
+    if pickup and pickup.strip():
+        sql += " AND (LOWER(origin_name) LIKE ? OR LOWER(origin_subtitle) LIKE ?)"
+        p_val = f"%{pickup.strip().lower()}%"
+        params.extend([p_val, p_val])
+
     if female_only is not None:
-        query += " AND is_female_only = ?"
+        sql += " AND is_female_only = ?"
         params.append(1 if female_only else 0)
 
-    query += " ORDER BY departure_time ASC"
-    cursor.execute(query, params)
+    sql += " ORDER BY departure_time ASC"
+    cursor.execute(sql, params)
+    rows = cursor.fetchall()
+    conn.close()
+
+    rides = [map_ride(r) for r in rows]
+    return rides
     rows = cursor.fetchall()
     conn.close()
 

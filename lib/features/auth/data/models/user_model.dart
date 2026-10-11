@@ -16,6 +16,7 @@ class UserModel {
   final int totalRidesAsDriver;
   final bool isDriverRegistered;
   final String? vehicleInfo;
+  final String? defaultAddress;
 
   const UserModel({
     required this.id,
@@ -33,6 +34,7 @@ class UserModel {
     this.totalRidesAsDriver = 0,
     this.isDriverRegistered = false,
     this.vehicleInfo,
+    this.defaultAddress,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -52,6 +54,7 @@ class UserModel {
       totalRidesAsDriver: json['totalRidesAsDriver'] as int? ?? 0,
       isDriverRegistered: json['isDriverRegistered'] as bool? ?? false,
       vehicleInfo: json['vehicleInfo'] as String?,
+      defaultAddress: json['defaultAddress'] as String? ?? json['default_address'] as String?,
     );
   }
 
@@ -72,6 +75,7 @@ class UserModel {
       'totalRidesAsDriver': totalRidesAsDriver,
       'isDriverRegistered': isDriverRegistered,
       'vehicleInfo': vehicleInfo,
+      'defaultAddress': defaultAddress,
     };
   }
 
@@ -84,6 +88,7 @@ class UserModel {
     double? rating,
     int? totalRidesAsPassenger,
     int? totalRidesAsDriver,
+    String? defaultAddress,
   }) {
     return UserModel(
       id: id,
@@ -101,6 +106,7 @@ class UserModel {
       totalRidesAsDriver: totalRidesAsDriver ?? this.totalRidesAsDriver,
       isDriverRegistered: isDriverRegistered ?? this.isDriverRegistered,
       vehicleInfo: vehicleInfo ?? this.vehicleInfo,
+      defaultAddress: defaultAddress ?? this.defaultAddress,
     );
   }
 }

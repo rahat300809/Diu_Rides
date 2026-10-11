@@ -310,6 +310,33 @@ class SharedSyncAuthRepository implements AuthRepository {
     );
   }
 
+  @override
+  Future<UserModel> updateDefaultAddress(String address) async {
+    final user = _currentUser ?? (await restoreSession());
+    if (user == null) {
+      throw Exception('Not authenticated');
+    }
+    try {
+      final res = await _dio.post('$_apiBase/auth/default-address', data: {
+        'userId': user.id,
+        'studentId': user.studentId,
+        'email': user.email,
+        'defaultAddress': address,
+      });
+      if (res.statusCode == 200 && res.data != null && res.data['user'] != null) {
+        final updated = UserModel.fromJson(Map<String, dynamic>.from(res.data['user'] as Map));
+        await _persistUser(updated);
+        return updated;
+      }
+    } catch (e) {
+      debugPrint('Server default address update note: $e');
+    }
+
+    final updated = user.copyWith(defaultAddress: address);
+    await _persistUser(updated);
+    return updated;
+  }
+
   Future<void> _persistUser(UserModel user) async {
     _currentUser = user;
     final encoded = jsonEncode(user.toJson());

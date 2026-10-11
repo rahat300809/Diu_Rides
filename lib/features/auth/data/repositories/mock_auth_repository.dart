@@ -451,4 +451,16 @@ class MockAuthRepository implements AuthRepository {
 
     return true;
   }
+
+  @override
+  Future<UserModel> updateDefaultAddress(String address) async {
+    if (_currentUser == null) {
+      throw Exception('Not authenticated');
+    }
+    final updated = _currentUser!.copyWith(defaultAddress: address);
+    _currentUser = updated;
+    await preferences.saveUserJson(jsonEncode(updated.toJson()));
+    await preferences.saveDedicatedAccount(updated.studentId, jsonEncode(updated.toJson()));
+    return updated;
+  }
 }

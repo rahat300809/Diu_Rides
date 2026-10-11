@@ -59,4 +59,6 @@ abstract class AuthRepository {
     required String otp,
     required String newPassword,
   });
+
+  Future<UserModel> updateDefaultAddress(String address);
 }

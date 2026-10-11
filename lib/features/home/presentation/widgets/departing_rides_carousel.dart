@@ -4,7 +4,6 @@ import 'package:diu_ride/core/theme/app_typography.dart';
 import 'package:diu_ride/core/utils/currency_formatter.dart';
 import 'package:diu_ride/core/utils/date_time_utils.dart';
 import 'package:diu_ride/features/rides/data/models/ride_model.dart';
-import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
 
 class DepartingRidesCarousel extends StatelessWidget {
   final List<RideModel> rides;
@@ -123,21 +122,25 @@ class DepartingRidesCarousel extends StatelessWidget {
   }
 
   Widget _buildRideCard(BuildContext context, RideModel ride) {
-    final isBike = ride.vehicle.type == VehicleType.bike;
-    final primaryColor = isBike ? AppColors.primary : AppColors.secondary;
-    final primaryBg = isBike ? AppColors.primaryFixed : AppColors.secondaryFixed;
+    const primaryColor = Color(0xFF007AFF);
 
     return Container(
-      width: 312,
+      width: 316,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.black.withOpacity(0.06)),
+        boxShadow: [
           BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 8,
-            offset: Offset(0, 3),
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 5),
+          ),
+          const BoxShadow(
+            color: Colors.white,
+            blurRadius: 2,
+            offset: Offset(0, -1),
           ),
         ],
       ),
@@ -156,10 +159,14 @@ class DepartingRidesCarousel extends StatelessWidget {
                     children: [
                       CircleAvatar(
                         radius: 20,
-                        backgroundColor: AppColors.surfaceContainerHigh,
+                        backgroundColor: const Color(0xFFE3F2FD),
                         child: Text(
                           ride.driverName.substring(0, 1),
-                          style: AppTypography.bodyLgMedium.copyWith(color: AppColors.primary),
+                          style: const TextStyle(
+                            color: Color(0xFF007AFF),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                       Positioned(
@@ -169,7 +176,7 @@ class DepartingRidesCarousel extends StatelessWidget {
                           width: 13,
                           height: 13,
                           decoration: const BoxDecoration(
-                            color: AppColors.primary,
+                            color: Color(0xFF00C853),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.check, size: 9, color: Colors.white),
@@ -186,15 +193,16 @@ class DepartingRidesCarousel extends StatelessWidget {
                           Text(
                             ride.driverName,
                             style: AppTypography.bodyMdMedium.copyWith(
-                              fontWeight: FontWeight.w700,
+                              fontWeight: FontWeight.w800,
+                              color: const Color(0xFF1C1C1E),
                             ),
                           ),
-                          const SizedBox(width: 4),
+                          const SizedBox(width: 5),
                           Text(
                             ride.driverDept,
-                            style: AppTypography.labelSm.copyWith(
-                              color: AppColors.secondary,
-                              fontWeight: FontWeight.w600,
+                            style: const TextStyle(
+                              color: Color(0xFF007AFF),
+                              fontWeight: FontWeight.w700,
                               fontSize: 10,
                             ),
                           ),
@@ -202,20 +210,21 @@ class DepartingRidesCarousel extends StatelessWidget {
                       ),
                       Row(
                         children: [
-                          const Icon(Icons.star, size: 14, color: AppColors.ratingStar),
+                          const Icon(Icons.star, size: 13, color: Color(0xFFFF9500)),
                           const SizedBox(width: 3),
                           Text(
                             ride.driverRating.toStringAsFixed(1),
-                            style: AppTypography.labelSm.copyWith(
+                            style: const TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: AppColors.onSurface,
+                              color: Color(0xFF1C1C1E),
+                              fontSize: 11,
                             ),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             '(${ride.driverRideCount} rides)',
-                            style: AppTypography.labelSm.copyWith(
-                              color: AppColors.onSurfaceVariant,
+                            style: const TextStyle(
+                              color: Color(0xFF8E8E93),
                               fontSize: 11,
                             ),
                           ),
@@ -232,16 +241,18 @@ class DepartingRidesCarousel extends StatelessWidget {
                 children: [
                   Text(
                     CurrencyFormatter.formatBdt(ride.farePerSeat),
-                    style: AppTypography.headlineSm.copyWith(
+                    style: const TextStyle(
                       color: primaryColor,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 19,
                     ),
                   ),
-                  Text(
-                    'per seat',
-                    style: AppTypography.labelSm.copyWith(
-                      color: AppColors.onSurfaceVariant,
+                  const Text(
+                    '1 seat',
+                    style: TextStyle(
+                      color: Color(0xFF8E8E93),
                       fontSize: 10,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -253,8 +264,8 @@ class DepartingRidesCarousel extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(12),
+              color: const Color(0xFFF2F4F7),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Column(
               children: [
@@ -264,7 +275,7 @@ class DepartingRidesCarousel extends StatelessWidget {
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: AppColors.primary,
+                        color: Color(0xFF00C853),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -272,21 +283,25 @@ class DepartingRidesCarousel extends StatelessWidget {
                     Expanded(
                       child: Text(
                         ride.originName,
-                        style: AppTypography.labelMd.copyWith(color: AppColors.onSurface),
+                        style: const TextStyle(
+                          color: Color(0xFF1C1C1E),
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 5),
                 Row(
                   children: [
                     Container(
                       width: 8,
                       height: 8,
                       decoration: const BoxDecoration(
-                        color: AppColors.secondary,
+                        color: Color(0xFF007AFF),
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -294,7 +309,11 @@ class DepartingRidesCarousel extends StatelessWidget {
                     Expanded(
                       child: Text(
                         ride.destinationName,
-                        style: AppTypography.labelMd.copyWith(color: AppColors.onSurface),
+                        style: const TextStyle(
+                          color: Color(0xFF1C1C1E),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -305,47 +324,52 @@ class DepartingRidesCarousel extends StatelessWidget {
             ),
           ),
 
-          // Key metrics badges
+          // Moto details + Helmet + Time
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  Icon(
-                    isBike ? Icons.two_wheeler : Icons.directions_car,
-                    size: 16,
-                    color: AppColors.outline,
+                  const Icon(
+                    Icons.two_wheeler,
+                    size: 15,
+                    color: Color(0xFF007AFF),
                   ),
                   const SizedBox(width: 4),
                   Text(
                     ride.vehicle.modelName,
-                    style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
+                    style: const TextStyle(
+                      color: Color(0xFF3A3A3C),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                    ),
                   ),
                 ],
               ),
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                     decoration: BoxDecoration(
-                      color: primaryBg.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(10),
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      '${ride.availableSeats} seat${ride.availableSeats > 1 ? 's' : ''} left',
-                      style: AppTypography.labelSm.copyWith(
-                        color: primaryColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
+                    child: const Text(
+                      '🪖 Helmet',
+                      style: TextStyle(
+                        color: Color(0xFFE65100),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 9.5,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Text(
                     DateTimeUtils.formatTime(ride.departureTime),
-                    style: AppTypography.labelSm.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.onSurface,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF007AFF),
+                      fontSize: 11,
                     ),
                   ),
                 ],
@@ -358,22 +382,22 @@ class DepartingRidesCarousel extends StatelessWidget {
             onPressed: () => onRequestSeat(ride),
             style: ElevatedButton.styleFrom(
               backgroundColor: primaryColor,
-              foregroundColor: AppColors.onPrimary,
+              foregroundColor: Colors.white,
               elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 11),
+              padding: const EdgeInsets.symmetric(vertical: 10),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(16),
               ),
             ),
-            child: Row(
+            child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Request Seat',
-                  style: AppTypography.labelLg.copyWith(color: Colors.white),
+                  'Book Moto Seat (1/1)',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(width: 6),
-                const Icon(Icons.arrow_forward, size: 16, color: Colors.white),
+                SizedBox(width: 6),
+                Icon(Icons.arrow_forward, size: 15, color: Colors.white),
               ],
             ),
           ),

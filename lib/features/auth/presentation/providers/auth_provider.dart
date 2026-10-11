@@ -349,6 +349,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<bool> updateDefaultAddress(String address) async {
+    try {
+      final updatedUser = await _repository.updateDefaultAddress(address);
+      state = state.copyWith(user: updatedUser);
+      return true;
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     state = state.copyWith(isLoading: true);
     await _repository.logout();
