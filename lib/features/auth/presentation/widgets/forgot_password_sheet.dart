@@ -31,7 +31,6 @@ class _ForgotPasswordSheetState extends ConsumerState<ForgotPasswordSheet> {
   bool _obscureNewPass = true;
   bool _obscureConfirmPass = true;
   String? _dispatchedEmail;
-  String? _generatedOtp;
 
   @override
   void initState() {
@@ -57,17 +56,24 @@ class _ForgotPasswordSheetState extends ConsumerState<ForgotPasswordSheet> {
         .requestPasswordReset(identifier);
 
     if (success && mounted) {
-      final authState = ref.read(authNotifierProvider);
       setState(() {
         _codeSent = true;
         _dispatchedEmail = identifier.contains('@') ? identifier : '$identifier@diu.edu.bd';
-        _generatedOtp = authState.resetOtp;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Password reset code sent to your DIU email: $_dispatchedEmail'),
+          content: Text('Password reset code & link sent to your DIU email: $_dispatchedEmail'),
           backgroundColor: AppColors.primary,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else if (mounted) {
+      final errorMsg = ref.read(authNotifierProvider).errorMessage ?? 'Unable to send reset code. Please check your Student ID or Email.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMsg),
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -108,6 +114,15 @@ class _ForgotPasswordSheetState extends ConsumerState<ForgotPasswordSheet> {
           backgroundColor: AppColors.primary,
           behavior: SnackBarBehavior.floating,
           duration: Duration(seconds: 4),
+        ),
+      );
+    } else if (mounted) {
+      final errorMsg = ref.read(authNotifierProvider).errorMessage ?? 'Password reset failed. Please check the code and try again.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(errorMsg),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -279,48 +294,40 @@ class _ForgotPasswordSheetState extends ConsumerState<ForgotPasswordSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Instant Code Badge for testing / campus network resilience
-                    if (_generatedOtp != null && _generatedOtp!.isNotEmpty)
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.primaryFixed.withOpacity(0.35),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.mark_email_read_outlined,
-                                color: AppColors.primary, size: 20),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Reset Code Sent: $_generatedOtp',
-                                    style: AppTypography.labelMd.copyWith(
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Dispatched to ${_dispatchedEmail ?? 'DIU email'}',
-                                    style: AppTypography.labelSm.copyWith(fontSize: 11),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                _otpController.text = _generatedOtp!;
-                              },
-                              child: const Text('Auto-Fill', style: TextStyle(fontWeight: FontWeight.bold)),
-                            ),
-                          ],
-                        ),
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryFixed.withOpacity(0.35),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                       ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.mark_email_read_outlined,
+                              color: AppColors.primary, size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Security Code Dispatched',
+                                  style: AppTypography.labelMd.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text(
+                                  'Please check ${_dispatchedEmail ?? 'your DIU email'} inbox for the 6-digit verification code.',
+                                  style: AppTypography.labelSm.copyWith(fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                     // Reset Code
                     Text(

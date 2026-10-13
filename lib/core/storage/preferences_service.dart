@@ -140,32 +140,19 @@ class PreferencesService {
   }
 
   Future<void> seedDefaultAccounts() async {
-    const defaultId = '201-15-14285';
-    if (getAccountCredentials(defaultId) == null) {
-      final defaultUserMap = {
-        'id': 'usr_201_15_14285',
-        'studentId': defaultId,
-        'name': 'Shakib Ahmed',
-        'email': 'student@diu.edu.bd',
-        'phone': '01712345678',
-        'department': 'CSE',
-        'batch': 'Batch 54',
-        'isDiuVerified': true,
-        'role': 'student',
-        'rating': 4.95,
-        'totalRidesAsPassenger': 12,
-        'totalRidesAsDriver': 4,
-        'isDriverRegistered': true,
-        'vehicleInfo': 'Yamaha FZ-S (Dhaka Metro-LA-11-2233)',
-      };
+    // Production Mode: Do not seed mock demo accounts
+  }
 
-      await saveStudentAccount(
-        studentId: defaultId,
-        email: 'student@diu.edu.bd',
-        password: 'password123',
-        userJson: jsonEncode(defaultUserMap),
-        isVerified: true,
-      );
+  Future<void> clearAllDemoRecords() async {
+    final keys = _prefs.getKeys();
+    for (final key in keys) {
+      if (key.contains('201-15-14285') ||
+          key.contains('demo') ||
+          key.startsWith('shared_rides_') ||
+          key.startsWith('chat_messages_') ||
+          key.startsWith('cached_bookings_')) {
+        await _prefs.remove(key);
+      }
     }
   }
 

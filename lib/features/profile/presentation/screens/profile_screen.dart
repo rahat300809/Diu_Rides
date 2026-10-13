@@ -11,6 +11,9 @@ import 'package:diu_ride/features/dashboard/presentation/screens/my_rides_dashbo
 import 'package:diu_ride/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:diu_ride/features/safety/presentation/screens/emergency_contacts_screen.dart';
 import 'package:diu_ride/features/chat/presentation/screens/campus_messages_screen.dart';
+import 'package:diu_ride/features/profile/presentation/widgets/developer_info_dialog.dart';
+import 'package:diu_ride/features/profile/presentation/widgets/app_update_dialog.dart';
+import 'package:diu_ride/features/profile/presentation/widgets/motorcycle_config_dialog.dart';
 
 final _profilePhotoPathProvider = StateProvider<String?>((ref) => null);
 
@@ -343,61 +346,112 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Motorcycle Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3)),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF3E0),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(Icons.two_wheeler, color: Color(0xFFE65100), size: 26),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                  // Motorcycle Card (Interactive Configuration)
+                  InkWell(
+                    onTap: () {
+                      MotorcycleConfigDialog.show(
+                        context: context,
+                        onSaved: (m, p, c, h) => setState(() {}),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFFFFE0B2), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3)),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              const Text('Registered Motorcycle',
-                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                              Text(
-                                user?.vehicleInfo ?? 'None — Offer a ride to register',
-                                style: const TextStyle(color: Color(0xFF8E8E93), fontSize: 12),
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF3E0),
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: const Icon(Icons.two_wheeler, color: Color(0xFFE65100), size: 26),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Row(
+                                      children: [
+                                        Text(
+                                          'Motorcycle Configuration',
+                                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                                        ),
+                                        SizedBox(width: 4),
+                                        Icon(Icons.verified, size: 14, color: Color(0xFFE65100)),
+                                      ],
+                                    ),
+                                    Text(
+                                      user?.vehicleInfo ?? 'Tap to setup motorcycle details',
+                                      style: TextStyle(
+                                        color: user?.vehicleInfo != null ? const Color(0xFF141416) : const Color(0xFF8E8E93),
+                                        fontSize: 12.5,
+                                        fontWeight: user?.vehicleInfo != null ? FontWeight.w600 : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: user?.isDriverRegistered == true
+                                      ? const Color(0xFFFFF3E0)
+                                      : const Color(0xFFF2F2F7),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  user?.isDriverRegistered == true ? '🟢 Biker Active' : 'Configure',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: user?.isDriverRegistered == true
+                                        ? const Color(0xFFE65100)
+                                        : const Color(0xFF8E8E93),
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: user?.isDriverRegistered == true
-                                ? const Color(0xFFFFF3E0)
-                                : const Color(0xFFF2F2F7),
-                            borderRadius: BorderRadius.circular(10),
+                          const SizedBox(height: 12),
+                          const Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Campus Peer Commuter Setup',
+                                style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
+                              ),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Edit Moto Setup',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFE65100),
+                                    ),
+                                  ),
+                                  SizedBox(width: 2),
+                                  Icon(Icons.arrow_forward_ios, size: 10, color: Color(0xFFE65100)),
+                                ],
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            user?.isDriverRegistered == true ? '🟢 Active' : 'Passenger',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: user?.isDriverRegistered == true
-                                  ? const Color(0xFFE65100)
-                                  : const Color(0xFF8E8E93),
-                            ),
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -452,6 +506,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             MaterialPageRoute(builder: (_) => const NotificationsScreen()),
                           ),
                         ),
+                        _divider(),
+                        _buildMenuTile(
+                          icon: Icons.system_update_alt,
+                          title: 'Check for Updates',
+                          subtitle: 'Version 1.0.1 (Latest) • Tap to download APK update',
+                          onTap: () => showAppUpdateDialog(context),
+                        ),
+                        _divider(),
+                        _buildMenuTile(
+                          icon: Icons.code,
+                          title: 'Developer Info',
+                          subtitle: 'MD. Rahat Mahamud • CSE Batch 252',
+                          onTap: () => showDeveloperInfoDialog(context),
+                        ),
                       ],
                     ),
                   ),
@@ -483,6 +551,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     'DIU Ride v1.0.0 • Daffodil Smart City, Ashulia',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Color(0xFFBDBDBD), fontSize: 10),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Dedicated Developer Info Footer Section (Batch 252)
+                  DeveloperFooterCard(
+                    onOpenDetails: () => showDeveloperInfoDialog(context),
                   ),
                   const SizedBox(height: 24),
                 ],

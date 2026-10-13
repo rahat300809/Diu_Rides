@@ -89,24 +89,6 @@ class RideResultCard extends StatelessWidget {
                                   fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              if (ride.isFemaleOnly) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.tertiaryFixed.withOpacity(0.6),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    'Women Only',
-                                    style: AppTypography.labelSm.copyWith(
-                                      color: AppColors.onTertiaryFixedVariant,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 9.5,
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                           const SizedBox(height: 2),
@@ -174,16 +156,16 @@ class RideResultCard extends StatelessWidget {
                       ),
                       Row(
                         children: [
-                          const Icon(
-                            Icons.sports_motorsports,
+                          Icon(
+                            Icons.verified,
                             size: 14,
-                            color: Color(0xFFE65100),
+                            color: primaryColor,
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            ride.vehicle.hasPassengerHelmet ? 'Passenger Helmet Ready' : 'Motorbike Seat (1/1)',
+                            'DIU Verified Bike',
                             style: AppTypography.labelSm.copyWith(
-                              color: const Color(0xFFE65100),
+                              color: primaryColor,
                               fontWeight: FontWeight.w700,
                               fontSize: 10.5,
                             ),

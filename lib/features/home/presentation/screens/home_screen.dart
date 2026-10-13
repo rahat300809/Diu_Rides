@@ -18,6 +18,7 @@ import 'package:diu_ride/features/notifications/presentation/screens/notificatio
 import 'package:diu_ride/features/notifications/presentation/providers/notifications_provider.dart';
 import 'package:diu_ride/features/chat/presentation/screens/campus_messages_screen.dart';
 import 'package:diu_ride/features/profile/presentation/screens/profile_screen.dart';
+import 'package:diu_ride/features/home/presentation/widgets/live_ride_status_card.dart';
 import 'package:diu_ride/core/constants/campus_locations.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -198,6 +199,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final List<RideModel> matchingBikes = trimmedQuery.isEmpty
         ? []
         : allRides.where((r) {
+            // Do not show user's own offered ride in search results to book!
+            if (user != null && (r.driverId == user.id || r.driverId == user.studentId || (user.phone.isNotEmpty && r.driverPhone == user.phone))) {
+              return false;
+            }
             final destMatch = r.destinationName.toLowerCase().contains(trimmedQuery) ||
                 (r.destinationSubtitle?.toLowerCase().contains(trimmedQuery) ?? false);
             final originMatch = r.originName.toLowerCase().contains(trimmedQuery) ||
@@ -215,9 +220,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             return destMatch || originMatch || corridorMatch || driverMatch || ab4Match;
           }).toList();
 
-    // Check if user has an active ride (either as driver or recent ride)
-    final activeRide = allRides.cast<RideModel?>().firstWhere(
-          (r) => r?.status == RideStatus.active,
+    // Check if user has an active ride as driver
+    final systemRides = ref.watch(allSystemRidesProvider).value ?? [];
+    final activeRide = systemRides.cast<RideModel?>().firstWhere(
+          (r) => r?.status == RideStatus.active &&
+                 user != null &&
+                 (r?.driverId == user.id || r?.driverId == user.studentId || (user.phone.isNotEmpty && r?.driverPhone == user.phone)),
           orElse: () => null,
         );
 
@@ -508,6 +516,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
+              // Live Ride & Commute Status Card (Instant visibility and quick access)
+              LiveRideStatusCard(
+                onNavigateTab: widget.onNavigateTab,
+              ),
+
               // 3. Live Destination Bike Matching Results View (When typing e.g. "Uttara")
               if (trimmedQuery.isNotEmpty)
                 DestinationMatchingBikesView(
@@ -662,88 +675,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
 
-              // 5. Clean Moto Service Categories (4-Grid Apple Style)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Campus Moto Share',
-                      style: AppTypography.headlineSm.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF141416),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => widget.onNavigateTab(1),
-                      child: const Text(
-                        'See All',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFE65100),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    _buildServiceCard(
-                      icon: Icons.two_wheeler,
-                      title: 'Standard Moto',
-                      subtitle: '1 seat • Avg ৳35',
-                      tag: 'Fastest',
-                      tagColor: const Color(0xFF2E7D32),
-                      onTap: () => widget.onNavigateTab(1),
-                    ),
-                    const SizedBox(width: 10),
-                    _buildServiceCard(
-                      icon: Icons.sports_motorsports,
-                      title: 'Helmet Ready',
-                      subtitle: 'Clean helmet provided',
-                      tag: 'Helmet',
-                      tagColor: const Color(0xFFE65100),
-                      onTap: () => widget.onNavigateTab(1),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    _buildServiceCard(
-                      icon: Icons.female,
-                      title: 'Female Moto',
-                      subtitle: 'Female peer commute',
-                      tag: 'Reserved',
-                      tagColor: const Color(0xFFE91E63),
-                      onTap: () {
-                        ref.read(rideSearchFilterProvider.notifier).toggleFemaleOnly();
-                        widget.onNavigateTab(1);
-                      },
-                    ),
-                    const SizedBox(width: 10),
-                    _buildServiceCard(
-                      icon: Icons.flash_on,
-                      title: 'Metro Express',
-                      subtitle: 'Diabari corridor link',
-                      tag: 'Express',
-                      tagColor: const Color(0xFFFF9500),
-                      onTap: () => widget.onNavigateTab(1),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // 6. Live Departing Peer Motorbikes Carousel (Realtime Synced)
               departingRidesAsync.when(
@@ -776,74 +708,5 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
-
-  Widget _buildServiceCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String tag,
-    required Color tagColor,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.black.withOpacity(0.06)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: tagColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, size: 18, color: tagColor),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: tagColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      tag,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: tagColor),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                title,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
+

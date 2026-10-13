@@ -30,16 +30,6 @@ class SearchFilterChips extends StatelessWidget {
           ),
           const SizedBox(width: 8),
 
-          // Female-Only
-          _buildChip(
-            label: 'Female-Only',
-            icon: Icons.female,
-            iconColor: AppColors.tertiary,
-            isSelected: filterState.femaleOnly,
-            onTap: notifier.toggleFemaleOnly,
-          ),
-          const SizedBox(width: 8),
-
           // Price: Lowest
           _buildChip(
             label: 'Price: Lowest',
@@ -52,19 +42,9 @@ class SearchFilterChips extends StatelessWidget {
 
           // Bikes Only
           _buildChip(
-            label: 'Bikes Only',
+            label: 'Motorbikes Only',
             icon: Icons.two_wheeler,
-            iconColor: const Color(0xFFE65100),
-            isSelected: true,
-            onTap: () {},
-          ),
-          const SizedBox(width: 8),
-
-          // Helmet Ready
-          _buildChip(
-            label: 'Helmet Ready',
-            icon: Icons.sports_motorsports,
-            iconColor: const Color(0xFFE65100),
+            iconColor: const Color(0xFF2E7D32),
             isSelected: true,
             onTap: () {},
           ),

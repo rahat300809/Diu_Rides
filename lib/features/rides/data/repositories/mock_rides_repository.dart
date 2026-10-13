@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:uuid/uuid.dart';
-import 'package:diu_ride/core/constants/campus_locations.dart';
 import 'package:diu_ride/core/utils/h3_utils.dart';
 import 'package:diu_ride/features/rides/data/models/ride_model.dart';
 import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
@@ -9,206 +8,8 @@ import 'package:diu_ride/features/rides/data/repositories/rides_repository.dart'
 class MockRidesRepository implements RidesRepository {
   final List<RideModel> _rides = [];
 
-  MockRidesRepository() {
-    _seedRides();
-  }
+  MockRidesRepository();
 
-  void _seedRides() {
-    _rides.addAll([
-      // Ride 1: Sakib Hasan (Bike) - Stitch Home Card 1
-      RideModel(
-        id: 'ride_sakib_01',
-        driverId: 'usr_sakib_01',
-        driverName: 'Sakib Hasan',
-        driverPhotoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
-        driverDept: "CSE '22",
-        driverRating: 4.9,
-        driverRideCount: 142,
-        originName: 'DIU Gate 1 (Main Entrance)',
-        originSubtitle: 'Daffodil Smart City, Ashulia',
-        originLat: CampusLocations.mainGate.latitude,
-        originLng: CampusLocations.mainGate.longitude,
-        destinationName: 'Uttara Diabari Metro Stn',
-        destinationSubtitle: 'Exit Gate 2, Diabari',
-        destinationLat: CampusLocations.uttaraMetro.latitude,
-        destinationLng: CampusLocations.uttaraMetro.longitude,
-        departureTime: DateTime.now().add(const Duration(minutes: 15)),
-        farePerSeat: 40.0,
-        totalSeats: 1,
-        availableSeats: 1,
-        isFemaleOnly: false,
-        status: RideStatus.published,
-        vehicle: const VehicleModel(
-          id: 'v_sakib',
-          type: VehicleType.bike,
-          modelName: 'Yamaha FZ-X',
-          color: 'Matte Blue',
-          licensePlate: 'Dhaka Metro-HA 21-4321',
-          hasPassengerHelmet: true,
-        ),
-        h3OriginIndex: CampusLocations.mainGate.h3Index,
-        h3DestinationIndex: CampusLocations.uttaraMetro.h3Index,
-        routeCorridor: 'Birulia - Uttara Express',
-        distanceKm: 12.8,
-        durationMinutes: 24,
-      ),
-
-      // Ride 2: Ayesha Siddiqa (Female Peer Bike)
-      RideModel(
-        id: 'ride_ayesha_02',
-        driverId: 'usr_ayesha_02',
-        driverName: 'Ayesha Siddiqa',
-        driverPhotoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
-        driverDept: "BBA '21",
-        driverRating: 5.0,
-        driverRideCount: 89,
-        originName: 'Knowledge City (Main Roundabout)',
-        originSubtitle: 'DSC Central Circle',
-        originLat: CampusLocations.academicBldg4.latitude,
-        originLng: CampusLocations.academicBldg4.longitude,
-        destinationName: 'Mirpur 12 Bus Stand',
-        destinationSubtitle: 'Near Metro Station Pillar 180',
-        destinationLat: CampusLocations.mirpur10.latitude,
-        destinationLng: CampusLocations.mirpur10.longitude,
-        departureTime: DateTime.now().add(const Duration(minutes: 30)),
-        farePerSeat: 45.0,
-        totalSeats: 1,
-        availableSeats: 1,
-        isFemaleOnly: true,
-        status: RideStatus.published,
-        vehicle: const VehicleModel(
-          id: 'v_ayesha',
-          type: VehicleType.bike,
-          modelName: 'Suzuki Gixxer SF 155',
-          color: 'Pearl Mira Red',
-          licensePlate: 'Dhaka Metro-HA 33-8822',
-          hasPassengerHelmet: true,
-          isSmokeFree: true,
-        ),
-        h3OriginIndex: CampusLocations.academicBldg4.h3Index,
-        h3DestinationIndex: CampusLocations.mirpur10.h3Index,
-        routeCorridor: 'Ashulia Highway Corridor',
-        distanceKm: 15.2,
-        durationMinutes: 28,
-      ),
-
-      // Ride 3: Rafiqul Islam (Top Recommended Bike) - Stitch Search Card 1
-      RideModel(
-        id: 'ride_rafiqul_03',
-        driverId: 'usr_rafiqul_03',
-        driverName: 'Rafiqul Islam',
-        driverPhotoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
-        driverDept: 'SWE • 4th Year',
-        driverRating: 4.9,
-        driverRideCount: 118,
-        originName: 'DIU Main Gate 1',
-        originSubtitle: 'Daffodil Smart City',
-        originLat: CampusLocations.mainGate.latitude,
-        originLng: CampusLocations.mainGate.longitude,
-        destinationName: 'House Building Metro',
-        destinationSubtitle: 'Uttara Sector 11 (House Building)',
-        destinationLat: CampusLocations.uttaraHouseBuilding.latitude,
-        destinationLng: CampusLocations.uttaraHouseBuilding.longitude,
-        departureTime: DateTime.now().add(const Duration(minutes: 20)),
-        farePerSeat: 45.0,
-        totalSeats: 1,
-        availableSeats: 1,
-        isFemaleOnly: false,
-        status: RideStatus.published,
-        vehicle: const VehicleModel(
-          id: 'v_rafiqul',
-          type: VehicleType.bike,
-          modelName: 'Honda CB Shine SP',
-          color: 'Red Metallic',
-          licensePlate: 'Dhaka Metro-HA 55-9012',
-          hasPassengerHelmet: true,
-        ),
-        h3OriginIndex: CampusLocations.mainGate.h3Index,
-        h3DestinationIndex: CampusLocations.uttaraHouseBuilding.h3Index,
-        routeCorridor: 'Express Highway',
-        distanceKm: 14.0,
-        durationMinutes: 25,
-      ),
-
-      // Ride 4: Farhana Akter (Women-to-Women Peer Bike)
-      RideModel(
-        id: 'ride_farhana_04',
-        driverId: 'usr_farhana_04',
-        driverName: 'Farhana Akter',
-        driverPhotoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80',
-        driverDept: 'Pharmacy Dept',
-        driverRating: 5.0,
-        driverRideCount: 64,
-        originName: 'DSC Sports Complex',
-        originSubtitle: 'Cricket Ground North Pavilion',
-        originLat: CampusLocations.sportsComplex.latitude,
-        originLng: CampusLocations.sportsComplex.longitude,
-        destinationName: 'Uttara Sector 11 (House Building)',
-        destinationSubtitle: 'Dhaka - Mymensingh Highway',
-        destinationLat: CampusLocations.uttaraHouseBuilding.latitude,
-        destinationLng: CampusLocations.uttaraHouseBuilding.longitude,
-        departureTime: DateTime.now().add(const Duration(minutes: 25)),
-        farePerSeat: 50.0,
-        totalSeats: 1,
-        availableSeats: 1,
-        isFemaleOnly: true,
-        status: RideStatus.published,
-        vehicle: const VehicleModel(
-          id: 'v_farhana',
-          type: VehicleType.bike,
-          modelName: 'TVS Apache RTR 160 4V',
-          color: 'Gloss White',
-          licensePlate: 'Dhaka Metro-HA 19-3344',
-          hasPassengerHelmet: true,
-          isSmokeFree: true,
-        ),
-        h3OriginIndex: CampusLocations.sportsComplex.h3Index,
-        h3DestinationIndex: CampusLocations.uttaraHouseBuilding.h3Index,
-        routeCorridor: 'Birulia Bridge - Uttara Link',
-        distanceKm: 16.0,
-        durationMinutes: 28,
-      ),
-
-      // Ride 5: Tanvir Ahmed (Tracking Screen Active Moto)
-      RideModel(
-        id: 'ride_active_01',
-        driverId: 'usr_diu_tanvir_201',
-        driverName: 'Tanvir Ahmed',
-        driverPhotoUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
-        driverDept: 'CSE Dept • Batch 54 (ID: 201-15-****)',
-        driverRating: 4.95,
-        driverRideCount: 210,
-        originName: 'Daffodil Knowledge City',
-        originSubtitle: 'Main Gate Passenger Pickup Canopy (DSC)',
-        originLat: CampusLocations.mainGate.latitude,
-        originLng: CampusLocations.mainGate.longitude,
-        destinationName: 'Uttara North Metro Station',
-        destinationSubtitle: 'Exit Gate 2, Diabari (Direct Metro Link)',
-        destinationLat: CampusLocations.uttaraMetro.latitude,
-        destinationLng: CampusLocations.uttaraMetro.longitude,
-        departureTime: DateTime.now().add(const Duration(minutes: 5)),
-        farePerSeat: 45.0,
-        totalSeats: 1,
-        availableSeats: 1,
-        isFemaleOnly: false,
-        status: RideStatus.active,
-        vehicle: const VehicleModel(
-          id: 'v_tanvir',
-          type: VehicleType.bike,
-          modelName: 'Bajaj Pulsar NS 160',
-          color: 'Ebony Black Metallic',
-          licensePlate: 'Dhaka Metro-HA 24-8891',
-          hasPassengerHelmet: true,
-          isSmokeFree: true,
-        ),
-        h3OriginIndex: CampusLocations.mainGate.h3Index,
-        h3DestinationIndex: CampusLocations.uttaraMetro.h3Index,
-        routeCorridor: 'Birulia - Ashulia Road',
-        distanceKm: 16.4,
-        durationMinutes: 26,
-      ),
-    ]);
-  }
 
   @override
   Stream<List<RideModel>> watchDepartingSoonRides() {
@@ -491,13 +292,29 @@ class MockRidesRepository implements RidesRepository {
   }) async => true;
 
   @override
+  Future<bool> deletePassengerRequest(String requestId) async {
+    _passengerRequests.removeWhere((r) => r is Map && r['id'] == requestId);
+    return true;
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> getCompletedRides({String? userId}) async => [];
 
   @override
   Future<bool> triggerAlertRing({
     required String targetUserId,
+    String? targetName,
+    String? senderId,
     required String senderName,
     required String rideId,
+    String? ringId,
     String? message,
+  }) async => true;
+
+  @override
+  Future<bool> stopAlertRing({
+    required String targetUserId,
+    String? senderId,
+    String? ringId,
   }) async => true;
 }

@@ -7,6 +7,7 @@ import 'package:diu_ride/core/config/app_config.dart';
 import 'package:diu_ride/core/network/websocket_client.dart';
 import 'package:diu_ride/core/storage/preferences_service.dart';
 import 'package:diu_ride/features/chat/data/models/chat_message.dart';
+import 'package:diu_ride/features/chat/data/models/campus_conversation_model.dart';
 import 'package:diu_ride/features/chat/data/repositories/chat_repository.dart';
 import 'package:diu_ride/features/chat/data/repositories/mock_chat_repository.dart';
 
@@ -159,6 +160,22 @@ class SharedSyncChatRepository implements ChatRepository {
   Stream<ChatMessage> subscribeToMessages(String rideId) {
     _cache.putIfAbsent(rideId, () => []);
     return _streamController.stream.where((m) => m.rideId == rideId);
+  }
+
+  @override
+  Future<List<CampusConversationModel>> getConversations({String? userId}) async {
+    try {
+      final uid = userId ?? _currentUserId;
+      final response = await _dio.get('$_apiBase/conversations?user_id=$uid');
+      if (response.statusCode == 200 && response.data is List) {
+        return (response.data as List)
+            .map((item) => CampusConversationModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('SharedSyncChatRepository: getConversations failed, trying fallback: $e');
+    }
+    return _localFallback.getConversations(userId: userId);
   }
 
   void dispose() {

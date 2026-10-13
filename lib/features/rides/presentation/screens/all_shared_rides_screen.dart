@@ -22,7 +22,6 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
   int _selectedMode = 0; // 0 = Available Bikes, 1 = Student Requests
   String _selectedLocation = 'All';
   bool _sortByLowestPrice = false;
-  bool _femaleOnly = false;
   final TextEditingController _searchController = TextEditingController();
 
   final List<String> _locationFilters = [
@@ -370,48 +369,6 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-
-                        // Female Only Toggle
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _femaleOnly = !_femaleOnly;
-                            });
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                            decoration: BoxDecoration(
-                              color: _femaleOnly ? const Color(0xFFE91E63) : Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: _femaleOnly
-                                    ? const Color(0xFFE91E63)
-                                    : Colors.black.withOpacity(0.08),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.female,
-                                  size: 14,
-                                  color: _femaleOnly ? Colors.white : const Color(0xFFE91E63),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Women Only',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: _femaleOnly ? FontWeight.w700 : FontWeight.w600,
-                                    color: _femaleOnly ? Colors.white : const Color(0xFF3A3A3C),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -425,8 +382,9 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                   ? _buildStudentRequestsView()
                   : allRidesAsync.when(
                       data: (rides) {
-                        // Filter strictly to bikes
-                        var filtered = rides.where((r) => r.vehicle.type == VehicleType.bike).toList();
+                        // Filter strictly to bikes and exclude driver's own offered ride
+                        final currentUser = ref.watch(authNotifierProvider).user;
+                        var filtered = rides.where((r) => r.vehicle.type == VehicleType.bike && !isCurrentUserRide(r, currentUser)).toList();
 
                         // Filter by location
                         if (_selectedLocation != 'All') {
@@ -448,11 +406,6 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                 r.driverName.toLowerCase().contains(search) ||
                                 r.vehicle.modelName.toLowerCase().contains(search);
                           }).toList();
-                        }
-
-                        // Female Only
-                        if (_femaleOnly) {
-                          filtered = filtered.where((r) => r.isFemaleOnly).toList();
                         }
 
                         // Sort by price
@@ -490,7 +443,6 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                     setState(() {
                                       _selectedLocation = 'All';
                                       _searchController.clear();
-                                      _femaleOnly = false;
                                       _sortByLowestPrice = false;
                                     });
                                   },
@@ -767,10 +719,10 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.shield, size: 12, color: Color(0xFF2E7D32)),
+                          Icon(Icons.verified, size: 12, color: Color(0xFF2E7D32)),
                           SizedBox(width: 4),
                           Text(
-                            'Helmet Ready',
+                            'DIU Verified',
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
@@ -842,14 +794,16 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
     final ridesRepo = ref.watch(ridesRepositoryProvider);
     final user = ref.watch(authNotifierProvider).user;
 
-    return FutureBuilder<List<dynamic>>(
-      future: ridesRepo.getPassengerRequests(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: Color(0xFFE65100)));
-        }
+    final requestsAsync = ref.watch(passengerRequestsProvider);
 
-        final requests = snapshot.data ?? [];
+    return requestsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator(color: Color(0xFFE65100))),
+      error: (e, _) => Center(
+        child: Text('Failed to load requests: $e', style: const TextStyle(color: Colors.grey)),
+      ),
+      data: (rawRequests) {
+        final requests = rawRequests.where((req) => !isCurrentUserPassengerRequest(req, user)).toList();
+
         if (requests.isEmpty) {
           return Center(
             child: Column(
@@ -894,7 +848,8 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
         return RefreshIndicator(
           color: const Color(0xFFE65100),
           onRefresh: () async {
-            setState(() {});
+            ref.invalidate(allPassengerRequestsProvider);
+            ref.invalidate(passengerRequestsProvider);
           },
           child: ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
@@ -903,6 +858,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
               final req = requests[index];
               final isMap = req is Map<String, dynamic>;
               final id = isMap ? (req['id'] ?? '') : (req.id ?? '');
+              final pId = isMap ? (req['passengerId'] ?? '') : (req.passengerId ?? '');
               final pName = isMap ? (req['passengerName'] ?? 'Student') : (req.passengerName ?? 'Student');
               final pDept = isMap ? (req['passengerDept'] ?? 'CSE') : (req.passengerDept ?? 'CSE');
               final pPhone = isMap ? (req['passengerPhone'] ?? '') : (req.passengerPhone ?? '');
@@ -912,6 +868,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
               final fare = isMap ? (req['proposedFare'] ?? 50.0) : (req.proposedFare ?? 50.0);
               final status = isMap ? (req['status'] ?? 'open') : (req.status ?? 'open');
               final isAccepted = status == 'accepted';
+              final isMyRequest = (user != null && ((user.id.isNotEmpty && user.id == pId) || (user.phone.isNotEmpty && user.phone == pPhone)));
 
               return Container(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -948,7 +905,22 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(pName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                              Row(
+                                children: [
+                                  Text(pName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                  if (isMyRequest) ...[
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFE3F2FD),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: const Text('You', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF1976D2))),
+                                    ),
+                                  ],
+                                ],
+                              ),
                               Text('$pDept • Requested: $time', style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
                             ],
                           ),
@@ -997,7 +969,80 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        if (isAccepted)
+                        if (isMyRequest) ...[
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatScreen(
+                                      rideId: id,
+                                      peerName: isAccepted ? 'Biker' : 'Campus Commute',
+                                      vehicleModel: 'My Ride Request',
+                                      peerPhone: pPhone,
+                                      peerRole: 'Driver',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.chat_bubble_outline, size: 15),
+                              label: Text(isAccepted ? 'Chat with Rider' : 'View Chat'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF1976D2),
+                                side: const BorderSide(color: Color(0xFF1976D2)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            onPressed: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  title: const Text('Cancel Your Request?'),
+                                  content: Text('Are you sure you want to remove your ride request to $dropoff?'),
+                                  actions: [
+                                    TextButton(
+                                      onPressed: () => Navigator.pop(ctx, false),
+                                      child: const Text('Keep'),
+                                    ),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFFE53935),
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text('Cancel & Remove'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                final ok = await ridesRepo.deletePassengerRequest(id);
+                                if (context.mounted) {
+                                  ref.invalidate(allPassengerRequestsProvider);
+                                  ref.invalidate(passengerRequestsProvider);
+                                  setState(() {});
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      backgroundColor: const Color(0xFFE53935),
+                                      content: Text(ok ? 'Your ride request has been cancelled and removed.' : 'Request removed.'),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.delete_forever, size: 15),
+                            label: const Text('Cancel Request'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFE53935),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ] else if (isAccepted) ...[
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () {
@@ -1021,8 +1066,47 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
                             ),
-                          )
-                        else ...[
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  title: const Text('Delete Request?'),
+                                  content: Text('Remove this request for $pName ($pickup → $dropoff)?'),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE53935), foregroundColor: Colors.white),
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                await ridesRepo.deletePassengerRequest(id);
+                                if (context.mounted) {
+                                  ref.invalidate(allPassengerRequestsProvider);
+                                  ref.invalidate(passengerRequestsProvider);
+                                  setState(() {});
+                                }
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.all(9),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFEBEE),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFFFCDD2)),
+                              ),
+                              child: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFE53935)),
+                            ),
+                          ),
+                        ] else ...[
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () async {
@@ -1030,7 +1114,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                 final currentUserName = user?.name ?? 'Campus Biker';
                                 final currentUserPhone = user?.phone ?? '01712345678';
 
-                                final ok = await ridesRepo.acceptPassengerRequest(
+                                await ridesRepo.acceptPassengerRequest(
                                   requestId: id,
                                   driverId: currentUserId,
                                   driverName: currentUserName,
@@ -1038,14 +1122,16 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                   driverBike: 'Campus Motorcycle',
                                 );
 
-                                if (ok && context.mounted) {
+                                if (context.mounted) {
+                                  ref.invalidate(allPassengerRequestsProvider);
+                                  ref.invalidate(passengerRequestsProvider);
+                                  setState(() {});
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       backgroundColor: const Color(0xFF1C1C1E),
                                       content: Text('Ride Request Accepted! You will commute with $pName.'),
                                     ),
                                   );
-                                  setState(() {});
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => ChatScreen(
@@ -1067,6 +1153,44 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                 padding: const EdgeInsets.symmetric(vertical: 10),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () async {
+                              final confirm = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                  title: const Text('Delete Student Request?'),
+                                  content: Text('Remove this request for $pName ($pickup → $dropoff)?'),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE53935), foregroundColor: Colors.white),
+                                      onPressed: () => Navigator.pop(ctx, true),
+                                      child: const Text('Delete'),
+                                    ),
+                                  ],
+                                ),
+                              );
+                              if (confirm == true) {
+                                await ridesRepo.deletePassengerRequest(id);
+                                if (context.mounted) {
+                                  ref.invalidate(passengerRequestsProvider);
+                                  setState(() {});
+                                }
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Container(
+                              padding: const EdgeInsets.all(9),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFEBEE),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFFFCDD2)),
+                              ),
+                              child: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFE53935)),
                             ),
                           ),
                         ],

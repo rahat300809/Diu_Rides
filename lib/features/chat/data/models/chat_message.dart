@@ -26,18 +26,34 @@ class ChatMessage {
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json, String currentUserId) {
+    double? lat = (json['sharedLat'] as num?)?.toDouble();
+    double? lng = (json['sharedLng'] as num?)?.toDouble();
+    final text = (json['text'] as String?) ?? '';
+    bool isLoc = json['isLocationShare'] as bool? ?? false;
+
+    // Auto-detect & parse coordinates from Google Maps URL or text
+    if ((lat == null || lng == null) && (isLoc || text.contains('google.com/maps') || text.contains('maps.google.com') || text.contains('📍'))) {
+      final match = RegExp(r'query=(-?\d+\.\d+),(-?\d+\.\d+)').firstMatch(text) ??
+          RegExp(r'(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})').firstMatch(text);
+      if (match != null) {
+        lat = double.tryParse(match.group(1)!);
+        lng = double.tryParse(match.group(2)!);
+        isLoc = true;
+      }
+    }
+
     return ChatMessage(
-      id: json['id'] as String,
-      rideId: json['rideId'] as String,
-      senderId: json['senderId'] as String,
-      senderName: json['senderName'] as String,
-      text: json['text'] as String,
-      timestamp: DateTime.parse(json['timestamp'] as String),
+      id: json['id'] as String? ?? 'msg_${DateTime.now().millisecondsSinceEpoch}',
+      rideId: json['rideId'] as String? ?? 'general',
+      senderId: json['senderId'] as String? ?? '',
+      senderName: json['senderName'] as String? ?? 'DIU Commuter',
+      text: text,
+      timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
       isMe: json['senderId'] == currentUserId,
       isRead: json['isRead'] as bool? ?? true,
-      isLocationShare: json['isLocationShare'] as bool? ?? false,
-      sharedLat: (json['sharedLat'] as num?)?.toDouble(),
-      sharedLng: (json['sharedLng'] as num?)?.toDouble(),
+      isLocationShare: isLoc,
+      sharedLat: lat,
+      sharedLng: lng,
     );
   }
 

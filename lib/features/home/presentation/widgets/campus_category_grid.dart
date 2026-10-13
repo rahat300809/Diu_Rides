@@ -83,58 +83,58 @@ class CampusCategoryGrid extends StatelessWidget {
             crossAxisSpacing: 12,
             childAspectRatio: 1.48,
             children: [
-              // 1. Standard Moto Share
+              // 1. Find a Bike Ride
               _buildCategoryCard(
-                title: 'Standard Moto',
-                subtitle: '1 seat • Avg ৳35',
-                badgeText: 'Fastest',
+                title: 'Find a Bike Ride',
+                subtitle: 'Active campus commutes',
+                badgeText: 'Live Rides',
                 badgeBg: const Color(0xFFE8F5E9),
                 badgeColor: const Color(0xFF2E7D32),
                 icon: Icons.two_wheeler,
                 iconColor: const Color(0xFF00C853),
                 iconBg: const Color(0xFFE8F5E9),
-                isSelected: selectedType == VehicleType.bike && !femaleOnlySelected,
+                isSelected: true,
                 onTap: () => onSelectCategory(VehicleType.bike, false),
               ),
 
-              // 2. Helmet Provided Moto
+              // 2. Offer Your Ride
               _buildCategoryCard(
-                title: 'Helmet Ready',
-                subtitle: 'Clean helmet provided',
-                badgeText: '🪖 Helmet',
+                title: 'Offer a Ride',
+                subtitle: 'Share your motorbike seat',
+                badgeText: 'Bikers',
                 badgeBg: const Color(0xFFFFF3E0),
                 badgeColor: const Color(0xFFE65100),
-                icon: Icons.sports_motorsports,
+                icon: Icons.add_circle_outline,
                 iconColor: const Color(0xFFE65100),
                 iconBg: const Color(0xFFFFF3E0),
                 isSelected: false,
                 onTap: () => onSelectCategory(VehicleType.bike, false),
               ),
 
-              // 3. Female Peer Moto
+              // 3. Campus Messages
               _buildCategoryCard(
-                title: 'Female Moto',
-                subtitle: 'Peer-to-peer verified',
-                badgeText: 'Women Only',
-                badgeBg: const Color(0xFFFCE4EC),
-                badgeColor: const Color(0xFFC2185B),
-                icon: Icons.female,
-                iconColor: const Color(0xFFE91E63),
-                iconBg: const Color(0xFFFCE4EC),
-                isSelected: femaleOnlySelected,
-                onTap: () => onSelectCategory(null, true),
+                title: 'Campus Messages',
+                subtitle: 'Direct peer chats & calls',
+                badgeText: 'Chatbox',
+                badgeBg: const Color(0xFFE0F2FE),
+                badgeColor: const Color(0xFF0284C7),
+                icon: Icons.chat_bubble_outline,
+                iconColor: const Color(0xFF0284C7),
+                iconBg: const Color(0xFFE0F2FE),
+                isSelected: false,
+                onTap: () => onSelectCategory(VehicleType.bike, false),
               ),
 
-              // 4. Express Metro Link
+              // 4. Scheduled Commutes
               _buildCategoryCard(
-                title: 'Metro Express',
-                subtitle: 'Diabari corridor link',
-                badgeText: '⚡ Non-Stop',
-                badgeBg: const Color(0xFFFFF3E0),
-                badgeColor: const Color(0xFFE65100),
-                icon: Icons.bolt,
-                iconColor: const Color(0xFFFF9800),
-                iconBg: const Color(0xFFFFF3E0),
+                title: 'Scheduled Commutes',
+                subtitle: 'Morning & evening classes',
+                badgeText: 'Planned',
+                badgeBg: const Color(0xFFF3E8FF),
+                badgeColor: const Color(0xFF7E22CE),
+                icon: Icons.schedule,
+                iconColor: const Color(0xFF7E22CE),
+                iconBg: const Color(0xFFF3E8FF),
                 isSelected: false,
                 onTap: () => onSelectCategory(VehicleType.bike, false),
               ),

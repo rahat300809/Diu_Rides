@@ -253,10 +253,16 @@ class SharedSyncRidesRepository implements RidesRepository {
   @override
   Future<bool> deleteRide(String rideId) async {
     try {
-      await _dio.delete('$_apiBase/rides?id=$rideId');
+      await _dio.delete('$_apiBase/rides/$rideId');
       debugPrint('Ride deleted from central backend: $rideId');
     } catch (e) {
-      debugPrint('Note: Delete ride error: $e');
+      try {
+        await _dio.delete('$_apiBase/rides?id=$rideId');
+      } catch (_) {
+        try {
+          await _dio.post('$_apiBase/rides/$rideId/delete');
+        } catch (_) {}
+      }
     }
 
     // Update preferences cache
@@ -411,6 +417,21 @@ class SharedSyncRidesRepository implements RidesRepository {
   }
 
   @override
+  Future<bool> deletePassengerRequest(String requestId) async {
+    try {
+      final res = await _dio.delete('$_apiBase/passenger-requests/$requestId');
+      return res.statusCode == 200;
+    } catch (_) {
+      try {
+        final res = await _dio.post('$_apiBase/passenger-requests/$requestId/delete');
+        return res.statusCode == 200;
+      } catch (_) {
+        return false;
+      }
+    }
+  }
+
+  @override
   Future<List<Map<String, dynamic>>> getCompletedRides({String? userId}) async {
     try {
       final url = userId != null
@@ -427,16 +448,40 @@ class SharedSyncRidesRepository implements RidesRepository {
   @override
   Future<bool> triggerAlertRing({
     required String targetUserId,
+    String? targetName,
+    String? senderId,
     required String senderName,
     required String rideId,
+    String? ringId,
     String? message,
   }) async {
     try {
       final res = await _dio.post('$_apiBase/alert-ring', data: {
         'targetUserId': targetUserId,
+        'targetName': targetName ?? '',
+        'senderId': senderId ?? '',
         'senderName': senderName,
         'rideId': rideId,
+        'ringId': ringId ?? 'ring_${DateTime.now().millisecondsSinceEpoch}',
         'message': message ?? '🔔 Alert: Please check your phone!',
+      });
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> stopAlertRing({
+    required String targetUserId,
+    String? senderId,
+    String? ringId,
+  }) async {
+    try {
+      final res = await _dio.post('$_apiBase/stop-ring', data: {
+        'targetUserId': targetUserId,
+        'senderId': senderId ?? '',
+        'ringId': ringId ?? '',
       });
       return res.statusCode == 200;
     } catch (_) {

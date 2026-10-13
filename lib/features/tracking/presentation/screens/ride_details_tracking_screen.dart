@@ -7,9 +7,12 @@ import 'package:diu_ride/core/theme/app_typography.dart';
 import 'package:diu_ride/core/utils/gps_location_service.dart';
 import 'package:diu_ride/features/auth/presentation/providers/auth_provider.dart';
 import 'package:diu_ride/features/chat/presentation/screens/chat_screen.dart';
+import 'package:diu_ride/features/chat/presentation/providers/chat_provider.dart';
 import 'package:diu_ride/features/rating/presentation/widgets/rate_ride_sheet.dart';
 import 'package:diu_ride/features/rides/data/models/ride_model.dart';
 import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
+import 'package:diu_ride/features/booking/presentation/providers/booking_provider.dart';
+import 'package:diu_ride/features/booking/data/models/booking_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 import 'package:diu_ride/features/safety/presentation/widgets/campus_sos_dialog.dart';
 import 'package:diu_ride/features/safety/presentation/widgets/campus_voice_call_dialog.dart';
@@ -157,6 +160,11 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
       longitude: lng,
     );
 
+    // Synchronize to chatbox immediately
+    try {
+      ref.read(chatNotifierProvider(ride.id).notifier).shareLocation(lat, lng);
+    } catch (_) {}
+
     if (mounted) {
       setState(() {
         _isSharingLocation = false;
@@ -173,12 +181,20 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
     final pos = await GpsLocationService.getCurrentLocation();
     final lat = pos?.latitude ?? ride.originLat;
     final lng = pos?.longitude ?? ride.originLng;
+    final mapsLink = GpsLocationService.getGoogleMapsLocationUrl(lat, lng);
 
     await ref.read(ridesRepositoryProvider).startRide(
       ride.id,
       startLat: lat,
       startLng: lng,
     );
+
+    // Synchronize to chatbox immediately
+    try {
+      ref.read(chatNotifierProvider(ride.id).notifier).sendMessage(
+        '🚀 [Trip Started] Rider has officially started the ride! Start GPS recorded: $mapsLink',
+      );
+    } catch (_) {}
 
     if (mounted) {
       _showToast('Ride Started! Start GPS & Google Maps link recorded.');
@@ -191,12 +207,20 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
     final pos = await GpsLocationService.getCurrentLocation();
     final lat = pos?.latitude ?? ride.destinationLat;
     final lng = pos?.longitude ?? ride.destinationLng;
+    final mapsLink = GpsLocationService.getGoogleMapsLocationUrl(lat, lng);
 
     await ref.read(ridesRepositoryProvider).completeRide(
       ride.id,
       endLat: lat,
       endLng: lng,
     );
+
+    // Synchronize to chatbox immediately
+    try {
+      ref.read(chatNotifierProvider(ride.id).notifier).sendMessage(
+        '🏁 [Trip Completed] Ride has arrived and completed successfully! Destination GPS recorded: $mapsLink',
+      );
+    } catch (_) {}
 
     if (mounted) {
       _showToast('Ride Completed! End GPS & full route link saved.');
@@ -206,17 +230,20 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
 
   @override
   Widget build(BuildContext context) {
-    final ridesAsync = ref.watch(searchRidesResultsProvider);
-    final RideModel ride = _updatedRide ?? ridesAsync.maybeWhen(
-      data: (list) {
-        for (final r in list) {
-          if (r.id == widget.rideId) return r;
-        }
-        return list.isNotEmpty ? list.first : _defaultRide(widget.rideId);
-      },
-      orElse: () => _defaultRide(widget.rideId),
+    final allRides = ref.watch(allAvailableRidesProvider).value ?? [];
+    final RideModel ride = _updatedRide ?? (
+      allRides.cast<RideModel?>().firstWhere(
+        (r) => r?.id == widget.rideId,
+        orElse: () => null,
+      ) ?? _defaultRide(widget.rideId)
     );
 
+    final currentUser = ref.watch(authNotifierProvider).user;
+    final isDriver = currentUser != null && (
+      ride.driverId == currentUser.id ||
+      ride.driverId == currentUser.studentId ||
+      (currentUser.phone.isNotEmpty && ride.driverPhone == currentUser.phone)
+    );
 
     final totalFare = (ride.farePerSeat * _seats).toInt();
 
@@ -649,7 +676,7 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                         const SizedBox(width: 8),
                         _buildTrustBadge(Icons.verified, 'Campus Commuter', AppColors.tertiary),
                         const SizedBox(width: 8),
-                        _buildTrustBadge(Icons.sports_motorsports, 'Helmet Ready', AppColors.secondary),
+                        _buildTrustBadge(Icons.shield_outlined, 'Safety Guaranteed', AppColors.secondary),
                       ],
                     ),
                   ),
@@ -707,20 +734,20 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                   ),
                   const SizedBox(height: 12),
 
-                  // Feature Amenities 2x2 grid
+                  // Motorcycle Amenities 2x2 grid
                   Row(
                     children: [
-                      Expanded(child: _buildAmenityTile(Icons.ac_unit, 'Air Conditioned')),
+                      Expanded(child: _buildAmenityTile(Icons.two_wheeler, 'Comfort Bike Ride')),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildAmenityTile(Icons.smoke_free, 'Smoke-free Car')),
+                      Expanded(child: _buildAmenityTile(Icons.verified_user, 'DIU Verified Bike')),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Expanded(child: _buildAmenityTile(Icons.battery_charging_full, 'Phone Charger Free')),
+                      Expanded(child: _buildAmenityTile(Icons.speed, 'Fast Campus Transit')),
                       const SizedBox(width: 8),
-                      Expanded(child: _buildAmenityTile(Icons.luggage, 'Trunk Bag Space')),
+                      Expanded(child: _buildAmenityTile(Icons.share_location, 'Live GPS Sharing')),
                     ],
                   ),
                 ],
@@ -894,222 +921,680 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
             ),
             const SizedBox(height: 14),
 
-            // 6. SEAT BOOKING CONFIGURATOR & CO-PASSENGERS
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 6, offset: Offset(0, 2))],
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+            // 6. DRIVER MISSION CONTROL OR PASSENGER SEAT CONFIGURATOR
+            if (isDriver)
+              _buildDriverMissionControlCard(ride, ref)
+            else
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLowest,
+                  borderRadius: BorderRadius.circular(22),
+                  boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 6, offset: Offset(0, 2))],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Select Seats', style: AppTypography.bodyLgMedium),
+                            Text('${ride.availableSeats} of ${ride.totalSeats} spots remaining', style: AppTypography.labelSm),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            InkWell(
+                              onTap: _seats > 1 ? () => setState(() => _seats--) : null,
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceContainer,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.remove, size: 16),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              child: Text(
+                                '$_seats',
+                                style: AppTypography.headlineSm.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: _seats < ride.availableSeats ? () => setState(() => _seats++) : null,
+                              child: Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.add, size: 16, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Co-passengers on Board
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Select Seats', style: AppTypography.bodyLgMedium),
-                          Text('${ride.availableSeats} of ${ride.totalSeats} spots remaining', style: AppTypography.labelSm),
+                          Row(
+                            children: [
+                              const CircleAvatar(
+                                radius: 12,
+                                backgroundColor: AppColors.primaryContainer,
+                                child: Icon(Icons.person, size: 14, color: Colors.white),
+                              ),
+                              const SizedBox(width: 8),
+                              Text('1 fellow DIU passenger already booked', style: AppTypography.labelSm),
+                            ],
+                          ),
+                          const Icon(Icons.shield, color: AppColors.primary, size: 16),
                         ],
                       ),
-                      Row(
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Share Live Status button
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        _showToast('Live tracking link created for Guardian via WhatsApp');
+                      },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.secondary,
+                        side: const BorderSide(color: AppColors.secondary),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      icon: const Icon(Icons.share_location),
+                      label: const Text('Share Live Trip with Guardian (WhatsApp)'),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Primary Action CTA
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() => _isReserved = true);
+                        _showToast('Seat Reserved! Driver ${ride.driverName} notified.');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _isReserved ? AppColors.tertiaryContainer : AppColors.primary,
+                        foregroundColor: AppColors.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          InkWell(
-                            onTap: _seats > 1 ? () => setState(() => _seats--) : null,
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceContainer,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.remove, size: 16),
+                          Padding(
+                            padding: const EdgeInsets.only(left: 12),
+                            child: Row(
+                              children: [
+                                Icon(_isReserved ? Icons.sync : Icons.verified, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _isReserved ? 'Seat Confirmed • Awaiting Pickup' : 'Reserve Ride Seat',
+                                  style: AppTypography.labelLg.copyWith(color: Colors.white),
+                                ),
+                              ],
                             ),
                           ),
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            padding: const EdgeInsets.only(right: 12),
                             child: Text(
-                              '$_seats',
-                              style: AppTypography.headlineSm.copyWith(fontWeight: FontWeight.bold),
+                              '৳$totalFare',
+                              style: AppTypography.headlineSm.copyWith(color: AppColors.primaryFixed),
                             ),
                           ),
-                          InkWell(
-                            onTap: _seats < ride.availableSeats ? () => setState(() => _seats++) : null,
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(8),
+                        ],
+                      ),
+                    ),
+                    if (_isReserved) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ChatScreen(
+                                      rideId: ride.id,
+                                      peerName: ride.driverName,
+                                      vehicleModel: ride.vehicle.modelName,
+                                      peerPhone: ride.driverPhone,
+                                      peerRole: 'Driver',
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                              label: const Text('Chat with Driver', style: TextStyle(fontWeight: FontWeight.bold)),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.primary,
+                                side: const BorderSide(color: AppColors.primary),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
                               ),
-                              child: const Icon(Icons.add, size: 16, color: Colors.white),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                CampusVoiceCallDialog.show(
+                                  context,
+                                  peerName: ride.driverName,
+                                  peerPhone: ride.driverPhone ?? '01712345678',
+                                  peerRole: 'Driver',
+                                  peerDept: ride.driverDept,
+                                );
+                              },
+                              icon: const Icon(Icons.call, size: 16),
+                              label: const Text('Call Driver', style: TextStyle(fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2E7D32),
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 8),
 
-                  // Co-passengers on Board
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(14),
+                    // Post-ride rate trigger
+                    TextButton.icon(
+                      onPressed: () {
+                        RateRideSheet.show(
+                          context: context,
+                          rideId: ride.id,
+                          driverName: ride.driverName,
+                          onSubmit: (rating, feedback, tags) {
+                            _showToast('Review submitted! Thank you for supporting peer safety.');
+                          },
+                        );
+                      },
+                      icon: const Icon(Icons.star_outline, size: 16),
+                      label: const Text('Leave Ride Feedback & Rating'),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            const CircleAvatar(
-                              radius: 12,
-                              backgroundColor: AppColors.primaryContainer,
-                              child: Icon(Icons.person, size: 14, color: Colors.white),
-                            ),
-                            const SizedBox(width: 8),
-                            Text('1 fellow DIU passenger already booked', style: AppTypography.labelSm),
-                          ],
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmCancelRide(RideModel ride) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Cancel Offered Ride?'),
+        content: const Text('Are you sure you want to cancel this trip? Any pending requests will be cancelled.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Keep Trip')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await ref.read(ridesRepositoryProvider).cancelOfferedRide(ride.id);
+              ref.invalidate(departingSoonRidesProvider);
+              ref.invalidate(searchRidesResultsProvider);
+              ref.invalidate(allAvailableRidesProvider);
+              _showToast('Trip cancelled successfully.');
+              if (mounted) Navigator.of(context).pop();
+            },
+            child: const Text('Cancel Trip'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDriverMissionControlCard(RideModel ride, WidgetRef ref) {
+    final bookingsAsync = ref.watch(rideBookingsProvider(ride.id));
+    final bookings = bookingsAsync.value ?? [];
+
+    Color statusColor;
+    String statusText;
+    switch (ride.status) {
+      case RideStatus.published:
+        statusColor = const Color(0xFFE65100);
+        statusText = 'OFFERED & READY';
+        break;
+      case RideStatus.active:
+        statusColor = const Color(0xFF2E7D32);
+        statusText = 'IN PROGRESS (STARTED)';
+        break;
+      case RideStatus.completed:
+        statusColor = const Color(0xFF00897B);
+        statusText = 'COMPLETED (SAVED TO CSV)';
+        break;
+      case RideStatus.cancelled:
+        statusColor = const Color(0xFFD32F2F);
+        statusText = 'CANCELLED';
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: statusColor.withOpacity(0.4), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: statusColor.withOpacity(0.12),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row: Driver Badge & Trip Status
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.sports_motorsports, color: statusColor, size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Driver Mission Control',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF141416),
                         ),
-                        const Icon(Icons.shield, color: AppColors.primary, size: 16),
+                      ),
+                      Text(
+                        'Manage your shared trip & passengers',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: statusColor.withOpacity(0.5)),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Passenger Requests & Confirmation Section
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F9FA),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.people_alt, size: 16, color: Color(0xFFE65100)),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Passenger Bookings (${bookings.length})',
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5),
+                        ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Share Live Status button
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      _showToast('Live tracking link created for Guardian via WhatsApp');
-                    },
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.secondary,
-                      side: const BorderSide(color: AppColors.secondary),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    Text(
+                      '${ride.availableSeats} of ${ride.totalSeats} seats left',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280), fontWeight: FontWeight.w600),
                     ),
-                    icon: const Icon(Icons.share_location),
-                    label: const Text('Share Live Trip with Guardian (WhatsApp)'),
-                  ),
-                  const SizedBox(height: 12),
+                  ],
+                ),
+                const SizedBox(height: 10),
 
-                  // Primary Action CTA
-                  ElevatedButton(
-                    onPressed: () {
-                      setState(() => _isReserved = true);
-                      _showToast('Seat Reserved! Driver ${ride.driverName} notified.');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _isReserved ? AppColors.tertiaryContainer : AppColors.primary,
-                      foregroundColor: AppColors.onPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                if (bookings.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      'Waiting for DIU peers to request seats on this trip.',
+                      style: TextStyle(fontSize: 12.5, color: Colors.grey[600]),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(left: 12),
-                          child: Row(
+                  )
+                else
+                  ...bookings.map((b) {
+                    final isPending = b.status == BookingStatus.requested;
+                    final isAccepted = b.status == BookingStatus.accepted;
+
+                    return Container(
+                      margin: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: isAccepted
+                              ? const Color(0xFF4CAF50).withOpacity(0.5)
+                              : isPending
+                                  ? const Color(0xFFFF9800).withOpacity(0.5)
+                                  : const Color(0xFFE0E0E0),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Icon(_isReserved ? Icons.sync : Icons.verified, size: 20),
+                              CircleAvatar(
+                                radius: 14,
+                                backgroundColor: const Color(0xFFE65100).withOpacity(0.12),
+                                child: Text(
+                                  b.passengerName.isNotEmpty ? b.passengerName[0].toUpperCase() : 'P',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFE65100)),
+                                ),
+                              ),
                               const SizedBox(width: 8),
-                              Text(
-                                _isReserved ? 'Seat Confirmed • Awaiting Pickup' : 'Reserve Ride Seat',
-                                style: AppTypography.labelLg.copyWith(color: Colors.white),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      b.passengerName,
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                    ),
+                                    Text(
+                                      'Pickup: ${b.pickupPoint} • ${b.seatsBooked} seat(s) • ৳${b.totalFare.toInt()}',
+                                      style: TextStyle(fontSize: 11.5, color: Colors.grey[700]),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: isAccepted
+                                      ? const Color(0xFFE8F5E9)
+                                      : isPending
+                                          ? const Color(0xFFFFF3E0)
+                                          : const Color(0xFFF5F5F5),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  b.status.name.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: isAccepted
+                                        ? const Color(0xFF2E7D32)
+                                        : isPending
+                                            ? const Color(0xFFE65100)
+                                            : Colors.grey[700],
+                                  ),
+                                ),
                               ),
                             ],
                           ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.only(right: 12),
-                          child: Text(
-                            '৳$totalFare',
-                            style: AppTypography.headlineSm.copyWith(color: AppColors.primaryFixed),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_isReserved) ...[
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => ChatScreen(
-                                    rideId: ride.id,
-                                    peerName: ride.driverName,
-                                    vehicleModel: ride.vehicle.modelName,
-                                    peerPhone: ride.driverPhone,
-                                    peerRole: 'Driver',
+
+                          // If pending: Confirm or Decline buttons
+                          if (isPending) ...[
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () async {
+                                      await ref.read(bookingNotifierProvider.notifier).acceptBooking(
+                                            bookingId: b.id,
+                                            rideId: ride.id,
+                                            driverName: ride.driverName,
+                                            pickupPoint: b.pickupPoint,
+                                          );
+                                      ref.invalidate(rideBookingsProvider(ride.id));
+                                      _showToast('Booking Confirmed for ${b.passengerName}!');
+                                    },
+                                    icon: const Icon(Icons.check, size: 14),
+                                    label: const Text('Confirm Booking', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2E7D32),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      padding: const EdgeInsets.symmetric(vertical: 8),
+                                    ),
                                   ),
                                 ),
-                              );
-                            },
-                            icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                            label: const Text('Chat with Driver', style: TextStyle(fontWeight: FontWeight.bold)),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.primary,
-                              side: const BorderSide(color: AppColors.primary),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
+                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
+                                  onPressed: () async {
+                                    await ref.read(bookingNotifierProvider.notifier).rejectBooking(
+                                          bookingId: b.id,
+                                          rideId: ride.id,
+                                          driverName: ride.driverName,
+                                        );
+                                    ref.invalidate(rideBookingsProvider(ride.id));
+                                    _showToast('Declined request from ${b.passengerName}.');
+                                  },
+                                  icon: const Icon(Icons.close, size: 14),
+                                  label: const Text('Decline', style: TextStyle(fontSize: 11.5)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFD32F2F),
+                                    side: const BorderSide(color: Color(0xFFD32F2F)),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              CampusVoiceCallDialog.show(
-                                context,
-                                peerName: ride.driverName,
-                                peerPhone: ride.driverPhone ?? '01712345678',
-                                peerRole: 'Driver',
-                                peerDept: ride.driverDept,
-                              );
-                            },
-                            icon: const Icon(Icons.call, size: 16),
-                            label: const Text('Call Driver', style: TextStyle(fontWeight: FontWeight.bold)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2E7D32),
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 8),
+                          ],
 
-                  // Post-ride rate trigger
-                  TextButton.icon(
-                    onPressed: () {
-                      RateRideSheet.show(
-                        context: context,
-                        rideId: ride.id,
-                        driverName: ride.driverName,
-                        onSubmit: (rating, feedback, tags) {
-                          _showToast('Review submitted! Thank you for supporting peer safety.');
-                        },
-                      );
-                    },
-                    icon: const Icon(Icons.star_outline, size: 16),
-                    label: const Text('Leave Ride Feedback & Rating'),
+                          // If accepted: Chat and Call buttons
+                          if (isAccepted) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => ChatScreen(
+                                          rideId: ride.id,
+                                          peerName: b.passengerName,
+                                          peerPhone: b.passengerPhone,
+                                          peerRole: 'Passenger',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  icon: const Icon(Icons.chat_bubble_outline, size: 13),
+                                  label: const Text('Chat & Ring', style: TextStyle(fontSize: 11)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFFE65100),
+                                    side: const BorderSide(color: Color(0xFFE65100)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
+                                  onPressed: () {
+                                    CampusVoiceCallDialog.show(
+                                      context,
+                                      peerName: b.passengerName,
+                                      peerPhone: b.passengerPhone,
+                                      peerRole: 'Passenger',
+                                      peerDept: b.passengerDept,
+                                    );
+                                  },
+                                  icon: const Icon(Icons.call, size: 13),
+                                  label: const Text('Call', style: TextStyle(fontSize: 11)),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF2E7D32),
+                                    side: const BorderSide(color: Color(0xFF2E7D32)),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // Primary Driver Action Buttons: GPS, Start, End, Cancel
+          // 1. Share GPS
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isSharingLocation ? null : () => _shareMyLocation(ride),
+              icon: _isSharingLocation
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.share_location, size: 18),
+              label: Text(
+                _isSharingLocation ? 'Sharing GPS...' : 'Share My Live GPS with Passenger',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1976D2),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // 2. Start Trip or End Trip depending on status
+          if (ride.status == RideStatus.published) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _startRideWithGps(ride),
+                icon: const Icon(Icons.play_arrow, size: 20),
+                label: const Text(
+                  'Start Trip (Record Start GPS & Time)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E7D32),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => _confirmCancelRide(ride),
+                icon: const Icon(Icons.cancel_outlined, size: 18),
+                label: const Text(
+                  'Cancel Offered Ride',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFD32F2F),
+                  side: const BorderSide(color: Color(0xFFD32F2F), width: 1.2),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+          ] else if (ride.status == RideStatus.active) ...[
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _completeRideWithGps(ride),
+                icon: const Icon(Icons.flag, size: 20),
+                label: const Text(
+                  'End Trip (Record End GPS & Auto-save CSV)',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE65100),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+              ),
+            ),
+          ] else if (ride.status == RideStatus.completed) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF81C784)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle, color: Color(0xFF2E7D32), size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Trip completed successfully. All rider, passenger, GPS & timing data saved to database & completed_trips.csv.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF1B5E20), fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ],
               ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }

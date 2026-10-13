@@ -86,13 +86,17 @@ class SharedSyncAuthRepository implements AuthRepository {
 
   @override
   Future<String> sendEmailOtp(String email) async {
+    final cleanEmail = email.trim().toLowerCase();
     try {
-      final res = await _dio.post('$_apiBase/auth/send-email-otp', data: {'email': email.trim().toLowerCase()});
-      if (res.statusCode == 200 && res.data != null && res.data['otp'] != null) {
-        return res.data['otp'].toString();
-      }
+      await FirebaseAuthService.sendEmailVerification(email: cleanEmail);
     } catch (_) {}
-    return await _fallback.sendEmailOtp(email);
+
+    try {
+      await _dio.post('$_apiBase/auth/send-email-otp', data: {'email': cleanEmail});
+    } catch (e) {
+      debugPrint('Server send-email-otp note: $e');
+    }
+    return 'SENT';
   }
 
   @override
@@ -241,20 +245,9 @@ class SharedSyncAuthRepository implements AuthRepository {
     };
     await preferences.savePendingRegistration(jsonEncode(pendingMap));
 
-    // Also prime fallback so it has pending data
-    try {
-      await _fallback.registerWithDiuEmail(
-        name: cleanName,
-        studentId: cleanId,
-        email: cleanEmail,
-        phone: cleanPhone,
-        password: password,
-      );
-    } catch (_) {}
-
     // Dispatch official verification email to DIU student inbox via Firebase
     try {
-      FirebaseAuthService.dispatchVerificationEmail(
+      await FirebaseAuthService.dispatchVerificationEmail(
         email: cleanEmail,
         password: password,
       );
@@ -264,48 +257,35 @@ class SharedSyncAuthRepository implements AuthRepository {
 
     try {
       final res = await _dio.post('$_apiBase/auth/register', data: pendingMap);
-      if (res.statusCode == 200 && res.data != null && res.data['otp'] != null) {
-        return res.data['otp'].toString();
+      if (res.statusCode == 200) {
+        return 'PENDING_EMAIL_VERIFICATION';
       }
+    } on DioException catch (dioErr) {
+      final msg = dioErr.response?.data is Map && dioErr.response?.data['detail'] != null
+          ? dioErr.response?.data['detail'].toString()
+          : 'Registration failed. Please verify your student information.';
+      throw Exception(msg);
     } catch (e) {
       debugPrint('Server register note: $e');
+      throw Exception('Failed to connect to authentication server. Please check internet connection.');
     }
 
-    return await _fallback.registerWithDiuEmail(
-      name: cleanName,
-      studentId: cleanId,
-      email: cleanEmail,
-      phone: cleanPhone,
-      password: password,
-    );
+    return 'PENDING_EMAIL_VERIFICATION';
   }
 
   @override
   Future<UserModel> verifyAndCompleteRegistration({
     required String otp,
   }) async {
-    String pendingEmail = _fallback.pendingRegistrationEmail ?? '';
+    String pendingEmail = '';
     String pendingStudentId = '';
 
     final savedPending = preferences.getPendingRegistration();
     if (savedPending != null) {
       try {
         final decoded = jsonDecode(savedPending) as Map<String, dynamic>;
-        if (pendingEmail.isEmpty) {
-          pendingEmail = decoded['email'] as String? ?? '';
-        }
+        pendingEmail = decoded['email'] as String? ?? '';
         pendingStudentId = decoded['studentId'] as String? ?? '';
-        if (_fallback.pendingRegistrationEmail == null) {
-          try {
-            await _fallback.registerWithDiuEmail(
-              name: decoded['name'] as String? ?? 'DIU Student',
-              studentId: pendingStudentId,
-              email: pendingEmail,
-              phone: decoded['phone'] as String? ?? '01712345678',
-              password: decoded['password'] as String? ?? 'password123',
-            );
-          } catch (_) {}
-        }
       } catch (_) {}
     }
 
@@ -328,28 +308,52 @@ class SharedSyncAuthRepository implements AuthRepository {
         await preferences.clearPendingRegistration();
         return user;
       }
+    } on DioException catch (dioErr) {
+      final msg = dioErr.response?.data is Map && dioErr.response?.data['detail'] != null
+          ? dioErr.response?.data['detail'].toString()
+          : 'Invalid verification code. Please enter the valid code sent to your DIU email.';
+      throw Exception(msg);
     } catch (e) {
       debugPrint('Server verify note: $e');
+      if (e.toString().contains('Invalid verification code')) {
+        rethrow;
+      }
+      throw Exception('Verification failed. Please check your DIU student email or click the Firebase link.');
     }
 
-    final user = await _fallback.verifyAndCompleteRegistration(otp: otp);
-    await _persistUser(user);
-    await preferences.clearPendingRegistration();
-    return user;
+    throw Exception('Verification failed. Please enter the valid code sent to your email.');
   }
 
   @override
   Future<String> requestPasswordReset({
     required String identifier,
   }) async {
+    final cleanId = identifier.trim();
+    final cleanEmail = cleanId.contains('@') ? cleanId.toLowerCase() : '$cleanId@diu.edu.bd';
+
+    // 1. Dispatch Firebase password reset email directly
+    try {
+      await FirebaseAuthService.sendPasswordResetEmail(cleanEmail);
+      debugPrint('[Firebase Reset] Dispatched Firebase password reset email to $cleanEmail');
+    } catch (e) {
+      debugPrint('[Firebase Reset] Note: $e');
+    }
+
+    // 2. Dispatch via Server Backend (sends designed email + OTP + direct link)
     try {
       final res = await _dio.post('$_apiBase/auth/request-password-reset', data: {
-        'identifier': identifier.trim(),
+        'identifier': cleanId,
+        'email': cleanEmail,
       });
-      if (res.statusCode == 200 && res.data != null && res.data['otp'] != null) {
-        return res.data['otp'].toString();
+      if (res.statusCode == 200 && res.data != null) {
+        final otp = res.data['otp']?.toString() ?? 'SENT';
+        return otp;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Backend Reset] Error: $e');
+    }
+
+    // 3. Fallback to local storage if offline
     return await _fallback.requestPasswordReset(identifier: identifier);
   }
 
@@ -359,16 +363,27 @@ class SharedSyncAuthRepository implements AuthRepository {
     required String otp,
     required String newPassword,
   }) async {
+    final cleanId = identifier.trim();
     try {
       final res = await _dio.post('$_apiBase/auth/reset-password', data: {
-        'identifier': identifier.trim(),
-        'otp': otp,
+        'identifier': cleanId,
+        'otp': otp.trim(),
         'newPassword': newPassword,
       });
       if (res.statusCode == 200) {
+        try {
+          await _fallback.verifyAndResetPassword(
+            identifier: identifier,
+            otp: otp,
+            newPassword: newPassword,
+          );
+        } catch (_) {}
         return true;
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Backend Reset Password] Error: $e');
+    }
+
     return await _fallback.verifyAndResetPassword(
       identifier: identifier,
       otp: otp,

@@ -156,7 +156,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final otp = await _repository.registerWithDiuEmail(
+      await _repository.registerWithDiuEmail(
         name: name,
         studentId: studentId,
         email: email,
@@ -172,7 +172,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         pendingEmail: email,
         pendingPhone: phone,
         pendingPassword: password,
-        lastGeneratedOtp: otp,
+        lastGeneratedOtp: null,
         clearError: true,
       );
       return true;
@@ -214,12 +214,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<bool> requestPasswordReset(String identifier) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
-      final otp = await _repository.requestPasswordReset(identifier: identifier);
+      await _repository.requestPasswordReset(identifier: identifier);
       state = state.copyWith(
         isLoading: false,
         isPasswordResetSent: true,
         resetIdentifier: identifier,
-        resetOtp: otp,
+        resetOtp: null,
         clearError: true,
       );
       return true;

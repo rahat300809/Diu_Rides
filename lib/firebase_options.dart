@@ -41,20 +41,21 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyA_CampusDiuRideKey_DemoWeb99',
-    appId: '1:108392193821:web:9102830192830192',
-    messagingSenderId: '108392193821',
-    projectId: 'diu-ride',
-    authDomain: 'diu-ride.firebaseapp.com',
-    storageBucket: 'diu-ride.appspot.com',
+    apiKey: 'AIzaSyCSOpUBZYClVhratJeK-OTRhypoRdTTjfk',
+    appId: '1:848215124719:web:aa6543bbb965882fb0491a',
+    messagingSenderId: '848215124719',
+    projectId: 'diuride252',
+    authDomain: 'diuride252.firebaseapp.com',
+    storageBucket: 'diuride252.firebasestorage.app',
+    measurementId: 'G-78EWC052SB',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyA_CampusDiuRideKey_DemoAndroid88',
-    appId: '1:108392193821:android:3490283019283019',
-    messagingSenderId: '108392193821',
-    projectId: 'diu-ride',
-    storageBucket: 'diu-ride.appspot.com',
+    apiKey: 'AIzaSyCGQ_Dvm-3qD0pFMfBJ9ctIIm4OF6Tjvy8',
+    appId: '1:848215124719:android:77908b3202850b73b0491a',
+    messagingSenderId: '848215124719',
+    projectId: 'diuride252',
+    storageBucket: 'diuride252.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

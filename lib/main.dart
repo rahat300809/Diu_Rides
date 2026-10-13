@@ -34,7 +34,7 @@ void main() async {
   try {
     // Initialize SharedPreferences (keeps login persistent until manual logout)
     preferencesService = await PreferencesService.init();
-    await preferencesService.seedDefaultAccounts();
+    await preferencesService.clearAllDemoRecords();
   } catch (e) {
     debugPrint('PreferencesService init error: $e');
   }

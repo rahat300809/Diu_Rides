@@ -93,14 +93,39 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   void _checkFirebaseVerification() async {
     final verified = await FirebaseAuthService.isEmailVerified();
     if (verified) {
-      final lastOtp = ref.read(authNotifierProvider).lastGeneratedOtp ?? '123456';
-      _otpController.text = lastOtp;
-      _verify();
+      final success = await ref.read(authNotifierProvider.notifier).verifyOtp('FIREBASE_VERIFIED');
+      if (success && mounted) {
+        final user = ref.read(authNotifierProvider).user;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            content: Row(
+              children: [
+                const Icon(Icons.verified_user, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Firebase email verified! Account activated for ${user?.studentId ?? ''}!',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainNavigationScreen()),
+          (route) => false,
+        );
+      }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Firebase verification link not clicked yet. Please check your DIU student email or use the 6-digit code above.'),
+            content: Text('Firebase verification link not clicked yet. Please click the link sent to your DIU student email or enter the 6-digit code.'),
             duration: Duration(seconds: 4),
           ),
         );
@@ -120,6 +145,27 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
           ),
         );
       }
+    }
+  }
+
+  void _openGmail() async {
+    final launched = await FirebaseAuthService.openGmailInbox(email: widget.email);
+    if (!launched && mounted) {
+      _openWebmail();
+    }
+  }
+
+  void _resendFirebaseEmail() async {
+    final sent = await FirebaseAuthService.sendEmailVerification(email: widget.email);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(sent
+              ? 'Firebase verification email sent to ${widget.email}. Please check your Gmail inbox.'
+              : 'Dispatched verification email request to ${widget.email}'),
+          backgroundColor: AppColors.primary,
+        ),
+      );
     }
   }
 
@@ -216,84 +262,43 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                Builder(
-                  builder: (context) {
-                    final lastOtp = authState.lastGeneratedOtp;
-                    if (lastOtp == null || lastOtp.isEmpty) return const SizedBox.shrink();
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 24),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryContainer.withOpacity(0.4),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: AppColors.primary.withOpacity(0.4),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                Container(
+                  margin: const EdgeInsets.only(bottom: 24),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer.withOpacity(0.35),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.mark_email_unread_outlined, size: 20, color: AppColors.primary),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Instant Verification Code',
-                                style: AppTypography.labelMd.copyWith(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  lastOtp,
-                                  style: AppTypography.titleMd.copyWith(
-                                    color: AppColors.onPrimary,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 2,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
+                          const Icon(Icons.mark_email_read, size: 20, color: AppColors.primary),
+                          const SizedBox(width: 8),
                           Text(
-                            'Dispatched to ${widget.email}. You can also use the verified instant campus code shown above.',
-                            style: AppTypography.bodySm.copyWith(
-                              color: AppColors.onSurfaceVariant,
-                              fontSize: 12,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                _otpController.text = lastOtp;
-                                _verify();
-                              },
-                              icon: const Icon(Icons.bolt, size: 18),
-                              label: const Text('Auto-Fill & Verify Immediately'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: AppColors.onPrimary,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
+                            'Official Verification Email Sent',
+                            style: AppTypography.labelMd.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
                         ],
                       ),
-                    );
-                  },
+                      const SizedBox(height: 8),
+                      Text(
+                        'A 6-digit code and Firebase verification link have been dispatched to ${widget.email}. Please check your inbox (or spam) and enter the code below.',
+                        style: AppTypography.bodySm.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 12.5,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
 
                 // OTP input
@@ -375,20 +380,48 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   ),
                 ),
 
-                const SizedBox(height: 20),
-                const Divider(),
-                const SizedBox(height: 16),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: _resendFirebaseEmail,
+                  icon: const Icon(Icons.send_outlined, size: 16, color: AppColors.primary),
+                  label: const Text('Resend Firebase Verification Link to Email'),
+                ),
 
-                // Quick Link to DIU Student Webmail
-                OutlinedButton.icon(
-                  onPressed: _openWebmail,
-                  icon: const Icon(Icons.mail_outline, size: 18, color: AppColors.primary),
-                  label: const Text('Open DIU Student Webmail'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary, width: 1.2),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 12),
+
+                // Quick Link to Gmail & DIU Student Webmail
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _openGmail,
+                        icon: const Icon(Icons.mail, size: 16),
+                        label: const Text('Open Gmail'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEA4335), // Google Red
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _openWebmail,
+                        icon: const Icon(Icons.school, size: 16),
+                        label: const Text('DIU Webmail'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary),
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

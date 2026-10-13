@@ -12,12 +12,27 @@ final ridesRepositoryProvider = Provider<RidesRepository>((ref) {
 
 final departingSoonRidesProvider = FutureProvider<List<RideModel>>((ref) async {
   final repo = ref.watch(ridesRepositoryProvider);
-  return repo.getDepartingSoonRides();
+  final all = await repo.getDepartingSoonRides();
+  final currentUser = ref.watch(authNotifierProvider).user;
+  if (currentUser == null) return all;
+  return all.where((r) =>
+    r.driverId != currentUser.id &&
+    r.driverId != currentUser.studentId &&
+    (currentUser.phone.isEmpty || r.driverPhone != currentUser.phone)
+  ).toList();
 });
 
 final departingSoonRidesStreamProvider = StreamProvider<List<RideModel>>((ref) {
   final repo = ref.watch(ridesRepositoryProvider);
-  return repo.watchDepartingSoonRides();
+  final currentUser = ref.watch(authNotifierProvider).user;
+  return repo.watchDepartingSoonRides().map((list) {
+    if (currentUser == null) return list;
+    return list.where((r) =>
+      r.driverId != currentUser.id &&
+      r.driverId != currentUser.studentId &&
+      (currentUser.phone.isEmpty || r.driverPhone != currentUser.phone)
+    ).toList();
+  });
 });
 
 class RideSearchFilterState {
@@ -121,16 +136,86 @@ final rideSearchFilterProvider = StateNotifierProvider<RideSearchNotifier, RideS
   return RideSearchNotifier();
 });
 
-final allAvailableRidesProvider = FutureProvider<List<RideModel>>((ref) async {
+/// Helper to detect if a ride was posted by the current user
+bool isCurrentUserRide(RideModel r, dynamic currentUser) {
+  if (currentUser == null) return false;
+  final String uId = (currentUser.id ?? '').toString().trim();
+  final String uStdId = (currentUser.studentId ?? '').toString().trim();
+  final String uPhone = (currentUser.phone ?? '').toString().replaceAll(RegExp(r'\D'), '');
+  final String uName = (currentUser.name ?? '').toString().trim().toLowerCase();
+
+  final String dId = r.driverId.trim();
+  final String dPhone = (r.driverPhone ?? '').replaceAll(RegExp(r'\D'), '');
+  final String dName = r.driverName.trim().toLowerCase();
+
+  if (uId.isNotEmpty && (dId == uId || dId.contains(uId))) return true;
+  if (uStdId.isNotEmpty && (dId == uStdId || dId.contains(uStdId))) return true;
+  if (uPhone.isNotEmpty && dPhone.isNotEmpty) {
+    if (uPhone == dPhone || (uPhone.length >= 8 && dPhone.endsWith(uPhone)) || (dPhone.length >= 8 && uPhone.endsWith(dPhone))) {
+      return true;
+    }
+  }
+  if (uName.isNotEmpty && dName.isNotEmpty && uName == dName && !uName.contains('student')) {
+    return true;
+  }
+  return false;
+}
+
+/// Helper to detect if a passenger request was posted by the current user
+bool isCurrentUserPassengerRequest(dynamic e, dynamic currentUser) {
+  if (currentUser == null) return false;
+  final String uId = (currentUser.id ?? '').toString().trim();
+  final String uStdId = (currentUser.studentId ?? '').toString().trim();
+  final String uPhone = (currentUser.phone ?? '').toString().replaceAll(RegExp(r'\D'), '');
+  final String uName = (currentUser.name ?? '').toString().trim().toLowerCase();
+
+  String pId = '';
+  String pPhone = '';
+  String pName = '';
+  if (e is Map) {
+    pId = (e['passengerId'] ?? e['passenger_id'] ?? '').toString().trim();
+    pPhone = (e['passengerPhone'] ?? e['passenger_phone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+    pName = (e['passengerName'] ?? e['passenger_name'] ?? '').toString().trim().toLowerCase();
+  } else {
+    try {
+      pId = (e.passengerId ?? '').toString().trim();
+      pPhone = (e.passengerPhone ?? '').toString().replaceAll(RegExp(r'\D'), '');
+      pName = (e.passengerName ?? '').toString().trim().toLowerCase();
+    } catch (_) {}
+  }
+
+  if (uId.isNotEmpty && (pId == uId || pId.contains(uId))) return true;
+  if (uStdId.isNotEmpty && (pId == uStdId || pId.contains(uStdId))) return true;
+  if (uPhone.isNotEmpty && pPhone.isNotEmpty) {
+    if (uPhone == pPhone || (uPhone.length >= 8 && pPhone.endsWith(uPhone)) || (pPhone.length >= 8 && uPhone.endsWith(pPhone))) {
+      return true;
+    }
+  }
+  if (uName.isNotEmpty && pName.isNotEmpty && uName == pName && !uName.contains('student')) {
+    return true;
+  }
+  return false;
+}
+
+final allSystemRidesProvider = FutureProvider<List<RideModel>>((ref) async {
   final repo = ref.watch(ridesRepositoryProvider);
   return repo.getAllAvailableRides();
+});
+
+final allAvailableRidesProvider = FutureProvider<List<RideModel>>((ref) async {
+  final all = await ref.watch(allSystemRidesProvider.future);
+  final currentUser = ref.watch(authNotifierProvider).user;
+  if (currentUser == null) return all;
+  // Rider shouldn't see their own posted rides in the available rides feed!
+  return all.where((r) => !isCurrentUserRide(r, currentUser)).toList();
 });
 
 final searchRidesResultsProvider = FutureProvider<List<RideModel>>((ref) async {
   final repo = ref.watch(ridesRepositoryProvider);
   final filter = ref.watch(rideSearchFilterProvider);
+  final currentUser = ref.watch(authNotifierProvider).user;
 
-  return repo.searchRides(
+  final results = await repo.searchRides(
     pickupQuery: filter.isAllRidesMode ? null : (filter.pickupQuery.isEmpty ? null : filter.pickupQuery),
     dropoffQuery: filter.isAllRidesMode ? null : (filter.dropoffQuery.isEmpty ? null : filter.dropoffQuery),
     generalQuery: filter.generalSearchQuery.isEmpty ? null : filter.generalSearchQuery,
@@ -141,11 +226,22 @@ final searchRidesResultsProvider = FutureProvider<List<RideModel>>((ref) async {
     verifiedOnly: filter.verifiedOnly,
     sortByLowestPrice: filter.sortByLowestPrice,
   );
+
+  if (currentUser == null) return results;
+  return results.where((r) => !isCurrentUserRide(r, currentUser)).toList();
+});
+
+final allPassengerRequestsProvider = FutureProvider<List<dynamic>>((ref) async {
+  final repo = ref.watch(ridesRepositoryProvider);
+  return repo.getPassengerRequests();
 });
 
 final passengerRequestsProvider = FutureProvider<List<dynamic>>((ref) async {
-  final repo = ref.watch(ridesRepositoryProvider);
-  return repo.getPassengerRequests();
+  final all = await ref.watch(allPassengerRequestsProvider.future);
+  final currentUser = ref.watch(authNotifierProvider).user;
+  if (currentUser == null) return all;
+  // Requester shouldn't see their own requests in the public request feed!
+  return all.where((e) => !isCurrentUserPassengerRequest(e, currentUser)).toList();
 });
 
 final completedRidesProvider = FutureProvider<List<Map<String, dynamic>>>((ref) async {

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:diu_ride/core/network/websocket_client.dart';
 import 'package:diu_ride/features/auth/presentation/providers/auth_provider.dart';
 import 'package:diu_ride/features/chat/data/models/chat_message.dart';
+import 'package:diu_ride/features/chat/data/models/campus_conversation_model.dart';
 import 'package:diu_ride/features/chat/data/repositories/chat_repository.dart';
 import 'package:diu_ride/features/chat/data/repositories/shared_sync_chat_repository.dart';
 
@@ -167,3 +168,10 @@ final chatNotifierProvider = StateNotifierProvider.family<ChatNotifier, ChatStat
   final repo = ref.watch(chatRepositoryProvider);
   return ChatNotifier(repo, ref, rideId);
 });
+
+final campusConversationsProvider = FutureProvider<List<CampusConversationModel>>((ref) async {
+  final repo = ref.watch(chatRepositoryProvider);
+  final user = ref.watch(authNotifierProvider).user;
+  return repo.getConversations(userId: user?.id);
+});
+

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:uuid/uuid.dart';
 import 'package:diu_ride/features/chat/data/models/chat_message.dart';
+import 'package:diu_ride/features/chat/data/models/campus_conversation_model.dart';
 import 'package:diu_ride/features/chat/data/repositories/chat_repository.dart';
 
 class MockChatRepository implements ChatRepository {
@@ -104,4 +105,30 @@ class MockChatRepository implements ChatRepository {
   Stream<ChatMessage> subscribeToMessages(String rideId) {
     return _streamController.stream.where((m) => m.rideId == rideId);
   }
+
+  @override
+  Future<List<CampusConversationModel>> getConversations({String? userId}) async {
+    return [
+      const CampusConversationModel(
+        rideId: 'ride_mock_01',
+        peerId: 'driver_tanvir_01',
+        peerName: 'Tanvir Ahmed',
+        peerRole: 'Biker / Rider',
+        peerPhone: '01712345678',
+        peerDept: 'CSE Batch 54',
+        route: 'Daffodil Smart City ➔ Mirpur 10',
+        origin: 'Daffodil Smart City',
+        destination: 'Mirpur 10',
+        vehicleModel: 'Yamaha FZ-S V3',
+        fare: 60.0,
+        status: 'accepted',
+        bookingId: 'book_mock_01',
+        lastMessage: 'Got it! Almost near Birulia bridge, see you in 3 mins.',
+        lastTimestamp: 'Just now',
+        lastSenderName: 'Tanvir Ahmed',
+        unreadCount: 0,
+      ),
+    ];
+  }
 }
+

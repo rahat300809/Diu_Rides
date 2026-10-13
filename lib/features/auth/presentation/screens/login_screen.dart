@@ -173,19 +173,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
   }
 
-  // --- Quick Demo Login Auto-Fill ---
-  void _fillDemoCredentials() {
-    _loginIdentifierController.text = '201-15-14285';
-    _loginPasswordController.text = 'password123';
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Demo student credentials filled (201-15-14285 / password123)'),
-        duration: Duration(seconds: 2),
-        backgroundColor: AppColors.primary,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
 
   // --- Open Forgot Password Dialog ---
   void _openForgotPassword() async {
@@ -530,50 +517,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           ),
           const SizedBox(height: 16),
 
-          // Quick Demo Test Card for fast testing
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.outlineVariant.withOpacity(0.5)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline, size: 18, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Demo Student: 201-15-14285',
-                        style: AppTypography.labelSm.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.onSurface,
-                        ),
-                      ),
-                      Text(
-                        'Pass: password123',
-                        style: AppTypography.labelSm.copyWith(
-                          color: AppColors.onSurfaceVariant,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                TextButton(
-                  onPressed: _fillDemoCredentials,
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    foregroundColor: AppColors.primary,
-                  ),
-                  child: const Text('1-Tap Fill', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

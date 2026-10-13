@@ -80,11 +80,20 @@ abstract class RidesRepository {
     required String driverPhone,
     required String driverBike,
   });
+  Future<bool> deletePassengerRequest(String requestId);
   Future<List<Map<String, dynamic>>> getCompletedRides({String? userId});
   Future<bool> triggerAlertRing({
     required String targetUserId,
+    String? targetName,
+    String? senderId,
     required String senderName,
     required String rideId,
+    String? ringId,
     String? message,
+  });
+  Future<bool> stopAlertRing({
+    required String targetUserId,
+    String? senderId,
+    String? ringId,
   });
 }

@@ -24,6 +24,8 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
   final _pickupController = TextEditingController(text: 'DIU Smart City, Ashulia');
   final _dropoffController = TextEditingController();
   final _notesController = TextEditingController();
+  final _timeController = TextEditingController(text: 'Right Now (Next 15m)');
+  final _fareController = TextEditingController(text: '50');
   double _proposedFare = 50.0;
   String _selectedTime = 'Right Now (Next 15m)';
   bool _isLoading = false;
@@ -44,11 +46,40 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
     'Tomorrow Morning',
   ];
 
+  Future<void> _pickCustomTimeAndDate() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 30)),
+    );
+    if (pickedDate == null || !mounted) return;
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.now(),
+    );
+    if (pickedTime == null || !mounted) return;
+
+    final hour = pickedTime.hourOfPeriod == 0 ? 12 : pickedTime.hourOfPeriod;
+    final minute = pickedTime.minute.toString().padLeft(2, '0');
+    final period = pickedTime.period == DayPeriod.am ? 'AM' : 'PM';
+    final dateStr = '${pickedDate.day}/${pickedDate.month}';
+    final formatted = '$dateStr at $hour:$minute $period';
+
+    setState(() {
+      _selectedTime = formatted;
+      _timeController.text = formatted;
+    });
+  }
+
   @override
   void dispose() {
     _pickupController.dispose();
     _dropoffController.dispose();
     _notesController.dispose();
+    _timeController.dispose();
+    _fareController.dispose();
     super.dispose();
   }
 
@@ -60,6 +91,11 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
       );
       return;
     }
+
+    final customTime = _timeController.text.trim().isNotEmpty
+        ? _timeController.text.trim()
+        : _selectedTime;
+    final customFare = double.tryParse(_fareController.text.trim()) ?? _proposedFare;
 
     setState(() => _isLoading = true);
 
@@ -73,10 +109,13 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
         passengerPhone: user?.phone ?? '01712345678',
         pickup: _pickupController.text.trim(),
         dropoff: dropoff,
-        requestedTime: _selectedTime,
-        proposedFare: _proposedFare,
+        requestedTime: customTime,
+        proposedFare: customFare,
         notes: _notesController.text.trim(),
       );
+
+      ref.invalidate(allPassengerRequestsProvider);
+      ref.invalidate(passengerRequestsProvider);
 
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -92,7 +131,7 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Ride Request Broadcasted! Campus riders heading to $dropoff will be notified.',
+                  'Ride Request Broadcasted! Campus riders heading to $dropoff will be notified (৳${customFare.toInt()}).',
                   style: AppTypography.labelMd.copyWith(color: Colors.white),
                 ),
               ),
@@ -268,34 +307,79 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Preferred Departure Time
-            Text(
-              'PREFERRED TIME',
-              style: AppTypography.labelSm.copyWith(
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF8E8E93),
-                fontSize: 11,
-              ),
+            // Preferred Departure Time (Manual Entry & Quick Presets)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'PREFERRED TIME (MANUAL ENTRY / PICK)',
+                  style: AppTypography.labelSm.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF8E8E93),
+                    fontSize: 11,
+                  ),
+                ),
+                GestureDetector(
+                  onTap: _pickCustomTimeAndDate,
+                  child: const Row(
+                    children: [
+                      Icon(Icons.calendar_month, size: 14, color: Color(0xFFE65100)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Date/Time Picker',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFE65100)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 6),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF2F2F7),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: TextField(
+                controller: _timeController,
+                onChanged: (val) => setState(() => _selectedTime = val),
+                decoration: InputDecoration(
+                  hintText: 'e.g. 10:30 AM, Right Now, Leaving 4:15 PM...',
+                  prefixIcon: const Icon(Icons.access_time_filled, size: 18, color: Color(0xFFE65100)),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.edit_calendar, color: Color(0xFFE65100), size: 20),
+                    onPressed: _pickCustomTimeAndDate,
+                    tooltip: 'Pick Date & Time',
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 6,
+              runSpacing: 6,
               children: _quickTimes.map((t) {
-                final isSelected = _selectedTime == t;
+                final isSelected = _timeController.text == t;
                 return GestureDetector(
-                  onTap: () => setState(() => _selectedTime = t),
+                  onTap: () {
+                    setState(() {
+                      _selectedTime = t;
+                      _timeController.text = t;
+                    });
+                  },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: isSelected ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       t,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w600,
                         color: isSelected ? Colors.white : const Color(0xFF3A3A3C),
                       ),
@@ -306,12 +390,12 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Proposed Fuel Share Fare
+            // Proposed Fuel Share Fare (Manual Entry & Quick Buttons)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'PROPOSED FUEL CONTRIBUTION',
+                  'PROPOSED FARE (CUSTOM MANUAL AMOUNT)',
                   style: AppTypography.labelSm.copyWith(
                     fontWeight: FontWeight.bold,
                     color: const Color(0xFF8E8E93),
@@ -319,7 +403,7 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
                   ),
                 ),
                 Text(
-                  '৳${_proposedFare.toInt()}',
+                  '৳${(double.tryParse(_fareController.text) ?? _proposedFare).toInt()}',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -329,24 +413,61 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
               ],
             ),
             const SizedBox(height: 6),
+            Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF4F5F7),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFFFCC80), width: 1.2),
+              ),
+              child: TextField(
+                controller: _fareController,
+                keyboardType: TextInputType.number,
+                onChanged: (val) {
+                  setState(() {
+                    _proposedFare = double.tryParse(val) ?? _proposedFare;
+                  });
+                },
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF141416)),
+                decoration: const InputDecoration(
+                  prefixIcon: Padding(
+                    padding: EdgeInsets.only(left: 14, right: 8, top: 12),
+                    child: Text(
+                      '৳',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFFE65100)),
+                    ),
+                  ),
+                  hintText: 'Enter custom fare amount (e.g. 35, 60, 100...)',
+                  hintStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.normal, color: Colors.grey),
+                  border: InputBorder.none,
+                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
             Row(
-              children: [40.0, 50.0, 60.0, 75.0, 90.0].map((f) {
-                final isSel = _proposedFare == f;
+              children: [35.0, 40.0, 50.0, 60.0, 75.0, 90.0, 100.0].map((f) {
+                final currentFare = double.tryParse(_fareController.text) ?? _proposedFare;
+                final isSel = currentFare == f;
                 return Expanded(
                   child: GestureDetector(
-                    onTap: () => setState(() => _proposedFare = f),
+                    onTap: () {
+                      setState(() {
+                        _proposedFare = f;
+                        _fareController.text = f.toInt().toString();
+                      });
+                    },
                     child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      margin: const EdgeInsets.symmetric(horizontal: 2),
+                      padding: const EdgeInsets.symmetric(vertical: 7),
                       decoration: BoxDecoration(
                         color: isSel ? const Color(0xFFE65100) : const Color(0xFFF4F5F7),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       alignment: Alignment.center,
                       child: Text(
                         '৳${f.toInt()}',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
                           color: isSel ? Colors.white : const Color(0xFF3A3A3C),
                         ),
@@ -378,7 +499,7 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
                           const Icon(Icons.send_rounded, size: 18),
                           const SizedBox(width: 8),
                           Text(
-                            'Post Request (৳${_proposedFare.toInt()})',
+                            'Post Request (৳${(double.tryParse(_fareController.text) ?? _proposedFare).toInt()})',
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w700,

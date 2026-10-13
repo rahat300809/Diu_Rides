@@ -5,6 +5,7 @@ import 'package:diu_ride/core/theme/app_typography.dart';
 import 'package:diu_ride/core/utils/currency_formatter.dart';
 import 'package:diu_ride/features/rides/data/models/ride_model.dart';
 import 'package:diu_ride/features/booking/presentation/providers/booking_provider.dart';
+import 'package:diu_ride/features/chat/presentation/screens/chat_screen.dart';
 
 class BookingConfirmationSheet extends ConsumerStatefulWidget {
   final RideModel ride;
@@ -57,6 +58,18 @@ class _BookingConfirmationSheetState
       Navigator.of(context).pop();
       if (success) {
         widget.onBookingSuccess();
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              rideId: widget.ride.id,
+              driverName: widget.ride.driverName,
+              peerName: widget.ride.driverName,
+              vehicleModel: widget.ride.vehicle.modelName,
+              peerPhone: widget.ride.driverPhone,
+              peerRole: 'Driver',
+            ),
+          ),
+        );
       } else {
         final err =
             ref.read(bookingNotifierProvider).errorMessage ?? 'Booking failed';

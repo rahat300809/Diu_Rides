@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Firebase Auth Service for DIU Rides
 /// Provides Firebase email code sending, verification, and authentication.
@@ -77,6 +78,35 @@ class FirebaseAuthService {
       return user.emailVerified;
     } catch (e) {
       debugPrint('[Firebase Auth] dispatchVerificationEmail note: $e');
+      return false;
+    }
+  }
+
+  /// Send Firebase password reset email to Gmail
+  static Future<bool> sendPasswordResetEmail(String email) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email.trim());
+      debugPrint('[Firebase Auth] Password reset email dispatched to $email');
+      return true;
+    } catch (e) {
+      debugPrint('[Firebase Auth] sendPasswordResetEmail error: $e');
+      return false;
+    }
+  }
+
+  /// Launch Gmail inbox or DIU webmail in browser or app
+  static Future<bool> openGmailInbox({String? email}) async {
+    try {
+      final gmailUrl = email != null && email.endsWith('@diu.edu.bd')
+          ? 'https://mail.google.com/a/diu.edu.bd'
+          : 'https://mail.google.com';
+      final uri = Uri.parse(gmailUrl);
+      if (await canLaunchUrl(uri)) {
+        return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      return false;
+    } catch (e) {
+      debugPrint('[Firebase Auth] openGmailInbox error: $e');
       return false;
     }
   }

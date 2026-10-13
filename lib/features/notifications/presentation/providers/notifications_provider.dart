@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:diu_ride/features/notifications/data/models/notification_model.dart';
+import 'package:diu_ride/core/services/system_notification_service.dart';
 
 /// Global notification event bus — receives ride/booking lifecycle events
 /// and surfaces them in the notifications screen + badge count.
@@ -171,6 +173,61 @@ class NotificationsNotifier extends StateNotifier<List<NotificationModel>> {
     ));
   }
 
+  /// University notice sent from Admin Portal
+  void onUniversityNotice({
+    required String title,
+    required String message,
+    String? audience,
+    String? id,
+  }) {
+    final noticeId = id ?? 'n_notice_${DateTime.now().millisecondsSinceEpoch}';
+    
+    // Prevent duplicate entries
+    if (state.any((n) => n.id == noticeId)) return;
+
+    _add(NotificationModel(
+      id: noticeId,
+      title: '📢 $title',
+      body: message,
+      type: NotificationType.safetyAlert,
+      timestamp: DateTime.now(),
+      isRead: false,
+    ));
+
+    // Post to Android system status / notification bar
+    SystemNotificationService.showNotification(
+      id: noticeId,
+      title: '📢 DIU Varsity Notice: $title',
+      body: message,
+    );
+  }
+
+  /// Sync all recent varsity notices from backend
+  Future<void> syncNoticesFromServer(Dio dio, String apiBaseUrl) async {
+    try {
+      final res = await dio.get('$apiBaseUrl/admin/notices');
+      if (res.statusCode == 200 && res.data is List) {
+        for (final item in res.data as List) {
+          if (item is Map) {
+            final id = item['id']?.toString() ?? '';
+            final title = item['title']?.toString() ?? 'Varsity Announcement';
+            final content = item['content']?.toString() ?? item['message']?.toString() ?? '';
+            if (id.isNotEmpty && !state.any((n) => n.id == id)) {
+              _add(NotificationModel(
+                id: id,
+                title: '📢 $title',
+                body: content,
+                type: NotificationType.safetyAlert,
+                timestamp: DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now(),
+                isRead: false,
+              ));
+            }
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
   // ---------------------------------------------------------------------------
   // READ STATE MANAGEMENT
   // ---------------------------------------------------------------------------
@@ -202,6 +259,9 @@ class NotificationsNotifier extends StateNotifier<List<NotificationModel>> {
   // ---------------------------------------------------------------------------
 
   void _add(NotificationModel n) {
+    // Print to terminal for debugging and verification
+    // ignore: avoid_print
+    print('[DIU_NOTIFICATION] ${n.title} - ${n.body}');
     // Prepend so newest is at top
     state = [n, ...state];
   }

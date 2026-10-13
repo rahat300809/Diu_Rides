@@ -11,6 +11,8 @@ import 'package:diu_ride/features/tracking/presentation/screens/ride_details_tra
 import 'package:diu_ride/features/chat/presentation/screens/chat_screen.dart';
 import 'package:diu_ride/features/rides/data/models/passenger_request_model.dart';
 import 'package:diu_ride/core/utils/date_time_utils.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:diu_ride/features/profile/presentation/widgets/motorcycle_config_dialog.dart';
 
 class OfferRideScreen extends ConsumerStatefulWidget {
   final VoidCallback onRidePublished;
@@ -29,16 +31,23 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
   final _destinationController = TextEditingController(text: 'Uttara Sector 10');
   final _waypointController = TextEditingController();
   final _fareController = TextEditingController(text: '50');
+  final _bikeModelController = TextEditingController(text: 'Yamaha FZ-X');
+  final _licensePlateController = TextEditingController(text: 'Dhaka Metro-HA 24-8891');
+  final _bikeColorController = TextEditingController(text: 'Black Metallic');
+  final _manualDateController = TextEditingController();
+  final _manualTimeController = TextEditingController();
 
   bool _isWaypointOpen = false;
   int _selectedDateIndex = 0; // 0: Today, 1: Tomorrow, 2: Custom
+  DateTime _selectedDate = DateTime.now();
   TimeOfDay _departureTime = const TimeOfDay(hour: 16, minute: 30);
   final VehicleType _vehicleType = VehicleType.bike; // Strictly motorbikes only
   final int _seats = 1; // 1 passenger seat for bikes
   String _bikeModel = 'Yamaha FZ-X';
   bool _hasPassengerHelmet = true;
-  bool _isFemaleOnly = false;
+  final bool _isFemaleOnly = false;
   bool _isPublishing = false;
+  bool _isManualScheduleInput = false;
 
   final List<String> _availableBikes = [
     'Yamaha FZ-X',
@@ -51,11 +60,49 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _manualDateController.text = '${DateTime.now().day.toString().padLeft(2, '0')}/${DateTime.now().month.toString().padLeft(2, '0')}/${DateTime.now().year}';
+    _manualTimeController.text = '04:30 PM';
+    _loadSavedMotoConfig();
+  }
+
+  Future<void> _loadSavedMotoConfig() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final model = prefs.getString('rider_moto_model');
+      final plate = prefs.getString('rider_moto_plate');
+      final color = prefs.getString('rider_moto_color');
+      final helmet = prefs.getBool('rider_moto_helmet');
+
+      if (model != null && model.isNotEmpty) {
+        _bikeModelController.text = model;
+        _bikeModel = model;
+      }
+      if (plate != null && plate.isNotEmpty) {
+        _licensePlateController.text = plate;
+      }
+      if (color != null && color.isNotEmpty) {
+        _bikeColorController.text = color;
+      }
+      if (helmet != null) {
+        _hasPassengerHelmet = helmet;
+      }
+      if (mounted) setState(() {});
+    } catch (_) {}
+  }
+
+  @override
   void dispose() {
     _originController.dispose();
     _destinationController.dispose();
     _waypointController.dispose();
     _fareController.dispose();
+    _bikeModelController.dispose();
+    _licensePlateController.dispose();
+    _bikeColorController.dispose();
+    _manualDateController.dispose();
+    _manualTimeController.dispose();
     super.dispose();
   }
 
@@ -65,13 +112,82 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
     if (totalMinutes >= 1440) totalMinutes -= 1440;
     setState(() {
       _departureTime = TimeOfDay(hour: totalMinutes ~/ 60, minute: totalMinutes % 60);
+      final hour = _departureTime.hourOfPeriod == 0 ? 12 : _departureTime.hourOfPeriod;
+      final minute = _departureTime.minute.toString().padLeft(2, '0');
+      final period = _departureTime.period == DayPeriod.am ? 'AM' : 'PM';
+      _manualTimeController.text = '${hour.toString().padLeft(2, '0')}:$minute $period';
     });
+  }
+
+  Future<void> _pickCustomDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      lastDate: DateTime.now().add(const Duration(days: 60)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFFE65100),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF1C1C1E),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+        _selectedDateIndex = 2;
+        _manualDateController.text = '${picked.day.toString().padLeft(2, '0')}/${picked.month.toString().padLeft(2, '0')}/${picked.year}';
+      });
+    }
+  }
+
+  Future<void> _pickCustomTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _departureTime,
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFFE65100),
+              onPrimary: Colors.white,
+              onSurface: Color(0xFF1C1C1E),
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _departureTime = picked;
+        final hour = picked.hourOfPeriod == 0 ? 12 : picked.hourOfPeriod;
+        final minute = picked.minute.toString().padLeft(2, '0');
+        final period = picked.period == DayPeriod.am ? 'AM' : 'PM';
+        _manualTimeController.text = '${hour.toString().padLeft(2, '0')}:$minute $period';
+      });
+    }
   }
 
   void _publishRide() async {
     final origin = _originController.text.trim();
     final dest = _destinationController.text.trim();
     final fare = double.tryParse(_fareController.text.trim()) ?? 50.0;
+    final bikeName = _bikeModelController.text.trim().isNotEmpty
+        ? _bikeModelController.text.trim()
+        : _bikeModel;
+    final plate = _licensePlateController.text.trim().isNotEmpty
+        ? _licensePlateController.text.trim()
+        : 'Dhaka Metro';
+    final color = _bikeColorController.text.trim().isNotEmpty
+        ? _bikeColorController.text.trim()
+        : 'Black';
 
     if (origin.isEmpty || dest.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -85,9 +201,9 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
     final vehicle = VehicleModel(
       id: 'v_user_offered',
       type: _vehicleType,
-      modelName: _bikeModel,
-      color: 'Matte Blue Metallic',
-      licensePlate: 'Dhaka Metro-HA 24-8891',
+      modelName: bikeName,
+      color: color,
+      licensePlate: plate,
       hasAc: false,
       hasPassengerHelmet: _hasPassengerHelmet,
       isSmokeFree: true,
@@ -95,14 +211,34 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
       hasLuggageSpace: false,
     );
 
-    final now = DateTime.now();
-    final departureDateTime = DateTime(
-      now.year,
-      now.month,
-      now.day + _selectedDateIndex,
-      _departureTime.hour,
-      _departureTime.minute,
-    );
+    // Support manual schedule text if provided
+    DateTime departureDateTime;
+    try {
+      if (_isManualScheduleInput && _manualDateController.text.trim().isNotEmpty) {
+        final parts = _manualDateController.text.trim().split(RegExp(r'[/.-]'));
+        if (parts.length == 3) {
+          final d = int.parse(parts[0]);
+          final m = int.parse(parts[1]);
+          final y = int.parse(parts[2].length == 2 ? '20${parts[2]}' : parts[2]);
+          _selectedDate = DateTime(y, m, d);
+        }
+      }
+      departureDateTime = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _departureTime.hour,
+        _departureTime.minute,
+      );
+    } catch (_) {
+      departureDateTime = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        _departureTime.hour,
+        _departureTime.minute,
+      );
+    }
 
     final currentUser = ref.read(authNotifierProvider).user;
 
@@ -137,6 +273,7 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
     setState(() => _isPublishing = false);
 
     if (mounted) {
+      ref.invalidate(allSystemRidesProvider);
       ref.invalidate(departingSoonRidesProvider);
       ref.invalidate(searchRidesResultsProvider);
       ref.invalidate(allAvailableRidesProvider);
@@ -346,69 +483,163 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
               _buildSectionCard(
                 stepNum: '2',
                 title: 'Departure Schedule',
-                extraTag: 'Post-Class Rush Hour',
+                extraTag: 'Campus Commute',
+                extraAction: TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _isManualScheduleInput = !_isManualScheduleInput;
+                    });
+                  },
+                  icon: Icon(
+                    _isManualScheduleInput ? Icons.tune : Icons.edit_calendar,
+                    size: 16,
+                    color: const Color(0xFFE65100),
+                  ),
+                  label: Text(
+                    _isManualScheduleInput ? 'Quick Stepper' : 'Manual Input',
+                    style: AppTypography.labelSm.copyWith(
+                      color: const Color(0xFFE65100),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Date selector chips
                     Row(
                       children: [
-                        _buildDateChip(0, 'Today', 'Mon, 28 Apr'),
+                        _buildDateChip(0, 'Today', '${DateTime.now().day}/${DateTime.now().month}'),
                         const SizedBox(width: 8),
-                        _buildDateChip(1, 'Tomorrow', 'Tue, 29 Apr'),
+                        _buildDateChip(1, 'Tomorrow', '${DateTime.now().add(const Duration(days: 1)).day}/${DateTime.now().add(const Duration(days: 1)).month}'),
                         const SizedBox(width: 8),
-                        _buildDateChip(2, 'Custom', 'Pick Date'),
+                        _buildDateChip(2, 'Custom', _selectedDateIndex == 2 ? '${_selectedDate.day}/${_selectedDate.month}' : 'Pick Date'),
                       ],
                     ),
                     const SizedBox(height: 14),
 
-                    // Time Stepper
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Estimated Roll-out', style: AppTypography.labelSm),
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.baseline,
-                                textBaseline: TextBaseline.alphabetic,
-                                children: [
-                                  Text(
-                                    formatTime,
-                                    style: AppTypography.headlineMd.copyWith(fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    period,
-                                    style: AppTypography.labelLg.copyWith(
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.bold,
+                    if (_isManualScheduleInput) ...[
+                      // Manual Input Fields for Date and Time
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF8F3),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFFFD180)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Customized Schedule Input',
+                              style: AppTypography.labelSm.copyWith(
+                                color: const Color(0xFFE65100),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _manualDateController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Date (DD/MM/YYYY)',
+                                      labelStyle: const TextStyle(fontSize: 12),
+                                      hintText: '28/04/2026',
+                                      prefixIcon: const Icon(Icons.calendar_today, size: 18, color: Color(0xFFE65100)),
+                                      suffixIcon: IconButton(
+                                        icon: const Icon(Icons.event, size: 18, color: Color(0xFFE65100)),
+                                        onPressed: _pickCustomDate,
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                                     ),
                                   ),
-                                  const SizedBox(width: 6),
-                                  Text('(Shift Ends)', style: AppTypography.labelSm),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: _manualTimeController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Departure Time',
+                                      labelStyle: const TextStyle(fontSize: 12),
+                                      hintText: '04:30 PM',
+                                      prefixIcon: const Icon(Icons.access_time, size: 18, color: Color(0xFFE65100)),
+                                      suffixIcon: IconButton(
+                                        icon: const Icon(Icons.watch_later_outlined, size: 18, color: Color(0xFFE65100)),
+                                        onPressed: _pickCustomTime,
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else ...[
+                      // Time Stepper
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            InkWell(
+                              onTap: _pickCustomTime,
+                              borderRadius: BorderRadius.circular(8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text('Departure Time', style: AppTypography.labelSm),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.edit, size: 13, color: Color(0xFFE65100)),
+                                    ],
+                                  ),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                                    textBaseline: TextBaseline.alphabetic,
+                                    children: [
+                                      Text(
+                                        formatTime,
+                                        style: AppTypography.headlineMd.copyWith(fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        period,
+                                        style: AppTypography.labelLg.copyWith(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text('(Tap to pick)', style: AppTypography.labelSm.copyWith(color: AppColors.outline)),
+                                    ],
+                                  ),
                                 ],
                               ),
-                            ],
-                          ),
-                          Row(
-                            children: [
-                              _buildStepBtn(Icons.remove, () => _adjustTime(-15)),
-                              const SizedBox(width: 8),
-                              Text('15m', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
-                              const SizedBox(width: 8),
-                              _buildStepBtn(Icons.add, () => _adjustTime(15)),
-                            ],
-                          ),
-                        ],
+                            ),
+                            Row(
+                              children: [
+                                _buildStepBtn(Icons.remove, () => _adjustTime(-15)),
+                                const SizedBox(width: 8),
+                                Text('15m', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
+                                const SizedBox(width: 8),
+                                _buildStepBtn(Icons.add, () => _adjustTime(15)),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -417,67 +648,139 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
               // STEP 3: MOTORBIKE & HELMET CARD
               _buildSectionCard(
                 stepNum: '3',
-                title: 'Motorbike & Helmet',
+                title: 'Motorbike & Safety',
                 extraTag: '1 Passenger Seat',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Motorbike Model Chips
-                    Text('Your Motorcycle Model', style: AppTypography.labelSm),
+                    // Customizable Bike Model Name
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Customize Motorcycle Name', style: AppTypography.labelSm),
+                        InkWell(
+                          onTap: () {
+                            MotorcycleConfigDialog.show(
+                              context: context,
+                              onSaved: (m, p, c, h) {
+                                setState(() {
+                                  _bikeModelController.text = m;
+                                  _bikeModel = m;
+                                  _licensePlateController.text = p;
+                                  _bikeColorController.text = c;
+                                  _hasPassengerHelmet = h;
+                                });
+                              },
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.settings, size: 13, color: Color(0xFFE65100)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Moto Setup ⚙️',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFE65100),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _bikeModelController,
+                      onChanged: (val) {
+                        setState(() {
+                          _bikeModel = val.trim().isNotEmpty ? val.trim() : 'Motorbike';
+                        });
+                      },
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.two_wheeler, color: Color(0xFFE65100)),
+                        hintText: 'e.g. Yamaha FZ-X, Suzuki Gixxer, Honda Hornet',
+                        labelText: 'Motorcycle Model Name',
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
                     const SizedBox(height: 8),
+
+                    // Quick Preset Chips
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
                       child: Row(
                         children: _availableBikes.map((bike) {
-                          final isSelected = _bikeModel == bike;
+                          final isSelected = _bikeModelController.text == bike;
                           return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: InkWell(
-                              onTap: () => setState(() => _bikeModel = bike),
-                              borderRadius: BorderRadius.circular(14),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: isSelected ? const Color(0xFFE65100) : Colors.white,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: isSelected ? const Color(0xFFE65100) : const Color(0xFFE5E5EA),
-                                    width: isSelected ? 1.5 : 1.0,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: isSelected
-                                          ? const Color(0xFFE65100).withOpacity(0.2)
-                                          : Colors.black.withOpacity(0.03),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.two_wheeler,
-                                      size: 16,
-                                      color: isSelected ? Colors.white : const Color(0xFF1C1C1E),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      bike,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w700,
-                                        color: isSelected ? Colors.white : const Color(0xFF1C1C1E),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                            padding: const EdgeInsets.only(right: 6),
+                            child: ActionChip(
+                              label: Text(bike),
+                              labelStyle: TextStyle(
+                                fontSize: 11,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? Colors.white : const Color(0xFF1C1C1E),
                               ),
+                              backgroundColor: isSelected ? const Color(0xFFE65100) : const Color(0xFFF2F2F7),
+                              side: BorderSide.none,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              onPressed: () {
+                                setState(() {
+                                  _bikeModelController.text = bike;
+                                  _bikeModel = bike;
+                                });
+                              },
                             ),
                           );
                         }).toList(),
                       ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // License Plate and Color Row
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: TextField(
+                            controller: _licensePlateController,
+                            decoration: InputDecoration(
+                              labelText: 'License Plate',
+                              hintText: 'Dhaka Metro-HA 24-8891',
+                              labelStyle: const TextStyle(fontSize: 12),
+                              prefixIcon: const Icon(Icons.pin, size: 18, color: Color(0xFFE65100)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: _bikeColorController,
+                            decoration: InputDecoration(
+                              labelText: 'Color',
+                              hintText: 'Black Metallic',
+                              labelStyle: const TextStyle(fontSize: 12),
+                              prefixIcon: const Icon(Icons.color_lens_outlined, size: 18, color: Color(0xFFE65100)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 14),
 
@@ -536,83 +839,6 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-
-                    // Helmet Checkbox
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE5E5EA)),
-                      ),
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: _hasPassengerHelmet,
-                            activeColor: const Color(0xFFE65100),
-                            onChanged: (val) => setState(() => _hasPassengerHelmet = val ?? true),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.sports_motorsports, size: 16, color: Color(0xFFE65100)),
-                                    const SizedBox(width: 5),
-                                    Text(
-                                      'Clean Passenger Helmet Provided',
-                                      style: AppTypography.bodyMdMedium.copyWith(fontWeight: FontWeight.w700),
-                                    ),
-                                  ],
-                                ),
-                                Text(
-                                  'DOT / BSTI certified helmet for your passenger',
-                                  style: AppTypography.labelSm.copyWith(fontSize: 10.5, color: const Color(0xFF8E8E93)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Female-Only Toggle
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: _isFemaleOnly,
-                            activeColor: AppColors.primary,
-                            onChanged: (val) => setState(() => _isFemaleOnly = val ?? false),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.female, size: 16, color: AppColors.primary),
-                                    const SizedBox(width: 4),
-                                    Text('Female Students Only', style: AppTypography.bodyMdMedium),
-                                  ],
-                                ),
-                                Text(
-                                  'Restricted to verified female DIU ID cardholders',
-                                  style: AppTypography.labelSm.copyWith(fontSize: 10.5),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -838,12 +1064,22 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
     final isSelected = _selectedDateIndex == index;
     return Expanded(
       child: InkWell(
-        onTap: () => setState(() => _selectedDateIndex = index),
+        onTap: () async {
+          if (index == 2) {
+            await _pickCustomDate();
+          } else {
+            setState(() {
+              _selectedDateIndex = index;
+              _selectedDate = index == 0 ? DateTime.now() : DateTime.now().add(const Duration(days: 1));
+              _manualDateController.text = '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}';
+            });
+          }
+        },
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryContainer : AppColors.surfaceContainer,
+            color: isSelected ? const Color(0xFFE65100) : AppColors.surfaceContainer,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
@@ -911,8 +1147,14 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
 
   Widget _buildMyActiveRidesSection() {
     final user = ref.watch(authNotifierProvider).user;
-    final allRides = ref.watch(allAvailableRidesProvider).value ?? [];
-    final myRides = allRides.where((r) => r.driverId == (user?.id ?? 'drv_peer')).toList();
+    final allRides = ref.watch(allSystemRidesProvider).value ?? [];
+    final myRides = allRides.where((r) =>
+      user != null && (
+        r.driverId == user.id ||
+        r.driverId == user.studentId ||
+        (user.phone.isNotEmpty && r.driverPhone == user.phone)
+      )
+    ).toList();
     final passengerReqsAsync = ref.watch(passengerRequestsProvider);
     final ridesRepo = ref.read(ridesRepositoryProvider);
 
@@ -1084,22 +1326,89 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                             'Leaves: ${DateTimeUtils.formatTime(ride.departureTime)}',
                             style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                           ),
-                          InkWell(
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) => RideDetailsTrackingScreen(rideId: ride.id),
+                          Row(
+                            children: [
+                              InkWell(
+                                onTap: () async {
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (ctx) => AlertDialog(
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                      title: const Text('Delete Ride Post?'),
+                                      content: Text('Are you sure you want to delete this ride offer from ${ride.originName} to ${ride.destinationName}?'),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(ctx, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        ElevatedButton(
+                                          onPressed: () => Navigator.pop(ctx, true),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFFD32F2F),
+                                            foregroundColor: Colors.white,
+                                          ),
+                                          child: const Text('Delete'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) {
+                                    await ridesRepo.deleteRide(ride.id);
+                                    ref.invalidate(allAvailableRidesProvider);
+                                    ref.invalidate(departingSoonRidesProvider);
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Ride post removed successfully.'),
+                                        backgroundColor: Color(0xFFD32F2F),
+                                      ),
+                                    );
+                                    setState(() {});
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFEBEE),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFFFFCDD2)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.delete_outline, size: 13, color: Color(0xFFD32F2F)),
+                                      SizedBox(width: 3),
+                                      Text(
+                                        'Delete',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFD32F2F),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              );
-                            },
-                            child: const Text(
-                              'Track / Manage →',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFE65100),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => RideDetailsTrackingScreen(rideId: ride.id),
+                                    ),
+                                  );
+                                },
+                                child: const Text(
+                                  'Track / Manage →',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFE65100),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -1394,6 +1703,53 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                                       side: const BorderSide(color: Color(0xFFE65100)),
                                       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: () async {
+                                      final confirm = await showDialog<bool>(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                          title: const Text('Delete Student Request?'),
+                                          content: Text('Are you sure you want to remove this request from ${req.passengerName} (${req.pickup} → ${req.dropoff})?'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(ctx, false),
+                                              child: const Text('Cancel'),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () => Navigator.pop(ctx, true),
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor: const Color(0xFFD32F2F),
+                                                foregroundColor: Colors.white,
+                                              ),
+                                              child: const Text('Delete'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                      if (confirm == true) {
+                                        await ridesRepo.deletePassengerRequest(req.id);
+                                        ref.invalidate(passengerRequestsProvider);
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Student request removed.'),
+                                            backgroundColor: Color(0xFFD32F2F),
+                                          ),
+                                        );
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFEBEE),
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: const Color(0xFFFFCDD2)),
+                                      ),
+                                      child: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFD32F2F)),
                                     ),
                                   ),
                                 ],
