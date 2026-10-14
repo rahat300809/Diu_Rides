@@ -9,6 +9,9 @@ import 'package:diu_ride/features/rides/data/models/ride_model.dart';
 import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 import 'package:diu_ride/features/rides/presentation/widgets/post_ride_request_sheet.dart';
+import 'package:diu_ride/features/rides/presentation/widgets/ride_result_card.dart';
+import 'package:diu_ride/features/rides/presentation/widgets/my_rides_activity_view.dart';
+import 'package:diu_ride/features/rides/presentation/screens/offer_ride_screen.dart';
 import 'package:diu_ride/features/tracking/presentation/screens/ride_details_tracking_screen.dart';
 import 'package:diu_ride/core/utils/direct_call_service.dart';
 
@@ -143,7 +146,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Sub-tab switcher: Available Bikes vs Student Requests
+                  // Sub-tab switcher: Find Rides vs My Rides & Status vs Student Requests
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(3),
@@ -177,16 +180,16 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                 children: [
                                   Icon(
                                     Icons.two_wheeler,
-                                    size: 16,
+                                    size: 15,
                                     color: _selectedMode == 0
                                         ? const Color(0xFFE65100)
                                         : const Color(0xFF8E8E93),
                                   ),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    'Available Bikes',
+                                    'Find Rides',
                                     style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 11.5,
                                       fontWeight: _selectedMode == 0 ? FontWeight.bold : FontWeight.w600,
                                       color: _selectedMode == 0
                                           ? const Color(0xFF141416)
@@ -221,19 +224,64 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    Icons.hail,
-                                    size: 16,
+                                    Icons.assignment_outlined,
+                                    size: 15,
                                     color: _selectedMode == 1
                                         ? const Color(0xFFE65100)
                                         : const Color(0xFF8E8E93),
                                   ),
-                                  const SizedBox(width: 6),
+                                  const SizedBox(width: 4),
                                   Text(
-                                    'Student Requests',
+                                    'My Rides & Status',
                                     style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 11.5,
                                       fontWeight: _selectedMode == 1 ? FontWeight.bold : FontWeight.w600,
                                       color: _selectedMode == 1
+                                          ? const Color(0xFF141416)
+                                          : const Color(0xFF8E8E93),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedMode = 2),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              decoration: BoxDecoration(
+                                color: _selectedMode == 2 ? Colors.white : Colors.transparent,
+                                borderRadius: BorderRadius.circular(11),
+                                boxShadow: _selectedMode == 2
+                                    ? [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.06),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              alignment: Alignment.center,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.hail,
+                                    size: 15,
+                                    color: _selectedMode == 2
+                                        ? const Color(0xFFE65100)
+                                        : const Color(0xFF8E8E93),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Requests',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: _selectedMode == 2 ? FontWeight.bold : FontWeight.w600,
+                                      color: _selectedMode == 2
                                           ? const Color(0xFF141416)
                                           : const Color(0xFF8E8E93),
                                     ),
@@ -246,6 +294,8 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                       ],
                     ),
                   ),
+
+                  if (_selectedMode != 1) ...[
 
                   // Search input
                   Container(
@@ -374,14 +424,30 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                     ),
                   ),
                 ],
+                ],
               ),
             ),
 
-            // 2. Rides List or Student Requests
+            // 2. Rides List or My Rides & Status or Student Requests
             Expanded(
               child: _selectedMode == 1
-                  ? _buildStudentRequestsView()
-                  : allRidesAsync.when(
+                  ? MyRidesActivityView(
+                      onOfferRide: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => OfferRideScreen(
+                              onRidePublished: () {
+                                ref.invalidate(myPostedRidesProvider);
+                                ref.invalidate(allAvailableRidesProvider);
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : _selectedMode == 2
+                      ? _buildStudentRequestsView()
+                      : allRidesAsync.when(
                       data: (rides) {
                         // Filter strictly to bikes and exclude driver's own offered ride
                         final currentUser = ref.watch(authNotifierProvider).user;
@@ -471,7 +537,17 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                             itemCount: filtered.length,
                             itemBuilder: (context, index) {
                               final ride = filtered[index];
-                              return _buildCleanMotoRideCard(ride);
+                              return RideResultCard(
+                                ride: ride,
+                                onBook: () => _handleBooking(ride),
+                                onTapDetails: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => RideDetailsTrackingScreen(rideId: ride.id),
+                                    ),
+                                  );
+                                },
+                              );
                             },
                           ),
                         );
@@ -487,354 +563,38 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          PostRideRequestSheet.show(context);
-        },
-        backgroundColor: const Color(0xFF141416),
-        icon: const Icon(Icons.hail, color: Color(0xFFFFA000), size: 20),
-        label: const Text(
-          'Request a Ride',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCleanMotoRideCard(RideModel ride) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.black.withOpacity(0.06)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(22),
-          onTap: () {
-            // Open full ride details modal/screen
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => RideDetailsTrackingScreen(rideId: ride.id),
+      floatingActionButton: _selectedMode == 1
+          ? FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => OfferRideScreen(
+                      onRidePublished: () {
+                        ref.invalidate(myPostedRidesProvider);
+                        ref.invalidate(allAvailableRidesProvider);
+                      },
+                    ),
+                  ),
+                );
+              },
+              backgroundColor: const Color(0xFF0F172A),
+              icon: const Icon(Icons.add, color: Colors.white, size: 20),
+              label: const Text(
+                'Post a Moto Ride',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
               ),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top: Driver Header & Tags
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: const Color(0xFFFFF3E0),
-                          child: Text(
-                            ride.driverName.isNotEmpty ? ride.driverName[0].toUpperCase() : 'D',
-                            style: const TextStyle(
-                              color: Color(0xFFE65100),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              ride.driverName,
-                              style: AppTypography.labelMd.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF141416),
-                              ),
-                            ),
-                            Row(
-                              children: [
-                                const Icon(Icons.star, size: 12, color: Color(0xFFFFA000)),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '${ride.driverRating.toStringAsFixed(1)} • ${ride.driverDept}',
-                                  style: AppTypography.labelSm.copyWith(
-                                    color: const Color(0xFF8E8E93),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                const Icon(Icons.schedule, size: 11, color: Color(0xFF8E8E93)),
-                                const SizedBox(width: 3),
-                                Text(
-                                  'Posted: ${DateTimeUtils.formatPostingTime(ride.createdAt)}',
-                                  style: AppTypography.labelSm.copyWith(
-                                    color: const Color(0xFF8E8E93),
-                                    fontSize: 10,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                    // Price & 1 Seat Badge
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          '৳${ride.farePerSeat.toInt()}',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFFE65100),
-                            letterSpacing: -0.5,
-                          ),
-                        ),
-                        const Text(
-                          '1 Moto Seat',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF34C759),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 12),
-                const Divider(height: 1, color: Color(0xFFF2F2F7)),
-                const SizedBox(height: 12),
-
-                // Middle: Route (From -> To)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Column(
-                      children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF2E7D32),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        Container(
-                          width: 2,
-                          height: 24,
-                          color: const Color(0xFFE5E5EA),
-                        ),
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFF3B30),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  ride.originName,
-                                  style: AppTypography.labelMd.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFF1C1C1E),
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              Text(
-                                DateTimeUtils.formatTime(ride.departureTime),
-                                style: AppTypography.labelSm.copyWith(
-                                  color: const Color(0xFF8E8E93),
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            ride.destinationName,
-                            style: AppTypography.labelMd.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF141416),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (ride.destinationChoices.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              '📍 Drop-off choices: ${{ride.destinationName, ...ride.destinationChoices}.join(" • ")}',
-                              style: const TextStyle(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFFE65100),
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 14),
-
-                // Bottom: Motorcycle Model & Action Buttons
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF2F2F7),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(Icons.two_wheeler, size: 13, color: Color(0xFF3A3A3C)),
-                          const SizedBox(width: 5),
-                          Text(
-                            ride.vehicle.modelName,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF3A3A3C),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.verified, size: 12, color: Color(0xFF2E7D32)),
-                          SizedBox(width: 4),
-                          Text(
-                            'DIU Verified',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF2E7D32),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-
-                    // Direct Phone Call button
-                    IconButton(
-                      onPressed: () {
-                        DirectCallService.showCallOptions(
-                          context,
-                          phoneNumber: ride.driverPhone ?? '',
-                          peerName: ride.driverName,
-                        );
-                      },
-                      icon: const Icon(Icons.call, size: 15, color: Color(0xFF2E7D32)),
-                      tooltip: 'Direct Call Driver',
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0xFFE8F5E9),
-                        padding: const EdgeInsets.all(7),
-                        minimumSize: Size.zero,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-
-                    // Direct SMS button
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => ChatScreen(
-                              rideId: ride.id,
-                              peerName: ride.driverName,
-                              vehicleModel: ride.vehicle.modelName,
-                              peerPhone: ride.driverPhone,
-                              peerRole: 'Driver',
-                            ),
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.chat_bubble_outline, size: 13),
-                      label: const Text('SMS', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF141416),
-                        side: BorderSide(color: const Color(0xFF141416).withOpacity(0.2)),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        minimumSize: Size.zero,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-
-                    // Book / Details Button
-                    ElevatedButton(
-                      onPressed: () => _handleBooking(ride),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF141416),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        minimumSize: Size.zero,
-                      ),
-                      child: const Text(
-                        'Request Seat',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            )
+          : FloatingActionButton.extended(
+              onPressed: () {
+                PostRideRequestSheet.show(context);
+              },
+              backgroundColor: const Color(0xFF141416),
+              icon: const Icon(Icons.hail, color: Color(0xFFFFA000), size: 20),
+              label: const Text(
+                'Request a Ride',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
             ),
-          ),
-        ),
-      ),
     );
   }
 

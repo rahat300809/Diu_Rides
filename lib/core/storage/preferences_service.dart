@@ -82,7 +82,7 @@ class PreferencesService {
     const demoEmail = 'student@diu.edu.bd';
     final existing = getAccountCredentials(demoStudentId);
     if (existing == null) {
-      final user = UserModel(
+      const user = UserModel(
         id: 'usr_201_15_14285',
         studentId: demoStudentId,
         name: 'DIU Student (Demo)',

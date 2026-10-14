@@ -210,6 +210,29 @@ final allAvailableRidesProvider = FutureProvider<List<RideModel>>((ref) async {
   return all.where((r) => !isCurrentUserRide(r, currentUser)).toList();
 });
 
+final myPostedRidesProvider = FutureProvider<List<RideModel>>((ref) async {
+  final repo = ref.watch(ridesRepositoryProvider);
+  final currentUser = ref.watch(authNotifierProvider).user;
+  if (currentUser == null) return [];
+  final allSystem = await ref.watch(allSystemRidesProvider.future);
+  final fromSystem = allSystem.where((r) => isCurrentUserRide(r, currentUser)).toList();
+  try {
+    final fromApi = await repo.getMyOfferedRides(currentUser.id);
+    final map = <String, RideModel>{};
+    for (final r in fromSystem) {
+      map[r.id] = r;
+    }
+    for (final r in fromApi) {
+      map[r.id] = r;
+    }
+    final list = map.values.toList();
+    list.sort((a, b) => b.departureTime.compareTo(a.departureTime));
+    return list;
+  } catch (_) {
+    return fromSystem;
+  }
+});
+
 final searchRidesResultsProvider = FutureProvider<List<RideModel>>((ref) async {
   final repo = ref.watch(ridesRepositoryProvider);
   final filter = ref.watch(rideSearchFilterProvider);

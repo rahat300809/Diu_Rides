@@ -572,349 +572,311 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       return const SizedBox();
     }
 
-    final isRider = (widget.peerRole?.toLowerCase() == 'passenger');
-    final myConfirmed = isRider ? _riderConfirmed : _passengerConfirmed;
-    final peerConfirmed = isRider ? _passengerConfirmed : _riderConfirmed;
-    final peerLabel = isRider ? 'Passenger' : 'Rider';
+    final isInProgress = _sessionStatus == 'in_progress';
+    final isCompleted = _sessionStatus == 'completed';
+    final isCancelled = _sessionStatus == 'cancelled';
 
-    final minutes = (_rideElapsedSeconds ~/ 60).toString().padLeft(2, '0');
-    final seconds = (_rideElapsedSeconds % 60).toString().padLeft(2, '0');
+    Color bannerColor;
+    Color textColor;
+    String statusTitle;
+    IconData statusIcon;
+
+    if (isInProgress) {
+      bannerColor = const Color(0xFFECFDF5);
+      textColor = const Color(0xFF047857);
+      final minutes = (_rideElapsedSeconds ~/ 60).toString().padLeft(2, '0');
+      final seconds = (_rideElapsedSeconds % 60).toString().padLeft(2, '0');
+      statusTitle = 'On Trip ($minutes:$seconds) • ৳${_rideFare.toStringAsFixed(0)}';
+      statusIcon = Icons.directions_bike;
+    } else if (isCompleted) {
+      bannerColor = const Color(0xFFF1F5F9);
+      textColor = const Color(0xFF475569);
+      statusTitle = 'Ride Completed';
+      statusIcon = Icons.check_circle;
+    } else if (isCancelled) {
+      bannerColor = const Color(0xFFFEF2F2);
+      textColor = const Color(0xFFDC2626);
+      statusTitle = 'Ride Cancelled';
+      statusIcon = Icons.cancel_outlined;
+    } else {
+      bannerColor = const Color(0xFFFFF7ED);
+      textColor = const Color(0xFFC2410C);
+      statusTitle = 'Ride Confirmed • ৳${_rideFare.toStringAsFixed(0)}';
+      statusIcon = Icons.schedule;
+    }
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _sessionStatus == 'in_progress'
-              ? const Color(0xFF10B981)
-              : (_sessionStatus == 'completed'
-                  ? const Color(0xFF059669)
-                  : (_sessionStatus == 'cancelled'
-                      ? const Color(0xFFEF4444).withOpacity(0.5)
-                      : AppColors.outline.withOpacity(0.2))),
-          width: 1.5,
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.cardShadow,
-            blurRadius: 6,
-            offset: Offset(0, 2),
+        color: bannerColor,
+        border: const Border(bottom: BorderSide(color: Color(0xFFE2E8F0), width: 0.8)),
+      ),
+      child: Row(
+        children: [
+          Icon(statusIcon, size: 14, color: textColor),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '$statusTitle  ($_originName ➔ $_destinationName)',
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          InkWell(
+            onTap: _showTripManagementSheet,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: textColor.withOpacity(0.3)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Options',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textColor),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(Icons.keyboard_arrow_down, size: 14, color: textColor),
+                ],
+              ),
+            ),
           ),
         ],
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header Row
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: _sessionStatus == 'in_progress'
-                  ? const Color(0xFF10B981).withOpacity(0.12)
-                  : (_sessionStatus == 'completed'
-                      ? const Color(0xFF059669).withOpacity(0.1)
-                      : (_sessionStatus == 'cancelled'
-                          ? const Color(0xFFEF4444).withOpacity(0.1)
-                          : AppColors.surfaceContainerHigh.withOpacity(0.3))),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _sessionStatus == 'in_progress'
-                      ? Icons.directions_bike
-                      : (_sessionStatus == 'completed'
-                          ? Icons.check_circle
-                          : (_sessionStatus == 'cancelled'
-                              ? Icons.cancel
-                              : Icons.hourglass_top)),
-                  size: 16,
-                  color: _sessionStatus == 'in_progress'
-                      ? const Color(0xFF10B981)
-                      : (_sessionStatus == 'completed'
-                          ? const Color(0xFF059669)
-                          : (_sessionStatus == 'cancelled' ? const Color(0xFFEF4444) : AppColors.primary)),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  _sessionStatus == 'in_progress'
-                      ? 'RIDE IN PROGRESS • READY TO RIDE'
-                      : (_sessionStatus == 'completed'
-                          ? 'TRIP COMPLETED'
-                          : (_sessionStatus == 'cancelled'
-                              ? 'TRIP CANCELLED (Not Confirmed)'
-                              : 'RIDE CONFIRMATION REQUIRED')),
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                    color: _sessionStatus == 'in_progress'
-                        ? const Color(0xFF047857)
-                        : (_sessionStatus == 'completed'
-                            ? const Color(0xFF065F46)
-                            : (_sessionStatus == 'cancelled' ? const Color(0xFFDC2626) : AppColors.primary)),
+    );
+  }
+
+  void _showTripManagementSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isInProgress = _sessionStatus == 'in_progress';
+        final isCompleted = _sessionStatus == 'completed';
+        final isCancelled = _sessionStatus == 'cancelled';
+        final minutes = (_rideElapsedSeconds ~/ 60).toString().padLeft(2, '0');
+        final seconds = (_rideElapsedSeconds % 60).toString().padLeft(2, '0');
+
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const Spacer(),
-                if (_sessionStatus == 'in_progress')
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Trip Details & Controls',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981),
-                      borderRadius: BorderRadius.circular(12),
+                      color: isInProgress ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    child: Text(
+                      isInProgress ? 'ACTIVE ($minutes:$seconds)' : _sessionStatus.toUpperCase(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: isInProgress ? const Color(0xFF16A34A) : const Color(0xFF475569),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
                       children: [
-                        const Icon(Icons.timer, size: 12, color: Colors.white),
-                        const SizedBox(width: 4),
-                        Text(
-                          '$minutes:$seconds',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 11,
-                          ),
+                        const Icon(Icons.trip_origin, size: 14, color: Color(0xFF10B981)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(_originName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                         ),
                       ],
                     ),
-                  )
-                else
-                  Text(
-                    '৳${_rideFare.toStringAsFixed(0)}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(width: 2, height: 16, color: const Color(0xFFCBD5E1)),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, size: 14, color: Color(0xFFEF4444)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(_destinationName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        ),
+                        Text('৳${_rideFare.toStringAsFixed(0)}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildStatusPill(label: 'Driver Ready', isConfirmed: _riderConfirmed),
+                  const SizedBox(width: 8),
+                  _buildStatusPill(label: 'Passenger Ready', isConfirmed: _passengerConfirmed),
+                ],
+              ),
+              const SizedBox(height: 14),
+              if (!isCompleted && !isCancelled) ...[
+                if (!isInProgress) ...[
+                  if (!_riderConfirmed || !_passengerConfirmed) ...[
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF047857),
+                        side: const BorderSide(color: Color(0xFF6EE7B7)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _isLoadingSession
+                          ? null
+                          : () {
+                              Navigator.pop(ctx);
+                              _confirmRideSession();
+                            },
+                      icon: const Icon(Icons.check_circle_outline, size: 16),
+                      label: const Text('Confirm Ride from My Side', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0284C7),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: _isLoadingSession
+                        ? null
+                        : () {
+                            Navigator.pop(ctx);
+                            _startRideSession();
+                          },
+                    icon: const Icon(Icons.play_arrow_rounded, size: 18),
+                    label: const Text('Start Commute (Driver on the way)', style: TextStyle(fontWeight: FontWeight.bold)),
                   ),
-              ],
-            ),
-          ),
-
-          // Body Details
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Route info
+                ] else ...[
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF059669),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: _isLoadingSession
+                        ? null
+                        : () {
+                            Navigator.pop(ctx);
+                            _completeRideSession();
+                          },
+                    icon: const Icon(Icons.check_circle_outline, size: 18),
+                    label: const Text('End Trip (Arrived Safely)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        '$_originName ➔ $_destinationName',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF0284C7),
+                          side: const BorderSide(color: Color(0xFFBAE6FD)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _shareLocation();
+                        },
+                        icon: const Icon(Icons.my_location, size: 15),
+                        label: const Text('Share GPS', style: TextStyle(fontSize: 12)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFDC2626),
+                          side: const BorderSide(color: Color(0xFFFCA5A5)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _showCancelTripDialog();
+                        },
+                        icon: const Icon(Icons.close, size: 15),
+                        label: const Text('Cancel Ride', style: TextStyle(fontSize: 12)),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-
-                // STATE 1: PENDING CONFIRMATION
-                if (_sessionStatus == 'pending') ...[
-                  Row(
-                    children: [
-                      // My status pill
-                      _buildStatusPill(
-                        label: 'You: ${myConfirmed ? "Confirmed ✓" : "Pending"}',
-                        isConfirmed: myConfirmed,
-                      ),
-                      const SizedBox(width: 8),
-                      // Peer status pill
-                      _buildStatusPill(
-                        label: '$peerLabel: ${peerConfirmed ? "Confirmed ✓" : "Pending"}',
-                        isConfirmed: peerConfirmed,
-                      ),
-                    ],
+              ] else ...[
+                Text(
+                  isCompleted ? '✓ Ride completed safely and archived.' : '✕ Ride was cancelled.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: isCompleted ? const Color(0xFF059669) : const Color(0xFFDC2626),
                   ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      // Confirm button
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: myConfirmed ? const Color(0xFF047857) : const Color(0xFF10B981),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 9),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onPressed: (_isLoadingSession || myConfirmed) ? null : _confirmRideSession,
-                          icon: Icon(myConfirmed ? Icons.check : Icons.check_circle_outline, size: 15),
-                          label: Text(
-                            myConfirmed ? 'Confirmed ✓' : 'Confirm Order',
-                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      // Start Trip directly
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE65100),
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 9),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onPressed: _isLoadingSession ? null : _startRideSession,
-                          icon: const Icon(Icons.play_arrow, size: 15),
-                          label: const Text(
-                            'Start Trip',
-                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      // Close / Cancel Trip button
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFEF4444),
-                          side: const BorderSide(color: Color(0xFFEF4444)),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onPressed: _isLoadingSession ? null : _showCancelTripDialog,
-                        icon: const Icon(Icons.close, size: 14),
-                        label: const Text(
-                          'Cancel',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-
-                // STATE 2: IN PROGRESS (BOTH CONFIRMED)
-                if (_sessionStatus == 'in_progress') ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.primary,
-                            side: const BorderSide(color: AppColors.primary),
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onPressed: _shareLocation,
-                          icon: const Icon(Icons.my_location, size: 15),
-                          label: const Text('Share Live GPS', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF047857),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          onPressed: _isLoadingSession ? null : _completeRideSession,
-                          icon: const Icon(Icons.flag, size: 15),
-                          label: const Text('End Trip (Complete)', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFEF4444),
-                          side: const BorderSide(color: Color(0xFFEF4444)),
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        onPressed: _isLoadingSession ? null : _showCancelTripDialog,
-                        icon: const Icon(Icons.close, size: 14),
-                        label: const Text('Cancel', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
-                  ),
-                ],
-
-                // STATE 3: COMPLETED
-                if (_sessionStatus == 'completed') ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFECFDF5),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFF10B981)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.check_circle, color: Color(0xFF047857), size: 18),
-                            const SizedBox(width: 6),
-                            const Text(
-                              '✓ PREVIOUS RIDE COMPLETED',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w800,
-                                color: Color(0xFF065F46),
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFD1FAE5),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                '৳${_rideFare.toStringAsFixed(0)}',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF047857)),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Route: $_originName ➔ $_destinationName\nDuration: ${_totalDurationMinutes > 0 ? _totalDurationMinutes.toStringAsFixed(1) : "15"} mins • Safe arrival archived in database.',
-                          style: const TextStyle(fontSize: 11.5, color: Color(0xFF047857), height: 1.35),
-                        ),
-                      ],
-                    ),
-                  ),
+                ),
+                if (_cancelReason.isNotEmpty) ...[
                   const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.two_wheeler, size: 14, color: AppColors.primary),
-                      label: const Text('Find / Post Next Ride ➔', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                    ),
-                  ),
-                ],
-
-                // STATE 4: CANCELLED
-                if (_sessionStatus == 'cancelled') ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          _cancelReason.isNotEmpty ? 'Reason: $_cancelReason' : 'Trip cancelled before confirmation.',
-                          style: const TextStyle(fontSize: 11.5, color: Color(0xFFDC2626)),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Find Another ➔', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
+                  Text(
+                    'Reason: $_cancelReason',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                   ),
                 ],
               ],
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -1046,6 +1008,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 peerRole: widget.peerRole ?? 'Ride Companion',
               );
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.more_vert, color: AppColors.onSurfaceVariant),
+            tooltip: 'Trip Options',
+            onPressed: _showTripManagementSheet,
           ),
         ],
       ),

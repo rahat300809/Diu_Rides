@@ -278,6 +278,15 @@ class SharedSyncRidesRepository implements RidesRepository {
 
   @override
   Future<List<RideModel>> getMyOfferedRides(String driverId) async {
+    try {
+      final res = await _dio.get('$_apiBase/rides', queryParameters: {'driver_id': driverId});
+      if (res.statusCode == 200 && res.data is List) {
+        final list = (res.data as List)
+            .map((json) => RideModel.fromJson(json as Map<String, dynamic>))
+            .toList();
+        if (list.isNotEmpty) return list;
+      }
+    } catch (_) {}
     final all = await getAllAvailableRides();
     return all.where((r) => r.driverId == driverId).toList();
   }

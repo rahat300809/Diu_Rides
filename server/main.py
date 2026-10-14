@@ -1672,6 +1672,7 @@ async def get_rides(
     female_only: Optional[bool] = None,
     exclude_user_id: Optional[str] = None,
     exclude_phone: Optional[str] = None,
+    driver_id: Optional[str] = None,
 ):
     try:
         await check_and_cleanup_expired_scheduled_posts()
@@ -1683,11 +1684,15 @@ async def get_rides(
     sql = "SELECT * FROM rides WHERE 1=1"
     params = []
 
-    if exclude_user_id:
+    if driver_id:
+        sql += " AND (driver_id = ? OR driver_id LIKE ?)"
+        params.extend([driver_id, f"%{driver_id}%"])
+
+    if exclude_user_id and not driver_id:
         sql += " AND (driver_id != ? AND driver_id NOT LIKE ?)"
         params.extend([exclude_user_id, f"%{exclude_user_id}%"])
 
-    if exclude_phone:
+    if exclude_phone and not driver_id:
         clean_p = "".join(filter(str.isdigit, exclude_phone))
         if len(clean_p) >= 8:
             short_p = clean_p[-8:]
@@ -1750,6 +1755,34 @@ async def get_rides(
 
     rides = [map_ride(r) for r in rows]
     return rides
+
+@app.get("/ride/api/rides/my-posted")
+@app.get("/api/rides/my-posted")
+async def get_my_posted_rides(user_id: str = Query(...)):
+    """
+    Uber-style Activity endpoint: returns all rides posted by the driver
+    along with their current booking requests and passenger details.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM rides 
+        WHERE driver_id = ? OR driver_id LIKE ? 
+        ORDER BY created_at DESC, departure_time DESC
+    """, (user_id, f"%{user_id}%"))
+    ride_rows = cursor.fetchall()
+
+    results = []
+    for r in ride_rows:
+        ride_dict = map_ride(r)
+        # Fetch all bookings for this ride
+        cursor.execute("SELECT * FROM bookings WHERE ride_id = ? ORDER BY requested_at DESC", (r["id"],))
+        booking_rows = cursor.fetchall()
+        ride_dict["bookings"] = [map_booking(b) for b in booking_rows]
+        results.append(ride_dict)
+
+    conn.close()
+    return results
 
 @app.post("/ride/api/rides")
 @app.post("/api/rides")
