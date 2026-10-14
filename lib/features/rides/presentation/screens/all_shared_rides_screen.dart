@@ -863,6 +863,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                       vehicleModel: 'My Ride Request',
                                       peerPhone: pPhone,
                                       peerRole: 'Driver',
+                                      peerId: isMap ? (req['acceptedDriverId'] ?? req['driver_id'])?.toString() : null,
                                     ),
                                   ),
                                 );
@@ -936,6 +937,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                       vehicleModel: 'Student Ride Request',
                                       peerPhone: pPhone,
                                       peerRole: 'Passenger',
+                                      peerId: pId,
                                     ),
                                   ),
                                 );
@@ -1022,6 +1024,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                         vehicleModel: 'Accepted Commute',
                                         peerPhone: pPhone,
                                         peerRole: 'Passenger',
+                                        peerId: pId,
                                       ),
                                     ),
                                   );

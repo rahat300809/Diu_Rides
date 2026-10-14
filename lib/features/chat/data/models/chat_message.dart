@@ -10,6 +10,7 @@ class ChatMessage {
   final bool isLocationShare;
   final double? sharedLat;
   final double? sharedLng;
+  final String? receiverId;
 
   const ChatMessage({
     required this.id,
@@ -23,6 +24,7 @@ class ChatMessage {
     this.isLocationShare = false,
     this.sharedLat,
     this.sharedLng,
+    this.receiverId,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json, String currentUserId) {
@@ -47,6 +49,7 @@ class ChatMessage {
       rideId: json['rideId'] as String? ?? 'general',
       senderId: json['senderId'] as String? ?? '',
       senderName: json['senderName'] as String? ?? 'DIU Commuter',
+      receiverId: json['receiverId'] as String?,
       text: text,
       timestamp: DateTime.tryParse(json['timestamp'] as String? ?? '') ?? DateTime.now(),
       isMe: json['senderId'] == currentUserId,
@@ -63,6 +66,7 @@ class ChatMessage {
       'rideId': rideId,
       'senderId': senderId,
       'senderName': senderName,
+      'receiverId': receiverId,
       'text': text,
       'timestamp': timestamp.toIso8601String(),
       'isRead': isRead,

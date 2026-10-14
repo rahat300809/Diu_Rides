@@ -57,6 +57,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Timer? _typingTimer;
   Timer? _debounceTypingTimer;
 
+  String get baseRideId {
+    if (widget.rideId.contains('__')) {
+      return widget.rideId.split('__')[0];
+    }
+    return widget.rideId;
+  }
+
+  String get effectiveChatId {
+    if (widget.rideId.contains('__')) {
+      return widget.rideId;
+    }
+    final currentUserId = ref.read(authNotifierProvider).user?.id ?? '';
+    final pId = widget.peerId;
+    if (pId != null && pId.isNotEmpty && currentUserId.isNotEmpty && pId != currentUserId) {
+      final sorted = [currentUserId.trim(), pId.trim()]..sort();
+      return '${widget.rideId}__${sorted[0]}__${sorted[1]}';
+    }
+    return widget.rideId;
+  }
+
   // Session state variables
   String _sessionStatus = 'pending'; // 'pending', 'in_progress', 'completed', 'cancelled'
   bool _riderConfirmed = false;
@@ -112,9 +132,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final user = ref.read(authNotifierProvider).user;
       final ws = ref.read(webSocketClientProvider);
       ws.send('typing_status', {
-        'rideId': widget.rideId,
+        'rideId': effectiveChatId,
+        'baseRideId': baseRideId,
         'userId': user?.id ?? '',
         'userName': user?.name ?? 'Companion',
+        'peerId': widget.peerId ?? '',
         'isTyping': isTyping,
       });
     } catch (_) {}
@@ -226,8 +248,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       );
     } catch (_) {}
 
-    ref.read(chatNotifierProvider(widget.rideId).notifier).sendMessage(
+    ref.read(chatNotifierProvider(effectiveChatId).notifier).sendMessage(
       '🚨 [Alert Ring] Dedicated attention buzz sent to ${widget.displayName}',
+      receiverId: widget.peerId,
     );
     _scrollToBottom();
   }
@@ -253,10 +276,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _loadSessionStatus() async {
-    if (widget.rideId == 'campus_community' || widget.rideId == 'support_campus') return;
+    if (baseRideId == 'campus_community' || baseRideId == 'support_campus') return;
     try {
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 4)));
-      final res = await dio.get('$_apiBase/rides/${widget.rideId}/session-status');
+      final res = await dio.get('$_apiBase/rides/$baseRideId/session-status');
       if (res.statusCode == 200 && res.data is Map) {
         final d = Map<String, dynamic>.from(res.data as Map);
         if (mounted) {
@@ -288,7 +311,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       // Also try fetching ride details to get driverPhone if missing
       if (_resolvedPeerPhone == null && widget.peerPhone == null) {
         try {
-          final rRes = await dio.get('$_apiBase/rides/${widget.rideId}');
+          final rRes = await dio.get('$_apiBase/rides/$baseRideId');
           if (rRes.statusCode == 200 && rRes.data is Map) {
             final rData = Map<String, dynamic>.from(rRes.data as Map);
             final phone = rData['driverPhone'] ?? rData['driver_phone'];
@@ -309,7 +332,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     _wsSessionSub = wsClient.messages.listen((msg) {
       final event = msg['event'] ?? msg['type'];
       final data = msg['data'] is Map ? Map<String, dynamic>.from(msg['data'] as Map) : msg;
-      if (event == 'ride_session_status_changed' && data['rideId'] == widget.rideId) {
+      if (event == 'ride_session_status_changed' && (data['rideId'] == widget.rideId || data['rideId'] == baseRideId || data['rideId'] == effectiveChatId)) {
         if (!mounted) return;
         setState(() {
           _sessionStatus = data['status']?.toString() ?? _sessionStatus;
@@ -336,9 +359,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           _rideProgressTimer?.cancel();
         }
 
-        ref.read(chatNotifierProvider(widget.rideId).notifier).loadMessages();
+        ref.read(chatNotifierProvider(effectiveChatId).notifier).loadMessages();
         _scrollToBottom();
-      } else if ((event == 'typing_status' || event == 'typing') && data['rideId'] == widget.rideId) {
+      } else if ((event == 'typing_status' || event == 'typing') && 
+                 (data['rideId'] == effectiveChatId || (data['rideId'] == widget.rideId && data['userId'] == widget.peerId))) {
         final currentUserId = ref.read(authNotifierProvider).user?.id;
         final senderId = data['userId']?.toString();
         if (senderId != null && senderId != currentUserId) {
@@ -412,13 +436,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       final lat = pos?.latitude ?? 23.8765;
       final lng = pos?.longitude ?? 90.3204;
       final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 5)));
-      await dio.post('$_apiBase/rides/${widget.rideId}/start', data: {
+      await dio.post('$_apiBase/rides/$baseRideId/start', data: {
         'latitude': lat,
         'longitude': lng,
       });
 
-      ref.read(chatNotifierProvider(widget.rideId).notifier).sendMessage(
+      ref.read(chatNotifierProvider(effectiveChatId).notifier).sendMessage(
         '🚀 [Trip Started] ${user?.name ?? "Rider"} started the ride! Live GPS tracking is active.',
+        receiverId: widget.peerId,
       );
 
       if (mounted) {
@@ -598,7 +623,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       setState(() {
         _sessionStatus = 'completed';
       });
-      ref.read(chatNotifierProvider(widget.rideId).notifier).loadMessages();
+      ref.read(chatNotifierProvider(effectiveChatId).notifier).loadMessages();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -617,7 +642,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildRideSessionControlBar() {
-    if (widget.rideId == 'campus_community' || widget.rideId == 'support_campus') {
+    if (baseRideId == 'campus_community' || baseRideId == 'support_campus') {
       return const SizedBox();
     }
 
@@ -966,7 +991,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final text = _messageController.text;
     if (text.trim().isEmpty) return;
     _sendTypingEvent(false);
-    ref.read(chatNotifierProvider(widget.rideId).notifier).sendMessage(text);
+    ref.read(chatNotifierProvider(effectiveChatId).notifier).sendMessage(text, receiverId: widget.peerId);
     _messageController.clear();
     _scrollToBottom();
   }
@@ -982,7 +1007,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final lat = pos?.latitude ?? 23.8765;
     final lng = pos?.longitude ?? 90.3204;
     if (!mounted) return;
-    ref.read(chatNotifierProvider(widget.rideId).notifier).shareLocation(lat, lng);
+    ref.read(chatNotifierProvider(effectiveChatId).notifier).shareLocation(lat, lng, receiverId: widget.peerId);
     _scrollToBottom();
   }
 
@@ -1000,7 +1025,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final chatState = ref.watch(chatNotifierProvider(widget.rideId));
+    final chatState = ref.watch(chatNotifierProvider(effectiveChatId));
     final displayName = widget.displayName;
 
     return Scaffold(

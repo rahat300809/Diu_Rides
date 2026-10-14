@@ -82,8 +82,7 @@ run('systemctl status diu-ride.service --no-pager', '8. Checking diu-ride.servic
 
 # 8. Test endpoints
 run('curl -s http://127.0.0.1:8001/ride/health', '9. Testing /ride/health')
-run('curl -s http://127.0.0.1:8001/health', '10. Testing /health')
-run('curl -s -X POST http://127.0.0.1:8001/ride/api/admin/clear-all-records', '11. Purging all previous test rides from database to make app brand new')
+# run('curl -s -X POST http://127.0.0.1:8001/ride/api/admin/clear-all-records', '11. Purging all previous test rides from database to make app brand new')
 run('curl -s -I http://127.0.0.1:8001/ride/ | head -n 12', '12. Testing /ride/ web header')
 run('curl -s -I http://127.0.0.1:8001/ride/download-apk | head -n 12', '13. Testing /ride/download-apk header')
 run('curl -s -I http://127.0.0.1:8001/download-apk | head -n 12', '14. Testing /download-apk header')

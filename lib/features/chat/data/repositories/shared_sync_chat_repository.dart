@@ -100,10 +100,8 @@ class SharedSyncChatRepository implements ChatRepository {
             .map((item) => ChatMessage.fromJson(Map<String, dynamic>.from(item as Map), _currentUserId))
             .toList();
 
-        if (list.isNotEmpty) {
-          _cache[rideId] = list;
-          return list;
-        }
+        _cache[rideId] = list;
+        return list;
       }
     } catch (e) {
       debugPrint('Get messages error (fallback to local): $e');
@@ -123,12 +121,14 @@ class SharedSyncChatRepository implements ChatRepository {
     double? sharedLng,
     String? senderId,
     String? senderName,
+    String? receiverId,
   }) async {
     final msg = ChatMessage(
       id: 'msg_${const Uuid().v4().substring(0, 8)}',
       rideId: rideId,
       senderId: senderId ?? 'usr_current',
       senderName: senderName ?? 'Me',
+      receiverId: receiverId,
       text: text,
       timestamp: DateTime.now(),
       isMe: true,

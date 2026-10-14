@@ -60,6 +60,7 @@ class MockChatRepository implements ChatRepository {
     double? sharedLng,
     String? senderId,
     String? senderName,
+    String? receiverId,
   }) async {
     await Future.delayed(const Duration(milliseconds: 150));
     final msg = ChatMessage(
@@ -67,6 +68,7 @@ class MockChatRepository implements ChatRepository {
       rideId: rideId,
       senderId: senderId ?? 'usr_diu_tanvir_201',
       senderName: senderName ?? 'Me',
+      receiverId: receiverId,
       text: text,
       timestamp: DateTime.now(),
       isMe: true,
@@ -80,23 +82,6 @@ class MockChatRepository implements ChatRepository {
     }
     _messages[rideId]!.add(msg);
     _streamController.add(msg);
-
-    // Simulated driver peer response after 2.5 seconds
-    if (!isLocationShare) {
-      Timer(const Duration(milliseconds: 2500), () {
-        final reply = ChatMessage(
-          id: 'msg_${const Uuid().v4().substring(0, 8)}',
-          rideId: rideId,
-          senderId: 'driver_tanvir_01',
-          senderName: 'Tanvir Ahmed',
-          text: 'Got it! Almost near Birulia bridge, see you in 3 mins.',
-          timestamp: DateTime.now(),
-          isMe: false,
-        );
-        _messages[rideId]?.add(reply);
-        _streamController.add(reply);
-      });
-    }
 
     return msg;
   }

@@ -502,6 +502,7 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
                 vehicleModel: ride.vehicle.modelName,
                 peerPhone: ride.driverPhone,
                 peerRole: 'Driver',
+                peerId: ride.driverId,
               ),
             ),
           );
@@ -688,6 +689,7 @@ class _DriverRideConversationsSection extends ConsumerWidget {
                         vehicleModel: 'Passenger Chat',
                         peerPhone: booking.passengerPhone,
                         peerRole: 'Passenger',
+                        peerId: booking.passengerId,
                       ),
                     ),
                   );

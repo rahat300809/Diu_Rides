@@ -74,6 +74,7 @@ class _BookingConfirmationSheetState
               vehicleModel: widget.ride.vehicle.modelName,
               peerPhone: widget.ride.driverPhone,
               peerRole: 'Driver',
+              peerId: widget.ride.driverId,
             ),
           ),
         );

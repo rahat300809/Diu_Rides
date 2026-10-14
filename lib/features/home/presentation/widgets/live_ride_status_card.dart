@@ -215,6 +215,7 @@ class LiveRideStatusCard extends ConsumerWidget {
                           driverName: matchingRide.driverName,
                           peerPhone: matchingRide.driverPhone,
                           peerRole: 'Driver',
+                          peerId: matchingRide.driverId,
                         ),
                       ),
                     );
@@ -473,6 +474,7 @@ class LiveRideStatusCard extends ConsumerWidget {
                               peerName: bookedPassenger.passengerName,
                               peerPhone: bookedPassenger.passengerPhone,
                               peerRole: 'Passenger',
+                              peerId: bookedPassenger.passengerId,
                             ),
                           ),
                         );

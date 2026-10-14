@@ -104,7 +104,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     });
   }
 
-  Future<void> sendMessage(String text) async {
+  Future<void> sendMessage(String text, {String? receiverId}) async {
     if (text.trim().isEmpty) return;
     final user = _ref.read(authNotifierProvider).user;
     final msg = await _repository.sendMessage(
@@ -112,6 +112,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       text: text.trim(),
       senderId: user?.id ?? 'usr_peer',
       senderName: user?.name ?? 'DIU Student',
+      receiverId: receiverId,
     );
 
     final formatted = ChatMessage(
@@ -119,6 +120,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       rideId: msg.rideId,
       senderId: msg.senderId,
       senderName: msg.senderName,
+      receiverId: msg.receiverId,
       text: msg.text,
       timestamp: msg.timestamp,
       isMe: true,
@@ -133,7 +135,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  Future<void> shareLocation(double lat, double lng) async {
+  Future<void> shareLocation(double lat, double lng, {String? receiverId}) async {
     final user = _ref.read(authNotifierProvider).user;
     final msg = await _repository.sendMessage(
       rideId: _rideId,
@@ -143,6 +145,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
       sharedLng: lng,
       senderId: user?.id ?? 'usr_peer',
       senderName: user?.name ?? 'DIU Student',
+      receiverId: receiverId,
     );
 
     final formatted = ChatMessage(

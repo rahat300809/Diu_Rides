@@ -625,6 +625,7 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                                     vehicleModel: ride.vehicle.modelName,
                                     peerPhone: ride.driverPhone,
                                     peerRole: 'Driver',
+                                    peerId: ride.driverId,
                                   ),
                                 ),
                               );
@@ -1178,6 +1179,7 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                                       vehicleModel: ride.vehicle.modelName,
                                       peerPhone: ride.driverPhone,
                                       peerRole: 'Driver',
+                                      peerId: ride.driverId,
                                     ),
                                   ),
                                 );
@@ -1547,6 +1549,7 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                                           peerName: b.passengerName,
                                           peerPhone: b.passengerPhone,
                                           peerRole: 'Passenger',
+                                          peerId: b.passengerId,
                                         ),
                                       ),
                                     );

@@ -210,9 +210,14 @@ def init_db():
         is_read INTEGER DEFAULT 1,
         is_location_share INTEGER DEFAULT 0,
         shared_lat REAL,
-        shared_lng REAL
+        shared_lng REAL,
+        receiver_id TEXT
     );
     """)
+    try:
+        cursor.execute("ALTER TABLE messages ADD COLUMN receiver_id TEXT")
+    except Exception:
+        pass
 
     # 5. Shared Locations (Rider & Passenger GPS Sharing with Google Maps)
     cursor.execute("""
@@ -602,11 +607,15 @@ def map_booking(row) -> Dict[str, Any]:
     }
 
 def map_message(row) -> Dict[str, Any]:
+    if not row:
+        return {}
+    keys = row.keys() if hasattr(row, 'keys') else []
     return {
         "id": row["id"],
         "rideId": row["ride_id"],
         "senderId": row["sender_id"],
         "senderName": row["sender_name"],
+        "receiverId": row["receiver_id"] if "receiver_id" in keys else None,
         "text": row["text"],
         "timestamp": row["timestamp"],
         "isRead": bool(row["is_read"]),
@@ -3206,9 +3215,17 @@ def get_ride_session_status(ride_id: str):
 # REST Endpoints: Chat & Realtime Messaging
 # =====================================================================
 
+def get_channel_id(ride_id: str, u1: str, u2: str) -> str:
+    """Computes a deterministic, isolated 1-on-1 channel ID between two users for a given ride."""
+    if not u1 or not u2 or str(u1).strip().lower() == str(u2).strip().lower():
+        return ride_id
+    base = ride_id.split('__')[0] if '__' in ride_id else ride_id
+    pair = sorted([str(u1).strip(), str(u2).strip()])
+    return f"{base}__{pair[0]}__{pair[1]}"
+
 def _fetch_messages(target_ride_id: Optional[str]):
-    """Fetch messages strictly for the given ride_id only.
-    No cross-ride joining — each conversation is isolated."""
+    """Fetch messages strictly for the given ride_id/channel_id only.
+    No cross-ride or cross-peer joining — each 1-on-1 conversation is isolated."""
     conn = get_db()
     cursor = conn.cursor()
     if not target_ride_id:
@@ -3217,12 +3234,25 @@ def _fetch_messages(target_ride_id: Optional[str]):
         conn.close()
         return [map_message(m) for m in rows]
 
-    # Always fetch only messages belonging to this exact ride_id.
-    # This prevents messages bleeding between different ride conversations.
-    cursor.execute(
-        "SELECT * FROM messages WHERE ride_id = ? ORDER BY timestamp ASC",
-        (target_ride_id,)
-    )
+    if "__" in target_ride_id:
+        parts = target_ride_id.split("__")
+        base_id = parts[0]
+        u1 = parts[1]
+        u2 = parts[2]
+        cursor.execute(
+            """
+            SELECT * FROM messages 
+            WHERE ride_id = ? 
+               OR (ride_id = ? AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)))
+            ORDER BY timestamp ASC
+            """,
+            (target_ride_id, base_id, u1, u2, u2, u1)
+        )
+    else:
+        cursor.execute(
+            "SELECT * FROM messages WHERE ride_id = ? ORDER BY timestamp ASC",
+            (target_ride_id,)
+        )
     rows = cursor.fetchall()
     conn.close()
     return [map_message(m) for m in rows]
@@ -3233,6 +3263,18 @@ async def _save_and_broadcast_message(target_ride_id: str, msg_data: Dict[str, A
     is_loc = bool(msg_data.get("isLocationShare", False))
     shared_lat = msg_data.get("sharedLat")
     shared_lng = msg_data.get("sharedLng")
+    sender_id = str(msg_data.get("senderId", "usr_anonymous")).strip()
+    receiver_id = str(msg_data.get("receiverId", "")).strip() or None
+
+    # Derive unique 1-on-1 private channel ID
+    channel_id = target_ride_id
+    if "__" in target_ride_id:
+        channel_id = target_ride_id
+        parts = target_ride_id.split("__")
+        if not receiver_id and len(parts) >= 3:
+            receiver_id = parts[2] if sender_id == parts[1] else parts[1]
+    elif sender_id and receiver_id and sender_id != receiver_id:
+        channel_id = get_channel_id(target_ride_id, sender_id, receiver_id)
 
     # If sharing location, automatically ensure Google Maps link is included in text if not present
     if is_loc and shared_lat is not None and shared_lng is not None:
@@ -3244,14 +3286,15 @@ async def _save_and_broadcast_message(target_ride_id: str, msg_data: Dict[str, A
     cursor = conn.cursor()
     cursor.execute("""
     INSERT INTO messages (
-        id, ride_id, sender_id, sender_name, text, timestamp,
+        id, ride_id, sender_id, sender_name, receiver_id, text, timestamp,
         is_read, is_location_share, shared_lat, shared_lng
-    ) VALUES (?,?,?,?,?,?,?,?,?,?)
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
     """, (
         msg_id,
-        target_ride_id,
-        msg_data.get("senderId", "usr_anonymous"),
+        channel_id,
+        sender_id,
         msg_data.get("senderName", "DIU Student"),
+        receiver_id,
         text,
         msg_data.get("timestamp", datetime.utcnow().isoformat()),
         1 if msg_data.get("isRead", True) else 0,
@@ -3376,13 +3419,23 @@ def get_user_conversations(user_id: Optional[str] = None):
         if is_driver:
             if passengers_seen:
                 for pid, pdata in passengers_seen.items():
-                    p_msgs = [m for m in msgs if str(m["sender_id"]).lower() == pid.lower()]
-                    p_latest = p_msgs[0]["text"] if p_msgs else latest_msg
+                    channel_id = get_channel_id(rid, driver_id, pid)
+                    cursor.execute(
+                        """
+                        SELECT * FROM messages 
+                        WHERE ride_id = ? 
+                           OR (ride_id = ? AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)))
+                        ORDER BY timestamp DESC
+                        """,
+                        (channel_id, rid, driver_id, pid, pid, driver_id)
+                    )
+                    p_msgs = cursor.fetchall()
+                    p_latest = p_msgs[0]["text"] if p_msgs else "Tap to open conversation"
                     p_ts = p_msgs[0]["timestamp"] if p_msgs else latest_ts
-                    p_sender = pdata["name"] if p_msgs else last_sender_name
+                    p_sender = p_msgs[0]["sender_name"] if p_msgs else ""
 
                     conversations.append({
-                        "rideId": rid,
+                        "rideId": channel_id,
                         "peerId": pid,
                         "peerName": pdata["name"],
                         "peerRole": "Passenger",
@@ -3432,8 +3485,24 @@ def get_user_conversations(user_id: Optional[str] = None):
                     is_involved = True
 
             if is_involved:
+                cur_pid = user_id if user_id else (list(passengers_seen.keys())[0] if passengers_seen else "passenger")
+                channel_id = get_channel_id(rid, driver_id, cur_pid)
+                cursor.execute(
+                    """
+                    SELECT * FROM messages 
+                    WHERE ride_id = ? 
+                       OR (ride_id = ? AND ((sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?)))
+                    ORDER BY timestamp DESC
+                    """,
+                    (channel_id, rid, driver_id, cur_pid, cur_pid, driver_id)
+                )
+                p_msgs = cursor.fetchall()
+                latest_p_msg = p_msgs[0]["text"] if p_msgs else "Tap to open conversation"
+                latest_p_ts = p_msgs[0]["timestamp"] if p_msgs else latest_ts
+                latest_p_sender = p_msgs[0]["sender_name"] if p_msgs else ""
+
                 conversations.append({
-                    "rideId": rid,
+                    "rideId": channel_id,
                     "peerId": driver_id,
                     "peerName": driver_name,
                     "peerRole": "Biker / Rider",
@@ -3446,10 +3515,10 @@ def get_user_conversations(user_id: Optional[str] = None):
                     "fare": fare,
                     "status": status,
                     "bookingId": bookings[0]["id"] if bookings else "",
-                    "lastMessage": latest_msg,
-                    "lastTimestamp": latest_ts,
-                    "lastSenderName": last_sender_name,
-                    "unreadCount": 1 if (last_sender_id and not user_aliases.intersection({last_sender_id.lower()})) else 0,
+                    "lastMessage": latest_p_msg,
+                    "lastTimestamp": latest_p_ts,
+                    "lastSenderName": latest_p_sender,
+                    "unreadCount": 1 if (p_msgs and p_msgs[0]["sender_id"] != cur_pid) else 0,
                 })
 
     conn.close()

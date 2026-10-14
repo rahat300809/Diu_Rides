@@ -593,6 +593,7 @@ class _MyRidesActivityViewState extends ConsumerState<MyRidesActivityView> {
                     vehicleModel: ride.vehicle.modelName,
                     peerPhone: booking.passengerPhone,
                     peerRole: 'Passenger',
+                    peerId: booking.passengerId,
                   ),
                 ),
               );

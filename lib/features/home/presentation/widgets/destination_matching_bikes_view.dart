@@ -522,6 +522,7 @@ class _ExpandableMatchingBikeCardState extends State<_ExpandableMatchingBikeCard
                                 vehicleModel: ride.vehicle.modelName,
                                 peerPhone: ride.driverPhone ?? '',
                                 peerRole: 'Driver',
+                                peerId: ride.driverId,
                               ),
                             ),
                           );

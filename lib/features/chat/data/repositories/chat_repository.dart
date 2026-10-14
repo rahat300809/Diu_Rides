@@ -11,6 +11,7 @@ abstract class ChatRepository {
     double? sharedLng,
     String? senderId,
     String? senderName,
+    String? receiverId,
   });
   Stream<ChatMessage> subscribeToMessages(String rideId);
   Future<List<CampusConversationModel>> getConversations({String? userId});
