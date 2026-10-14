@@ -386,15 +386,16 @@ async def check_and_cleanup_expired_scheduled_posts(conn=None):
             
             if dep_dt:
                 diff_minutes = (now_local - dep_dt).total_seconds() / 60.0
-                if diff_minutes >= 30:
+                if diff_minutes >= 10:
                     cursor.execute("DELETE FROM rides WHERE id = ?", (r["id"],))
                     cursor.execute("DELETE FROM bookings WHERE ride_id = ?", (r["id"],))
+                    cursor.execute("DELETE FROM messages WHERE ride_id = ?", (r["id"],))
                     deleted_rides.append(r["id"])
                 elif diff_minutes >= 0:
                     prompt_flag = r["extension_prompted"] if "extension_prompted" in r.keys() else 0
                     if not prompt_flag:
                         cursor.execute("UPDATE rides SET extension_prompted = 1 WHERE id = ?", (r["id"],))
-                        remaining = max(1, int(30 - diff_minutes))
+                        remaining = max(1, int(10 - diff_minutes))
                         prompt_rides.append({
                             "id": r["id"],
                             "type": "ride",
@@ -436,14 +437,14 @@ async def check_and_cleanup_expired_scheduled_posts(conn=None):
             
             if req_dt:
                 diff_minutes = (now_local - req_dt).total_seconds() / 60.0
-                if diff_minutes >= 30:
+                if diff_minutes >= 10:
                     cursor.execute("DELETE FROM passenger_requests WHERE id = ?", (req["id"],))
                     deleted_reqs.append(req["id"])
                 elif diff_minutes >= 0:
                     prompt_flag = req["extension_prompted"] if "extension_prompted" in req.keys() else 0
                     if not prompt_flag:
                         cursor.execute("UPDATE passenger_requests SET extension_prompted = 1 WHERE id = ?", (req["id"],))
-                        remaining = max(1, int(30 - diff_minutes))
+                        remaining = max(1, int(10 - diff_minutes))
                         prompt_reqs.append({
                             "id": req["id"],
                             "type": "passenger_request",
@@ -1753,7 +1754,19 @@ async def get_rides(
     rows = cursor.fetchall()
     conn.close()
 
-    rides = [map_ride(r) for r in rows]
+    now_local = datetime.now()
+    rides = []
+    for r in rows:
+        m = map_ride(r)
+        if m.get("status") == "published":
+            dep_str = m.get("departureTime") or ""
+            try:
+                dep_dt = datetime.fromisoformat(dep_str.replace("Z", "")).replace(tzinfo=None)
+                if (now_local - dep_dt).total_seconds() > 0:
+                    continue  # Past departure time, auto-excluded from feed
+            except Exception:
+                pass
+        rides.append(m)
     return rides
 
 @app.get("/ride/api/rides/my-posted")
@@ -1934,10 +1947,18 @@ async def delete_ride_endpoint(
     cursor = conn.cursor()
     cursor.execute("DELETE FROM rides WHERE id = ?", (target_id,))
     cursor.execute("DELETE FROM bookings WHERE ride_id = ?", (target_id,))
+    cursor.execute("DELETE FROM messages WHERE ride_id = ?", (target_id,))
+    try:
+        cursor.execute("DELETE FROM shared_locations WHERE ride_id = ?", (target_id,))
+        cursor.execute("DELETE FROM driver_locations WHERE ride_id = ?", (target_id,))
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
     await manager.broadcast("ride_deleted", {"id": target_id})
+    await manager.broadcast("post_deleted", {"id": target_id, "type": "ride"})
+    print(f"[RIDE DELETED] Successfully purged ride {target_id} from database and broadcasted.")
     return {"status": "success", "message": f"Ride {target_id} deleted successfully", "id": target_id}
 
 @app.post("/ride/api/rides/{ride_id}/start")
@@ -2471,6 +2492,27 @@ async def delete_passenger_request_endpoint(
 
     await manager.broadcast("passenger_request_deleted", {"id": target_id})
     return {"status": "success", "message": f"Passenger request {target_id} deleted successfully", "id": target_id}
+
+@app.post("/ride/api/admin/clear-all-records")
+@app.post("/api/admin/clear-all-records")
+@app.delete("/ride/api/admin/clear-all-records")
+@app.delete("/api/admin/clear-all-records")
+async def clear_all_records_endpoint():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM rides")
+    cursor.execute("DELETE FROM bookings")
+    cursor.execute("DELETE FROM passenger_requests")
+    cursor.execute("DELETE FROM messages")
+    cursor.execute("DELETE FROM shared_locations")
+    cursor.execute("DELETE FROM driver_locations")
+    cursor.execute("DELETE FROM sos_alerts")
+    conn.commit()
+    conn.close()
+
+    await manager.broadcast("rides_cleared", {"status": "cleared", "timestamp": datetime.utcnow().isoformat()})
+    print("[ADMIN] All rides, bookings, requests, messages, and locations cleared from database.")
+    return {"status": "success", "message": "All ride records and associated data have been purged successfully."}
 
 # =====================================================================
 # REST Endpoints: Alert Ring / Sound Trigger

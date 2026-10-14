@@ -52,22 +52,31 @@ class DirectCallService {
     final uri = Uri.parse('tel:$clean');
     try {
       bool launched = false;
-      if (await canLaunchUrl(uri)) {
+      try {
         launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+      } catch (_) {}
+
       if (!launched) {
-        launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+        try {
+          launched = await launchUrl(uri, mode: LaunchMode.platformDefault);
+        } catch (_) {}
       }
+
+      if (!launched) {
+        try {
+          if (await canLaunchUrl(uri)) {
+            launched = await launchUrl(uri);
+          }
+        } catch (_) {}
+      }
+
       if (!launched) {
         await Clipboard.setData(ClipboardData(text: clean));
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Calling not supported on this device. Phone number $clean copied!'),
-              backgroundColor: const Color(0xFF1976D2),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
+          showCallOptions(
+            context,
+            phoneNumber: clean,
+            peerName: peerName ?? 'Peer',
           );
         }
       }

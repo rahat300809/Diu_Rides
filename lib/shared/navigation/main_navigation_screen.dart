@@ -377,14 +377,20 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
     if (isSender) return; // Do not ring yourself
 
     // Dedicated ring check: only ring if this user is explicitly targeted
-    final isTarget = targetUserId.isNotEmpty && (
-        targetUserId == currentAuth.id ||
-        targetUserId == currentAuth.studentId ||
-        (currentAuth.phone.isNotEmpty && targetUserId == currentAuth.phone) ||
-        (currentAuth.email.isNotEmpty && targetUserId.toLowerCase() == currentAuth.email.toLowerCase()) ||
-        (targetName.isNotEmpty && targetName.toLowerCase() == currentAuth.name.toLowerCase()) ||
-        targetUserId.toLowerCase() == currentAuth.name.toLowerCase()
-    );
+    final tIdLower = targetUserId.toLowerCase();
+    final tNameLower = targetName.toLowerCase();
+    final cNameLower = currentAuth.name.toLowerCase();
+    final cIdLower = currentAuth.id.toLowerCase();
+    final cStudentLower = currentAuth.studentId.toLowerCase();
+    final cPhone = currentAuth.phone.replaceAll(RegExp(r'[^\d]'), '');
+    final tPhone = targetUserId.replaceAll(RegExp(r'[^\d]'), '');
+
+    final bool phoneMatch = (cPhone.isNotEmpty && tPhone.isNotEmpty && (cPhone == tPhone || (cPhone.length >= 8 && tPhone.endsWith(cPhone.substring(cPhone.length - 8)))));
+    final bool nameMatch = (tNameLower.isNotEmpty && (cNameLower.contains(tNameLower) || tNameLower.contains(cNameLower))) ||
+                           (tIdLower.isNotEmpty && (cNameLower.contains(tIdLower) || tIdLower.contains(cNameLower)));
+    final bool idMatch = (tIdLower.isNotEmpty && (tIdLower == cIdLower || tIdLower == cStudentLower));
+
+    final isTarget = phoneMatch || nameMatch || idMatch || targetUserId == 'all';
 
     if (!isTarget) return; // Dedicated! Ignore rings targeted at other students
 

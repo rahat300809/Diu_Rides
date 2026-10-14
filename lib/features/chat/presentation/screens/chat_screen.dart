@@ -24,6 +24,7 @@ class ChatScreen extends ConsumerStatefulWidget {
   final String vehicleModel;
   final String? peerPhone;
   final String? peerRole;
+  final String? peerId;
 
   const ChatScreen({
     super.key,
@@ -33,6 +34,7 @@ class ChatScreen extends ConsumerStatefulWidget {
     this.vehicleModel = 'Campus Ride',
     this.peerPhone,
     this.peerRole,
+    this.peerId,
   });
 
   String get displayName => peerName ?? driverName;
@@ -49,6 +51,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Timer? _rideProgressTimer;
   int _rideElapsedSeconds = 0;
   bool _isLoadingSession = false;
+
+  // Realtime peer typing indicator state
+  bool _isPeerTyping = false;
+  Timer? _typingTimer;
+  Timer? _debounceTypingTimer;
 
   // Session state variables
   String _sessionStatus = 'pending'; // 'pending', 'in_progress', 'completed', 'cancelled'
@@ -85,10 +92,32 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _messageController.addListener(_onMessageInputChanged);
     Future.microtask(() {
       _loadSessionStatus();
       _listenWebSocketSession();
     });
+  }
+
+  void _onMessageInputChanged() {
+    _debounceTypingTimer?.cancel();
+    _debounceTypingTimer = Timer(const Duration(milliseconds: 300), () {
+      final isTyping = _messageController.text.trim().isNotEmpty;
+      _sendTypingEvent(isTyping);
+    });
+  }
+
+  void _sendTypingEvent(bool isTyping) {
+    try {
+      final user = ref.read(authNotifierProvider).user;
+      final ws = ref.read(webSocketClientProvider);
+      ws.send('typing_status', {
+        'rideId': widget.rideId,
+        'userId': user?.id ?? '',
+        'userName': user?.name ?? 'Companion',
+        'isTyping': isTyping,
+      });
+    } catch (_) {}
   }
 
   Future<void> _triggerAlertRing() async {
@@ -97,7 +126,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final ringId = 'ring_${DateTime.now().millisecondsSinceEpoch}';
     final targetId = widget.peerPhone?.isNotEmpty == true
         ? widget.peerPhone!
-        : (widget.peerName?.isNotEmpty == true ? widget.peerName! : widget.driverName);
+        : (widget.peerId?.isNotEmpty == true
+            ? widget.peerId!
+            : (widget.peerName?.isNotEmpty == true ? widget.peerName! : widget.driverName));
 
     if (mounted) {
       showDialog(
@@ -203,6 +234,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    _debounceTypingTimer?.cancel();
+    _typingTimer?.cancel();
+    _messageController.removeListener(_onMessageInputChanged);
     _rideProgressTimer?.cancel();
     _wsSessionSub?.cancel();
     _messageController.dispose();
@@ -304,6 +338,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
         ref.read(chatNotifierProvider(widget.rideId).notifier).loadMessages();
         _scrollToBottom();
+      } else if ((event == 'typing_status' || event == 'typing') && data['rideId'] == widget.rideId) {
+        final currentUserId = ref.read(authNotifierProvider).user?.id;
+        final senderId = data['userId']?.toString();
+        if (senderId != null && senderId != currentUserId) {
+          final isTyping = data['isTyping'] == true;
+          if (mounted) {
+            setState(() => _isPeerTyping = isTyping);
+            _typingTimer?.cancel();
+            if (isTyping) {
+              _typingTimer = Timer(const Duration(seconds: 4), () {
+                if (mounted) setState(() => _isPeerTyping = false);
+              });
+            }
+          }
+        }
       }
     });
   }
@@ -916,6 +965,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   void _sendMessage() {
     final text = _messageController.text;
     if (text.trim().isEmpty) return;
+    _sendTypingEvent(false);
     ref.read(chatNotifierProvider(widget.rideId).notifier).sendMessage(text);
     _messageController.clear();
     _scrollToBottom();
@@ -1133,6 +1183,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         },
                       ),
           ),
+
+          // Animated Peer Typing Indicator Bubble
+          if (_isPeerTyping)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _TypingBubbleIndicator(peerName: displayName),
+            ),
 
           // Quick commute suggestion chips bar
           Container(
@@ -1770,3 +1827,103 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 }
 
+class _TypingBubbleIndicator extends StatefulWidget {
+  final String peerName;
+
+  const _TypingBubbleIndicator({required this.peerName});
+
+  @override
+  State<_TypingBubbleIndicator> createState() => _TypingBubbleIndicatorState();
+}
+
+class _TypingBubbleIndicatorState extends State<_TypingBubbleIndicator>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildDot(int index) {
+    return AnimatedBuilder(
+      animation: _animController,
+      builder: (context, child) {
+        final double progress = (_animController.value - (index * 0.18)) % 1.0;
+        final double bounce = (progress >= 0 && progress <= 0.5)
+            ? (1.0 - (progress * 2 - 0.5).abs() * 2)
+            : 0.0;
+        return Transform.translate(
+          offset: Offset(0, -bounce * 4.5),
+          child: Container(
+            width: 6.5,
+            height: 6.5,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE65100).withOpacity(0.55 + (bounce * 0.45)),
+              shape: BoxShape.circle,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(left: 16, bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+          bottomRight: Radius.circular(16),
+          bottomLeft: Radius.circular(4),
+        ),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${widget.peerName} is typing',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFFE65100),
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(width: 7),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildDot(0),
+              _buildDot(1),
+              _buildDot(2),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

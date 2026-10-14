@@ -15,7 +15,8 @@ import 'package:diu_ride/features/booking/presentation/providers/booking_provide
 import 'package:diu_ride/features/booking/data/models/booking_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 import 'package:diu_ride/features/safety/presentation/widgets/campus_sos_dialog.dart';
-import 'package:diu_ride/features/safety/presentation/widgets/campus_voice_call_dialog.dart';
+import 'package:diu_ride/core/services/notification_sound_service.dart';
+import 'package:diu_ride/core/utils/direct_call_service.dart';
 
 class RideDetailsTrackingScreen extends ConsumerStatefulWidget {
   final String rideId;
@@ -611,7 +612,7 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                         ),
                       ),
 
-                      // Quick Connect Triggers: Chat & Call
+                      // Quick Connect Triggers: Chat, Ring Buzzer & Direct Call
                       Row(
                         children: [
                           InkWell(
@@ -641,13 +642,26 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                           ),
                           const SizedBox(width: 8),
                           InkWell(
+                            onTap: () => _triggerAlertRingFromTracking(ride),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFF9500).withOpacity(0.14),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.notifications_active, color: Color(0xFFFF9500), size: 18),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
                             onTap: () {
-                              CampusVoiceCallDialog.show(
+                              DirectCallService.showCallOptions(
                                 context,
+                                phoneNumber: ride.driverPhone ?? '01712345678',
                                 peerName: ride.driverName,
-                                peerPhone: ride.driverPhone ?? '01712345678',
                                 peerRole: 'Driver',
-                                peerDept: ride.driverDept,
                               );
                             },
                             borderRadius: BorderRadius.circular(20),
@@ -685,72 +699,157 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
             ),
             const SizedBox(height: 14),
 
-            // 3. VEHICLE DETAILS & AMENITIES
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(22),
-                boxShadow: const [BoxShadow(color: AppColors.cardShadow, blurRadius: 6, offset: Offset(0, 2))],
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 38,
-                            height: 38,
-                            decoration: BoxDecoration(
-                              color: AppColors.secondaryFixed,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.two_wheeler, color: AppColors.onSecondaryFixed, size: 22),
-                          ),
-                          const SizedBox(width: 10),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(ride.vehicle.modelName, style: AppTypography.bodyLgMedium),
-                              Text(
-                                '${ride.vehicle.color} • ${ride.vehicle.licensePlate}',
-                                style: AppTypography.labelSm,
+            // 3. 3D INTERACTIVE VEHICLE DETAILS & SAFETY AMENITIES CARD
+            InkWell(
+              onTap: () => _showVehicleSpecsAndSafetySheet(context, ride),
+              borderRadius: BorderRadius.circular(24),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Colors.white, Color(0xFFFFF7ED)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFFFFD8A8), width: 1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE65100).withOpacity(0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFFE65100), Color(0xFFFF9800)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFE65100).withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
                               ),
-                            ],
+                              child: const Icon(Icons.two_wheeler, color: Colors.white, size: 24),
+                            ),
+                            const SizedBox(width: 12),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      ride.vehicle.modelName.isNotEmpty ? ride.vehicle.modelName : 'Yamaha R15 V4',
+                                      style: AppTypography.bodyLgMedium.copyWith(fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.info_outline, size: 14, color: Color(0xFFE65100)),
+                                  ],
+                                ),
+                                Text(
+                                  '${ride.vehicle.color} • ${ride.vehicle.licensePlate}',
+                                  style: AppTypography.labelSm.copyWith(color: const Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDCFCE7),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'DIU Sticker OK',
+                            style: TextStyle(
+                              color: Color(0xFF16A34A),
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Motorcycle Amenities 2x2 grid with interactive touch
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildAmenityTile(
+                            Icons.sports_motorsports,
+                            'Fresh Helmet Included 🪖',
+                            color: const Color(0xFF10B981),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildAmenityTile(
+                            Icons.verified_user,
+                            'DIU Verified Bike',
+                            color: const Color(0xFF0284C7),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildAmenityTile(
+                            Icons.bolt,
+                            'Fast Campus Transit',
+                            color: const Color(0xFFF59E0B),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildAmenityTile(
+                            Icons.share_location,
+                            'Live GPS Sharing',
+                            color: const Color(0xFF8B5CF6),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF3E0),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.touch_app, size: 13, color: Color(0xFFE65100)),
+                          SizedBox(width: 4),
+                          Text(
+                            'Tap bike card to view Fresh Helmet, Safety Gear & Bike Specs',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFFE65100)),
                           ),
                         ],
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceContainer,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text('DIU Sticker OK', style: AppTypography.labelSm),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Motorcycle Amenities 2x2 grid
-                  Row(
-                    children: [
-                      Expanded(child: _buildAmenityTile(Icons.two_wheeler, 'Comfort Bike Ride')),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildAmenityTile(Icons.verified_user, 'DIU Verified Bike')),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: _buildAmenityTile(Icons.speed, 'Fast Campus Transit')),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildAmenityTile(Icons.share_location, 'Live GPS Sharing')),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 14),
@@ -1097,12 +1196,11 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                           Expanded(
                             child: ElevatedButton.icon(
                               onPressed: () {
-                                CampusVoiceCallDialog.show(
+                                DirectCallService.showCallOptions(
                                   context,
+                                  phoneNumber: ride.driverPhone ?? '01712345678',
                                   peerName: ride.driverName,
-                                  peerPhone: ride.driverPhone ?? '01712345678',
                                   peerRole: 'Driver',
-                                  peerDept: ride.driverDept,
                                 );
                               },
                               icon: const Icon(Icons.call, size: 16),
@@ -1465,12 +1563,11 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                                 const SizedBox(width: 8),
                                 OutlinedButton.icon(
                                   onPressed: () {
-                                    CampusVoiceCallDialog.show(
+                                    DirectCallService.showCallOptions(
                                       context,
+                                      phoneNumber: b.passengerPhone,
                                       peerName: b.passengerName,
-                                      peerPhone: b.passengerPhone,
                                       peerRole: 'Passenger',
-                                      peerDept: b.passengerDept,
                                     );
                                   },
                                   icon: const Icon(Icons.call, size: 13),
@@ -1617,21 +1714,338 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
     );
   }
 
-  Widget _buildAmenityTile(IconData icon, String label) {
+  Widget _buildAmenityTile(IconData icon, String label, {Color? color}) {
+    final tileColor = color ?? AppColors.primary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
+        color: tileColor.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: tileColor.withOpacity(0.2), width: 0.8),
       ),
       child: Row(
         children: [
-          Icon(icon, size: 16, color: AppColors.primary),
+          Icon(icon, size: 16, color: tileColor),
           const SizedBox(width: 6),
-          Text(label, style: AppTypography.labelSm.copyWith(fontSize: 11)),
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.labelSm.copyWith(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF1E293B),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  void _showVehicleSpecsAndSafetySheet(BuildContext context, RideModel ride) {
+    final vehicleName = ride.vehicle.modelName.isNotEmpty ? ride.vehicle.modelName : 'Yamaha R15 V4 (Campus Edition)';
+    final vehicleColor = ride.vehicle.color.isNotEmpty ? ride.vehicle.color : 'Matte Blue Metallic';
+    final licensePlate = ride.vehicle.licensePlate.isNotEmpty ? ride.vehicle.licensePlate : 'Dhaka Metro-HA 24-8891';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 20,
+              offset: Offset(0, -4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE65100), Color(0xFFFF9800)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE65100).withOpacity(0.3),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(Icons.two_wheeler, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              vehicleName,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF0F172A),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Text(
+                              'VERIFIED',
+                              style: TextStyle(
+                                color: Color(0xFF10B981),
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '$vehicleColor • $licensePlate',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Divider(color: Color(0xFFF1F5F9)),
+            const SizedBox(height: 10),
+            const Text(
+              'Included Amenities & Safety Equipment',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            const SizedBox(height: 12),
+            _buildSpecFeatureTile(
+              icon: Icons.sports_motorsports,
+              iconColor: const Color(0xFF10B981),
+              title: 'Fresh & Sanitized Helmet Included 🪖',
+              subtitle: 'Disinfected passenger helmet with anti-scratch visor and clean inner padding provided on every trip.',
+            ),
+            const SizedBox(height: 10),
+            _buildSpecFeatureTile(
+              icon: Icons.pan_tool_alt,
+              iconColor: const Color(0xFF0284C7),
+              title: 'Dual Grab Rails & Foot-pegs 🏍️',
+              subtitle: 'Ergonomic pillion seating with sturdy aluminium rear grab rails for high-speed stability and comfort.',
+            ),
+            const SizedBox(height: 10),
+            _buildSpecFeatureTile(
+              icon: Icons.verified_user,
+              iconColor: const Color(0xFF7C3AED),
+              title: 'DIU Varsity Security Gate Sticker 🛡️',
+              subtitle: 'Authorized campus sticker ensuring seamless transit past university security checkpoints without delays.',
+            ),
+            const SizedBox(height: 10),
+            _buildSpecFeatureTile(
+              icon: Icons.clean_hands,
+              iconColor: const Color(0xFFE65100),
+              title: 'Sanitized Commute Guarantee 🧼',
+              subtitle: 'Contact points, seat, and handles sanitized before every peer journey.',
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE65100),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('Understood & Verified (সব ঠিক আছে)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSpecFeatureTile({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5, color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _triggerAlertRingFromTracking(RideModel ride) async {
+    final user = ref.read(authNotifierProvider).user;
+    final senderName = user?.name ?? 'Commuter';
+    final ringId = 'ring_${DateTime.now().millisecondsSinceEpoch}';
+    final targetId = ride.driverPhone?.isNotEmpty == true
+        ? ride.driverPhone!
+        : (ride.driverId.isNotEmpty ? ride.driverId : ride.driverName);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF9500).withOpacity(0.14),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.notifications_active, color: Color(0xFFFF9500), size: 38),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Ringing ${ride.driverName}...',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Dedicated alert buzzer is ringing on their phone. Tap Stop to cancel at any time.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: Colors.grey[700], height: 1.4),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD32F2F),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 0,
+                ),
+                icon: const Icon(Icons.call_end, size: 20),
+                label: const Text('Stop Ringing', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                onPressed: () async {
+                  NotificationSoundService.stopRinging();
+                  try {
+                    await ref.read(ridesRepositoryProvider).stopAlertRing(
+                      targetUserId: targetId,
+                      senderId: user?.id,
+                      ringId: ringId,
+                    );
+                  } catch (_) {}
+                  if (context.mounted) {
+                    Navigator.pop(ctx);
+                    _showToast('Ringing stopped.');
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      await ref.read(ridesRepositoryProvider).triggerAlertRing(
+        targetUserId: targetId,
+        targetName: ride.driverName,
+        senderId: user?.id ?? '',
+        senderName: senderName,
+        rideId: ride.id,
+        ringId: ringId,
+        message: '🚨 Urgent: $senderName is ringing you for pickup!',
+      );
+    } catch (_) {}
   }
 
   Widget _buildTimelineItem({
@@ -1646,11 +2060,22 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
         Column(
           children: [
             Container(
-              width: 12,
-              height: 12,
+              width: 24,
+              height: 24,
               decoration: BoxDecoration(
-                color: isOrigin ? AppColors.primary : AppColors.secondary,
+                color: isOrigin ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
                 shape: BoxShape.circle,
+                border: Border.all(
+                  color: isOrigin ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                  width: 2,
+                ),
+              ),
+              child: Center(
+                child: Icon(
+                  isOrigin ? Icons.my_location : Icons.location_on,
+                  size: 13,
+                  color: isOrigin ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+                ),
               ),
             ),
           ],
@@ -1663,17 +2088,26 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(title, style: AppTypography.bodyMdMedium.copyWith(fontWeight: FontWeight.bold)),
-                  Text(
-                    time,
-                    style: AppTypography.labelMd.copyWith(
-                      color: isOrigin ? AppColors.primary : AppColors.secondary,
-                      fontWeight: FontWeight.bold,
+                  Text(title, style: AppTypography.bodyMdMedium.copyWith(fontWeight: FontWeight.bold, fontSize: 14)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: isOrigin ? const Color(0xFFE8F5E9) : const Color(0xFFFFEBEE),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      time,
+                      style: TextStyle(
+                        color: isOrigin ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 11,
+                      ),
                     ),
                   ),
                 ],
               ),
-              Text(subtitle, style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+              const SizedBox(height: 2),
+              Text(subtitle, style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11.5)),
             ],
           ),
         ),

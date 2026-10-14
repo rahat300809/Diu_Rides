@@ -11,8 +11,8 @@ import 'package:diu_ride/features/chat/presentation/screens/chat_screen.dart';
 import 'package:diu_ride/features/rides/data/models/ride_model.dart';
 import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
-import 'package:diu_ride/features/safety/presentation/widgets/campus_voice_call_dialog.dart';
 import 'package:diu_ride/core/services/notification_sound_service.dart';
+import 'package:diu_ride/core/utils/direct_call_service.dart';
 
 class CampusMessagesScreen extends ConsumerStatefulWidget {
   final VoidCallback onExploreRides;
@@ -66,142 +66,46 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
           child: ListView(
             padding: const EdgeInsets.only(bottom: 24, top: 8),
             children: [
-              // 1. DIU Campus Rider Community Public Room (All Bikers & Commuters)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFE65100), Color(0xFFF57C00)],
-                    ),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFFE65100).withOpacity(0.25),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: Colors.white,
-                      child: Icon(Icons.forum, color: Color(0xFFE65100), size: 22),
-                    ),
-                    title: const Row(
-                      children: [
-                        Text('DIU Rider Community', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                        SizedBox(width: 6),
-                        Icon(Icons.stars, size: 16, color: Colors.amber),
-                      ],
-                    ),
-                    subtitle: const Text(
-                      'All Bikers & Commuters • Post ride asks & live updates',
-                      style: TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                    trailing: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text('Open Room', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                    ),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ChatScreen(
-                            rideId: 'campus_community',
-                            driverName: 'DIU Rider Community',
-                            vehicleModel: 'All Bikers & Commuters',
-                            peerPhone: 'Public Campus Channel',
-                            peerRole: 'Community Group',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-
-              // 3. Official Campus Support Desk Tile
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLowest,
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: const [
-                      BoxShadow(color: AppColors.cardShadow, blurRadius: 4, offset: Offset(0, 1)),
-                    ],
-                  ),
-                  child: ListTile(
-                    leading: const CircleAvatar(
-                      backgroundColor: AppColors.primaryContainer,
-                      child: Icon(Icons.support_agent, color: Colors.white, size: 20),
-                    ),
-                    title: Row(
-                      children: [
-                        Text('DIU Campus Support Desk', style: AppTypography.bodyLgMedium),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.verified, size: 14, color: AppColors.primary),
-                      ],
-                    ),
-                    subtitle: Text(
-                      'Commute queries, route assistance & student support',
-                      style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
-                    ),
-                    trailing: const Icon(Icons.chevron_right, color: AppColors.outline),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const ChatScreen(
-                            rideId: 'support_campus',
-                            driverName: 'DIU Campus Support',
-                            vehicleModel: 'Official Helpdesk',
-                            peerPhone: '01847140000',
-                            peerRole: 'Campus Support',
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
               // Section Header
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: [
                     Text(
-                      'Active Commute Conversations',
-                      style: AppTypography.bodyLgMedium.copyWith(fontWeight: FontWeight.bold),
+                      'Messages',
+                      style: AppTypography.headlineSm.copyWith(fontWeight: FontWeight.bold, fontSize: 19),
                     ),
                     const Spacer(),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.primaryContainer.withOpacity(0.3),
+                        color: const Color(0xFF10B981).withOpacity(0.12),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Text(
-                        'Live Peer Sync',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.circle, size: 8, color: Color(0xFF10B981)),
+                          SizedBox(width: 4),
+                          Text(
+                            'Active Peers',
+                            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
 
-              // 3. Central & Realtime Conversations (All Passengers & Bikers)
+              // Central & Realtime Messenger Conversations (Sorted with newest at top)
               convosAsync.when(
                 data: (convos) {
                   if (convos.isNotEmpty) {
+                    final sorted = List<CampusConversationModel>.from(convos);
+                    sorted.sort((a, b) => (b.lastTimestamp).compareTo(a.lastTimestamp));
                     return Column(
-                      children: convos.map((c) => _buildUnifiedConversationTile(c)).toList(),
+                      children: sorted.map((c) => _buildUnifiedConversationTile(c)).toList(),
                     );
                   }
 
@@ -290,7 +194,13 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
     );
   }
 
-  void _ringPeer(BuildContext context, String peerName, String rideId) async {
+  void _ringPeer(
+    BuildContext context,
+    String peerName,
+    String rideId, {
+    String? peerPhone,
+    String? peerId,
+  }) async {
     final user = ref.read(authNotifierProvider).user;
     final currentUser = user?.name ?? 'Fellow Student';
     final ringId = 'ring_${DateTime.now().millisecondsSinceEpoch}';
@@ -353,7 +263,9 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
 
     try {
       await ref.read(ridesRepositoryProvider).triggerAlertRing(
-        targetUserId: peerName,
+        targetUserId: (peerId != null && peerId.isNotEmpty)
+            ? peerId
+            : ((peerPhone != null && peerPhone.isNotEmpty) ? peerPhone : peerName),
         targetName: peerName,
         senderId: user?.id ?? '',
         senderName: currentUser,
@@ -366,42 +278,265 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
 
   Widget _buildUnifiedConversationTile(CampusConversationModel c) {
     final isPassenger = c.peerRole.toLowerCase().contains('passenger');
-    final avatarColor = isPassenger ? const Color(0xFF0288D1) : AppColors.primary;
+    final avatarColor = isPassenger ? const Color(0xFF0288D1) : const Color(0xFFE65100);
     final initialLetter = c.peerName.isNotEmpty ? c.peerName[0].toUpperCase() : (isPassenger ? 'P' : 'D');
 
-    Color statusBg = const Color(0xFFFFF3E0);
-    Color statusFg = const Color(0xFFE65100);
-    final st = c.status.toLowerCase();
-    if (st == 'accepted' || st == 'completed') {
-      statusBg = const Color(0xFFE8F5E9);
-      statusFg = const Color(0xFF2E7D32);
-    } else if (st == 'inquired') {
-      statusBg = const Color(0xFFE1F5FE);
-      statusFg = const Color(0xFF0288D1);
+    // Messenger style relative time formatting
+    String timeStr = '';
+    if (c.lastTimestamp.isNotEmpty) {
+      try {
+        final dt = DateTime.parse(c.lastTimestamp).toLocal();
+        final now = DateTime.now();
+        final diff = now.difference(dt);
+        if (diff.inMinutes < 1) {
+          timeStr = 'Now';
+        } else if (diff.inMinutes < 60) {
+          timeStr = '${diff.inMinutes}m';
+        } else if (diff.inHours < 24) {
+          timeStr = '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+        } else {
+          timeStr = '${dt.day}/${dt.month}';
+        }
+      } catch (_) {
+        timeStr = '';
+      }
     }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(color: AppColors.cardShadow, blurRadius: 4, offset: Offset(0, 1)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    final hasUnread = c.unreadCount > 0;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ChatScreen(
+                rideId: c.rideId,
+                peerName: c.peerName,
+                vehicleModel: c.vehicleModel,
+                peerPhone: c.peerPhone.isNotEmpty ? c.peerPhone : null,
+                peerRole: c.peerRole,
+                peerId: c.peerId,
+              ),
+            ),
+          ).then((_) {
+            ref.invalidate(campusConversationsProvider);
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: Color(0xFFF3F4F6), width: 1),
+            ),
+          ),
+          child: Row(
             children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: avatarColor.withOpacity(0.15),
-                child: Text(
-                  initialLetter,
-                  style: TextStyle(fontWeight: FontWeight.bold, color: avatarColor, fontSize: 16),
+              // 1. Messenger Circular Avatar with active green dot
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: avatarColor.withOpacity(0.14),
+                    child: Text(
+                      initialLetter,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: avatarColor,
+                        fontSize: 19,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 13,
+                      height: 13,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
+
+              // 2. Name & Inner message short part
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            c.peerName,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: hasUnread ? FontWeight.w800 : FontWeight.w600,
+                              color: const Color(0xFF111827),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.verified, size: 14, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: avatarColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            c.peerRole,
+                            style: TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: avatarColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            c.lastMessage.isNotEmpty ? c.lastMessage : 'Tap to open chat',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: hasUnread ? FontWeight.w700 : FontWeight.w400,
+                              color: hasUnread ? const Color(0xFF111827) : const Color(0xFF6B7280),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (timeStr.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '• $timeStr',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: hasUnread ? AppColors.primary : const Color(0xFF9CA3AF),
+                              fontWeight: hasUnread ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
                 ),
+              ),
+
+              // 3. Trailing Quick Actions (Call & Ring)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasUnread)
+                    Container(
+                      margin: const EdgeInsets.only(right: 6),
+                      padding: const EdgeInsets.all(5),
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '${c.unreadCount}',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.call, size: 19, color: Color(0xFF2E7D32)),
+                    tooltip: 'Call ${c.peerName}',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: () {
+                      DirectCallService.showCallOptions(
+                        context,
+                        peerName: c.peerName,
+                        phoneNumber: c.peerPhone.isNotEmpty ? c.peerPhone : '01712345678',
+                        peerRole: c.peerRole,
+                        peerDept: c.peerDept,
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.notifications_active, size: 19, color: Color(0xFFFF9500)),
+                    tooltip: 'Alert Ring',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: () => _ringPeer(
+                      context,
+                      c.peerName,
+                      c.rideId,
+                      peerPhone: c.peerPhone,
+                      peerId: c.peerId,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPassengerConversationTile(BookingModel booking, RideModel ride) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ChatScreen(
+                rideId: booking.rideId,
+                peerName: ride.driverName,
+                vehicleModel: ride.vehicle.modelName,
+                peerPhone: ride.driverPhone,
+                peerRole: 'Driver',
+              ),
+            ),
+          );
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          decoration: const BoxDecoration(
+            border: Border(bottom: BorderSide(color: Color(0xFFF3F4F6), width: 1)),
+          ),
+          child: Row(
+            children: [
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 25,
+                    backgroundColor: const Color(0xFFE65100).withOpacity(0.14),
+                    child: Text(
+                      ride.driverName.isNotEmpty ? ride.driverName[0].toUpperCase() : 'D',
+                      style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFFE65100), fontSize: 19),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 13,
+                      height: 13,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -412,318 +547,68 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
                       children: [
                         Flexible(
                           child: Text(
-                            c.peerName,
-                            style: AppTypography.bodyMdMedium.copyWith(fontWeight: FontWeight.bold),
+                            ride.driverName,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 4),
                         const Icon(Icons.verified, size: 14, color: AppColors.primary),
-                        const Spacer(),
+                        const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                           decoration: BoxDecoration(
-                            color: statusBg,
-                            borderRadius: BorderRadius.circular(6),
+                            color: const Color(0xFFE65100).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          child: Text(
-                            c.status.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              color: statusFg,
-                            ),
+                          child: const Text(
+                            'Biker',
+                            style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFFE65100)),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
-                      '${c.peerRole} • ${c.peerDept}',
-                      style: AppTypography.labelSm.copyWith(color: AppColors.outline),
+                      'Trip: ${booking.pickupPoint} ➔ ${booking.dropoffPoint}',
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Route snippet
-          Row(
-            children: [
-              const Icon(Icons.route, size: 13, color: AppColors.outline),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  c.route.isNotEmpty ? c.route : '${c.origin} ➔ ${c.destination}',
-                  style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (c.fare > 0) ...[
-                const SizedBox(width: 4),
-                Text(
-                  '৳${c.fare.toInt()}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.primary),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 6),
-          // Latest message snippet
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.chat_bubble_outline,
-                  size: 13,
-                  color: c.unreadCount > 0 ? AppColors.primary : AppColors.outline,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    c.lastMessage,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: c.unreadCount > 0 ? AppColors.onSurface : AppColors.onSurfaceVariant,
-                      fontWeight: c.unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.call, size: 19, color: Color(0xFF2E7D32)),
+                    tooltip: 'Call Driver',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: () {
+                      DirectCallService.showCallOptions(
+                        context,
+                        peerName: ride.driverName,
+                        phoneNumber: ride.driverPhone ?? '01712345678',
+                        peerRole: 'Driver',
+                        peerDept: ride.driverDept,
+                      );
+                    },
                   ),
-                ),
-                if (c.unreadCount > 0)
-                  Container(
-                    margin: const EdgeInsets.only(left: 6),
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${c.unreadCount} new',
-                      style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
-                    ),
+                  IconButton(
+                    icon: const Icon(Icons.notifications_active, size: 19, color: Color(0xFFFF9500)),
+                    tooltip: 'Alert Ring Driver',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: () => _ringPeer(context, ride.driverName, booking.rideId, peerPhone: ride.driverPhone),
                   ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ChatScreen(
-                          rideId: c.rideId,
-                          peerName: c.peerName,
-                          vehicleModel: c.vehicleModel,
-                          peerPhone: c.peerPhone.isNotEmpty ? c.peerPhone : null,
-                          peerRole: c.peerRole,
-                        ),
-                      ),
-                    ).then((_) {
-                      ref.invalidate(campusConversationsProvider);
-                    });
-                  },
-                  icon: const Icon(Icons.chat_bubble_outline, size: 15),
-                  label: const Text('Chat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    CampusVoiceCallDialog.show(
-                      context,
-                      peerName: c.peerName,
-                      peerPhone: c.peerPhone.isNotEmpty ? c.peerPhone : '01712345678',
-                      peerRole: c.peerRole,
-                      peerDept: c.peerDept,
-                    );
-                  },
-                  icon: const Icon(Icons.call, size: 15),
-                  label: const Text('Voice Call', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: () => _ringPeer(context, c.peerName, c.rideId),
-                icon: const Icon(Icons.notifications_active, color: Color(0xFFFF9500), size: 20),
-                tooltip: 'Alert Ring (${c.peerName})',
-                style: IconButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFF3E0),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
+                ],
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPassengerConversationTile(BookingModel booking, RideModel ride) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(color: AppColors.cardShadow, blurRadius: 4, offset: Offset(0, 1)),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: AppColors.primaryContainer,
-                child: Text(
-                  ride.driverName.isNotEmpty ? ride.driverName[0].toUpperCase() : 'D',
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          ride.driverName,
-                          style: AppTypography.bodyMdMedium.copyWith(fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.verified, size: 14, color: AppColors.primary),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: booking.status == BookingStatus.accepted
-                                ? const Color(0xFFE8F5E9)
-                                : const Color(0xFFFFF3E0),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            booking.status.name.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                              color: booking.status == BookingStatus.accepted
-                                  ? const Color(0xFF2E7D32)
-                                  : const Color(0xFFE65100),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      'Driver • ${ride.vehicle.modelName}',
-                      style: AppTypography.labelSm.copyWith(color: AppColors.outline),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Trip: ${booking.pickupPoint} ➔ ${booking.dropoffPoint}',
-            style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ChatScreen(
-                          rideId: booking.rideId,
-                          peerName: ride.driverName,
-                          vehicleModel: ride.vehicle.modelName,
-                          peerPhone: ride.driverPhone,
-                          peerRole: 'Driver',
-                        ),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.chat_bubble_outline, size: 15),
-                  label: const Text('Chat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: const BorderSide(color: AppColors.primary),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    CampusVoiceCallDialog.show(
-                      context,
-                      peerName: ride.driverName,
-                      peerPhone: ride.driverPhone ?? '01712345678',
-                      peerRole: 'Driver',
-                      peerDept: ride.driverDept,
-                    );
-                  },
-                  icon: const Icon(Icons.call, size: 15),
-                  label: const Text('Voice Call', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: () => _ringPeer(context, ride.driverName, booking.rideId),
-                icon: const Icon(Icons.notifications_active, color: Color(0xFFFF9500), size: 20),
-                tooltip: 'Alert Ring Driver (জরুরি রিং)',
-                style: IconButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFF3E0),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -791,28 +676,53 @@ class _DriverRideConversationsSection extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: bookings.map((booking) {
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: const [
-                  BoxShadow(color: AppColors.cardShadow, blurRadius: 4, offset: Offset(0, 1)),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+            return Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ChatScreen(
+                        rideId: ride.id,
+                        peerName: booking.passengerName,
+                        vehicleModel: 'Passenger Chat',
+                        peerPhone: booking.passengerPhone,
+                        peerRole: 'Passenger',
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: Color(0xFFF3F4F6), width: 1)),
+                  ),
+                  child: Row(
                     children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: AppColors.primaryFixed,
-                        child: Text(
-                          booking.passengerName.isNotEmpty ? booking.passengerName[0].toUpperCase() : 'P',
-                          style: AppTypography.bodyMdMedium.copyWith(color: AppColors.onPrimaryFixed),
-                        ),
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 25,
+                            backgroundColor: const Color(0xFF0288D1).withOpacity(0.14),
+                            child: Text(
+                              booking.passengerName.isNotEmpty ? booking.passengerName[0].toUpperCase() : 'P',
+                              style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF0288D1), fontSize: 19),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              width: 13,
+                              height: 13,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981),
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -821,187 +731,146 @@ class _DriverRideConversationsSection extends ConsumerWidget {
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  booking.passengerName,
-                                  style: AppTypography.bodyMdMedium.copyWith(fontWeight: FontWeight.bold),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: booking.status == BookingStatus.accepted
-                                        ? const Color(0xFFE8F5E9)
-                                        : const Color(0xFFFFF3E0),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
+                                Flexible(
                                   child: Text(
-                                    booking.status.name.toUpperCase(),
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      color: booking.status == BookingStatus.accepted
-                                          ? const Color(0xFF2E7D32)
-                                          : const Color(0xFFE65100),
-                                    ),
+                                    booking.passengerName,
+                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Color(0xFF111827)),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.verified, size: 14, color: AppColors.primary),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF0288D1).withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'Passenger',
+                                    style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.bold, color: Color(0xFF0288D1)),
                                   ),
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 3),
                             Text(
-                              'Passenger • ${booking.passengerDept} • ${booking.seatsBooked} Seat(s)',
-                              style: AppTypography.labelSm.copyWith(color: AppColors.outline),
+                              'Pickup: ${booking.pickupPoint} ➔ Dropoff: ${booking.dropoffPoint}',
+                              style: const TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Pickup: ${booking.pickupPoint} ➔ Dropoff: ${booking.dropoffPoint}',
-                    style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ChatScreen(
-                                  rideId: ride.id,
-                                  peerName: booking.passengerName,
-                                  vehicleModel: 'Passenger Chat',
-                                  peerPhone: booking.passengerPhone,
-                                  peerRole: 'Passenger',
-                                ),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.chat_bubble_outline, size: 15),
-                          label: const Text('Chat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.primary,
-                            side: const BorderSide(color: AppColors.primary),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.call, size: 19, color: Color(0xFF2E7D32)),
+                            tooltip: 'Call Passenger',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            onPressed: () {
+                              DirectCallService.showCallOptions(
+                                context,
+                                peerName: booking.passengerName,
+                                phoneNumber: booking.passengerPhone.isNotEmpty ? booking.passengerPhone : '01712345678',
+                                peerRole: 'Passenger',
+                                peerDept: booking.passengerDept,
+                              );
+                            },
                           ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            CampusVoiceCallDialog.show(
-                              context,
-                              peerName: booking.passengerName,
-                              peerPhone: booking.passengerPhone,
-                              peerRole: 'Passenger',
-                              peerDept: booking.passengerDept,
-                            );
-                          },
-                          icon: const Icon(Icons.call, size: 15),
-                          label: const Text('Voice Call', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF2E7D32),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: () async {
-                          final currentUser = ref.read(authNotifierProvider).user?.name ?? 'Rider';
-                          final ringId = 'ring_${DateTime.now().millisecondsSinceEpoch}';
-                          final authUser = ref.read(authNotifierProvider).user;
+                          IconButton(
+                            icon: const Icon(Icons.notifications_active, size: 19, color: Color(0xFFFF9500)),
+                            tooltip: 'Alert Ring Passenger',
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            onPressed: () async {
+                              final currentUser = ref.read(authNotifierProvider).user?.name ?? 'Rider';
+                              final ringId = 'ring_${DateTime.now().millisecondsSinceEpoch}';
+                              final authUser = ref.read(authNotifierProvider).user;
 
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (ctx) => AlertDialog(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                              backgroundColor: Colors.white,
-                              content: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Container(
-                                    width: 68,
-                                    height: 68,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFF9500).withOpacity(0.15),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(Icons.notifications_active, color: Color(0xFFFF9500), size: 34),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Text(
-                                    'Ringing ${booking.passengerName}...',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Dedicated alert buzzer is ringing on ${booking.passengerName}\'s phone. Tap Stop to cancel.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFFD32F2F),
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (ctx) => AlertDialog(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                                  backgroundColor: Colors.white,
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 68,
+                                        height: 68,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFF9500).withOpacity(0.15),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.notifications_active, color: Color(0xFFFF9500), size: 34),
                                       ),
-                                      icon: const Icon(Icons.call_end, size: 18),
-                                      label: const Text('Stop Ringing', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      onPressed: () async {
-                                        NotificationSoundService.stopRinging();
-                                        try {
-                                          await ref.read(ridesRepositoryProvider).stopAlertRing(
-                                            targetUserId: booking.passengerName,
-                                            senderId: authUser?.id,
-                                            ringId: ringId,
-                                          );
-                                        } catch (_) {}
-                                        if (ctx.mounted) Navigator.pop(ctx);
-                                      },
-                                    ),
+                                      const SizedBox(height: 14),
+                                      Text(
+                                        'Ringing ${booking.passengerName}...',
+                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        'Dedicated alert buzzer is ringing on their phone. Tap Stop to cancel.',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                                      ),
+                                      const SizedBox(height: 20),
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFFD32F2F),
+                                            foregroundColor: Colors.white,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                          ),
+                                          icon: const Icon(Icons.call_end, size: 18),
+                                          label: const Text('Stop Ringing', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          onPressed: () async {
+                                            NotificationSoundService.stopRinging();
+                                            try {
+                                              await ref.read(ridesRepositoryProvider).stopAlertRing(
+                                                targetUserId: booking.passengerPhone.isNotEmpty ? booking.passengerPhone : booking.passengerName,
+                                                senderId: authUser?.id,
+                                                ringId: ringId,
+                                              );
+                                            } catch (_) {}
+                                            if (ctx.mounted) Navigator.pop(ctx);
+                                          },
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ),
-                          );
+                                ),
+                              );
 
-                          try {
-                            await ref.read(ridesRepositoryProvider).triggerAlertRing(
-                              targetUserId: booking.passengerPhone.isNotEmpty ? booking.passengerPhone : booking.passengerName,
-                              targetName: booking.passengerName,
-                              senderId: authUser?.id ?? '',
-                              senderName: currentUser,
-                              rideId: ride.id,
-                              ringId: ringId,
-                              message: '🚨 Urgent: Rider $currentUser is buzzing you for pickup!',
-                            );
-                          } catch (_) {}
-                        },
-                        icon: const Icon(Icons.notifications_active, color: Color(0xFFFF9500), size: 20),
-                        tooltip: 'Alert Ring Passenger (জরুরি রিং)',
-                        style: IconButton.styleFrom(
-                          backgroundColor: const Color(0xFFFFF3E0),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
+                              try {
+                                await ref.read(ridesRepositoryProvider).triggerAlertRing(
+                                  targetUserId: booking.passengerPhone.isNotEmpty ? booking.passengerPhone : booking.passengerName,
+                                  targetName: booking.passengerName,
+                                  senderId: authUser?.id ?? '',
+                                  senderName: currentUser,
+                                  rideId: ride.id,
+                                  ringId: ringId,
+                                  message: '🚨 Urgent: Rider $currentUser is buzzing you for pickup!',
+                                );
+                              } catch (_) {}
+                            },
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
             );
           }).toList(),

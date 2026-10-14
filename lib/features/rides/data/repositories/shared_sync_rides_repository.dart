@@ -314,8 +314,9 @@ class SharedSyncRidesRepository implements RidesRepository {
       }
     }
 
-    // Update preferences cache
+    // Update preferences cache & local fallback
     try {
+      await _localFallback.deleteRide(rideId);
       final currentList = await getAllAvailableRides();
       final updated = currentList.where((r) => r.id != rideId).toList();
       await preferences.saveSharedRides(jsonEncode(updated.map((r) => r.toJson()).toList()));

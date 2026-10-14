@@ -469,6 +469,10 @@ class _MyRidesActivityViewState extends ConsumerState<MyRidesActivityView> {
                           if (confirm == true) {
                             await ref.read(ridesRepositoryProvider).deleteRide(ride.id);
                             ref.invalidate(myPostedRidesProvider);
+                            ref.invalidate(allAvailableRidesProvider);
+                            ref.invalidate(departingSoonRidesProvider);
+                            ref.invalidate(departingSoonRidesStreamProvider);
+                            ref.invalidate(allSystemRidesProvider);
                           }
                         },
                       ),

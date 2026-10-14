@@ -8,6 +8,7 @@ import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 import 'package:diu_ride/features/tracking/presentation/screens/ride_details_tracking_screen.dart';
 import 'package:diu_ride/features/chat/presentation/screens/chat_screen.dart';
+import 'package:diu_ride/core/utils/direct_call_service.dart';
 
 /// LiveRideStatusCard
 /// Displays real-time ride and booking status directly on the Home Screen,
@@ -26,7 +27,7 @@ class LiveRideStatusCard extends ConsumerWidget {
     final allRidesAsync = ref.watch(allAvailableRidesProvider);
     final allRides = allRidesAsync.value ?? [];
 
-    // Find active booking or active offered ride
+    // Find active booking for passenger (even if scheduled for later)
     final activeBooking = bookingsAsync.value?.cast<BookingModel?>().firstWhere(
           (b) => b?.status == BookingStatus.accepted || b?.status == BookingStatus.requested,
           orElse: () => null,
@@ -40,6 +41,7 @@ class LiveRideStatusCard extends ConsumerWidget {
           orElse: () => null,
         );
 
+    // 1. PASSENGER VIEW: Toplist Confirmed Commute / Requested Seat
     if (activeBooking != null) {
       final matchingRide = allRides.firstWhere(
         (r) => r.id == activeBooking.rideId,
@@ -77,13 +79,13 @@ class LiveRideStatusCard extends ConsumerWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isConfirmed ? const Color(0xFF4CAF50).withOpacity(0.4) : const Color(0xFFFF9800).withOpacity(0.4),
+            color: isConfirmed ? const Color(0xFF10B981) : const Color(0xFFFF9800),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: (isConfirmed ? const Color(0xFF4CAF50) : const Color(0xFFFF9800)).withOpacity(0.12),
-              blurRadius: 12,
+              color: (isConfirmed ? const Color(0xFF10B981) : const Color(0xFFFF9800)).withOpacity(0.14),
+              blurRadius: 14,
               offset: const Offset(0, 4),
             ),
           ],
@@ -112,7 +114,7 @@ class LiveRideStatusCard extends ConsumerWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        isConfirmed ? 'CONFIRMED COMMUTE' : 'SEAT REQUESTED',
+                        isConfirmed ? 'CONFIRMED COMMUTE (DRIVER ASSIGNED)' : 'SEAT REQUESTED (PENDING)',
                         style: TextStyle(
                           color: isConfirmed ? const Color(0xFF2E7D32) : const Color(0xFFE65100),
                           fontSize: 11,
@@ -136,19 +138,42 @@ class LiveRideStatusCard extends ConsumerWidget {
             const SizedBox(height: 12),
             Row(
               children: [
-                const Icon(Icons.two_wheeler, size: 20, color: Color(0xFFE65100)),
-                const SizedBox(width: 8),
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: const Color(0xFFFFE0B2),
+                  child: Text(
+                    matchingRide.driverName.isNotEmpty ? matchingRide.driverName[0].toUpperCase() : 'D',
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFE65100)),
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              matchingRide.driverName,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.verified, size: 14, color: Color(0xFF10B981)),
+                        ],
+                      ),
                       Text(
-                        matchingRide.driverName,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        '${matchingRide.driverDept} • ${matchingRide.vehicle.modelName} (${matchingRide.vehicle.color})',
+                        style: TextStyle(color: Colors.grey[700], fontSize: 11.5),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       Text(
                         'Route: ${activeBooking.pickupPoint} ➔ ${activeBooking.dropoffPoint}',
-                        style: TextStyle(color: Colors.grey[700], fontSize: 12),
+                        style: const TextStyle(color: Color(0xFF374151), fontSize: 12, fontWeight: FontWeight.w600),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -179,7 +204,7 @@ class LiveRideStatusCard extends ConsumerWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 OutlinedButton.icon(
                   onPressed: () {
                     Navigator.of(context).push(
@@ -188,6 +213,8 @@ class LiveRideStatusCard extends ConsumerWidget {
                           rideId: activeBooking.rideId,
                           peerName: matchingRide.driverName,
                           driverName: matchingRide.driverName,
+                          peerPhone: matchingRide.driverPhone,
+                          peerRole: 'Driver',
                         ),
                       ),
                     );
@@ -198,8 +225,26 @@ class LiveRideStatusCard extends ConsumerWidget {
                     foregroundColor: const Color(0xFFE65100),
                     side: const BorderSide(color: Color(0xFFE65100)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   ),
+                ),
+                const SizedBox(width: 6),
+                IconButton(
+                  tooltip: 'Direct Call Driver',
+                  style: IconButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981).withOpacity(0.12),
+                    foregroundColor: const Color(0xFF10B981),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () {
+                    DirectCallService.showCallOptions(
+                      context,
+                      phoneNumber: matchingRide.driverPhone ?? '',
+                      peerName: matchingRide.driverName,
+                      peerRole: 'Driver',
+                    );
+                  },
+                  icon: const Icon(Icons.phone, size: 18),
                 ),
               ],
             ),
@@ -208,18 +253,35 @@ class LiveRideStatusCard extends ConsumerWidget {
       );
     }
 
+    // 2. DRIVER VIEW: Toplist Booked Passenger / Active Offered Ride
     if (activeOfferedRide != null) {
+      final driverBookingsAsync = ref.watch(rideBookingsProvider(activeOfferedRide.id));
+      final bookedPassenger = driverBookingsAsync.value?.cast<BookingModel?>().firstWhere(
+            (b) => b?.status == BookingStatus.accepted || b?.status == BookingStatus.requested,
+            orElse: () => null,
+          );
+
+      final hasBookedPassenger = bookedPassenger != null;
+      final isAccepted = bookedPassenger?.status == BookingStatus.accepted;
+
       return Container(
         margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF2E7D32).withOpacity(0.4), width: 1.5),
+          border: Border.all(
+            color: hasBookedPassenger
+                ? (isAccepted ? const Color(0xFF10B981) : const Color(0xFFFF9800))
+                : const Color(0xFF2E7D32).withOpacity(0.4),
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF2E7D32).withOpacity(0.12),
-              blurRadius: 12,
+              color: hasBookedPassenger
+                  ? (isAccepted ? const Color(0xFF10B981) : const Color(0xFFFF9800)).withOpacity(0.14)
+                  : const Color(0xFF2E7D32).withOpacity(0.12),
+              blurRadius: 14,
               offset: const Offset(0, 4),
             ),
           ],
@@ -232,7 +294,9 @@ class LiveRideStatusCard extends ConsumerWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE8F5E9),
+                    color: hasBookedPassenger
+                        ? (isAccepted ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0))
+                        : const Color(0xFFE8F5E9),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Row(
@@ -241,16 +305,22 @@ class LiveRideStatusCard extends ConsumerWidget {
                       Container(
                         width: 8,
                         height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF2E7D32),
+                        decoration: BoxDecoration(
+                          color: hasBookedPassenger
+                              ? (isAccepted ? const Color(0xFF2E7D32) : const Color(0xFFE65100))
+                              : const Color(0xFF2E7D32),
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text(
-                        'ACTIVE RIDER POOL',
+                      Text(
+                        hasBookedPassenger
+                            ? (isAccepted ? 'CONFIRMED COMMUTE (PASSENGER BOOKED)' : 'NEW SEAT BOOKING REQUEST')
+                            : 'ACTIVE RIDER POOL',
                         style: TextStyle(
-                          color: Color(0xFF2E7D32),
+                          color: hasBookedPassenger
+                              ? (isAccepted ? const Color(0xFF2E7D32) : const Color(0xFFE65100))
+                              : const Color(0xFF2E7D32),
                           fontSize: 11,
                           fontWeight: FontWeight.w800,
                         ),
@@ -260,58 +330,227 @@ class LiveRideStatusCard extends ConsumerWidget {
                 ),
                 const Spacer(),
                 Text(
-                  '৳${activeOfferedRide.farePerSeat.toInt()} / seat',
-                  style: const TextStyle(
+                  hasBookedPassenger
+                      ? '৳${bookedPassenger.totalFare.toInt()}'
+                      : '৳${activeOfferedRide.farePerSeat.toInt()} / seat',
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF2E7D32),
+                    color: hasBookedPassenger ? const Color(0xFFE65100) : const Color(0xFF2E7D32),
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Your Ride: ${activeOfferedRide.originName} ➔ ${activeOfferedRide.destinationName}',
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => RideDetailsTrackingScreen(rideId: activeOfferedRide.id),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.share_location, size: 15),
-                    label: const Text('Live Trip Tracking', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+            if (hasBookedPassenger) ...[
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: const Color(0xFFDCFCE7),
+                    child: Text(
+                      bookedPassenger.passengerName.isNotEmpty
+                          ? bookedPassenger.passengerName[0].toUpperCase()
+                          : 'P',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF16A34A)),
                     ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                OutlinedButton.icon(
-                  onPressed: () => onNavigateTab(3),
-                  icon: const Icon(Icons.message, size: 15),
-                  label: const Text('Messages', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2E7D32),
-                    side: const BorderSide(color: Color(0xFF2E7D32)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                bookedPassenger.passengerName,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.school, size: 14, color: Color(0xFF16A34A)),
+                          ],
+                        ),
+                        Text(
+                          '${bookedPassenger.passengerDept} • ${bookedPassenger.seatsBooked} Seat(s) Booked',
+                          style: TextStyle(color: Colors.grey[700], fontSize: 11.5),
+                        ),
+                        Text(
+                          'Pickup: ${bookedPassenger.pickupPoint} ➔ ${bookedPassenger.dropoffPoint}',
+                          style: const TextStyle(color: Color(0xFF374151), fontSize: 12, fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (!isAccepted) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          final success = await ref.read(bookingNotifierProvider.notifier).acceptBooking(
+                                bookingId: bookedPassenger.id,
+                                rideId: activeOfferedRide.id,
+                                driverName: currentUser?.name ?? 'Rider',
+                                pickupPoint: bookedPassenger.pickupPoint,
+                              );
+                          if (context.mounted && success) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Booking accepted for ${bookedPassenger.passengerName}!'),
+                                backgroundColor: const Color(0xFF10B981),
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.check, size: 16),
+                        label: const Text('Accept Booking', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        await ref.read(bookingNotifierProvider.notifier).rejectBooking(
+                              bookingId: bookedPassenger.id,
+                              rideId: activeOfferedRide.id,
+                              driverName: currentUser?.name ?? 'Rider',
+                            );
+                      },
+                      icon: const Icon(Icons.close, size: 15),
+                      label: const Text('Decline', style: TextStyle(fontSize: 12)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFDC2626),
+                        side: const BorderSide(color: Color(0xFFFCA5A5)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => RideDetailsTrackingScreen(rideId: activeOfferedRide.id),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.share_location, size: 15),
+                        label: const Text('Live GPS Track', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => ChatScreen(
+                              rideId: activeOfferedRide.id,
+                              peerName: bookedPassenger.passengerName,
+                              peerPhone: bookedPassenger.passengerPhone,
+                              peerRole: 'Passenger',
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.chat_bubble_outline, size: 15),
+                      label: const Text('Chat & Ring', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF10B981),
+                        side: const BorderSide(color: Color(0xFF10B981)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    IconButton(
+                      tooltip: 'Direct Call Passenger',
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981).withOpacity(0.12),
+                        foregroundColor: const Color(0xFF10B981),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        DirectCallService.showCallOptions(
+                          context,
+                          phoneNumber: bookedPassenger.passengerPhone,
+                          peerName: bookedPassenger.passengerName,
+                          peerRole: 'Passenger',
+                        );
+                      },
+                      icon: const Icon(Icons.phone, size: 18),
+                    ),
+                  ],
                 ),
               ],
-            ),
+            ] else ...[
+              Text(
+                'Your Ride: ${activeOfferedRide.originName} ➔ ${activeOfferedRide.destinationName}',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => RideDetailsTrackingScreen(rideId: activeOfferedRide.id),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.share_location, size: 15),
+                      label: const Text('Live Trip Tracking', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E7D32),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  OutlinedButton.icon(
+                    onPressed: () => onNavigateTab(3),
+                    icon: const Icon(Icons.message, size: 15),
+                    label: const Text('Messages', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF2E7D32),
+                      side: const BorderSide(color: Color(0xFF2E7D32)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       );

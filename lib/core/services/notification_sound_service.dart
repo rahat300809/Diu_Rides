@@ -17,28 +17,37 @@ class NotificationSoundService {
   static bool get isRinging => _isRinging;
 
   /// Play a loud ringing buzzer sound when someone rings you
-  static Future<void> playRingAlert({int durationSeconds = 8}) async {
+  static Future<void> playRingAlert({int durationSeconds = 25}) async {
     try {
       stopRinging();
       _isRinging = true;
 
-      // Initialize player
-      _ringPlayer = AudioPlayer();
-      await _ringPlayer?.setVolume(1.0);
-      await _ringPlayer?.setReleaseMode(ReleaseMode.loop);
+      // 1. Initialize audio player and play looping alert sound
+      try {
+        _ringPlayer = AudioPlayer();
+        await _ringPlayer?.setVolume(1.0);
+        await _ringPlayer?.setReleaseMode(ReleaseMode.loop);
+        await _ringPlayer?.play(AssetSource('sounds/ring_alert.wav'));
+      } catch (e) {
+        debugPrint('[NotificationSoundService] Ring player asset error, using audio pulse: $e');
+      }
 
-      // Play custom loud ringing tone
-      await _ringPlayer?.play(AssetSource('sounds/ring_alert.wav'));
-
-      // Periodic vibration pulses
+      // 2. Hardware vibration + periodic system sound buzzer pulses
       _vibrationTimer?.cancel();
       _vibratePulse();
-      _vibrationTimer = Timer.periodic(const Duration(milliseconds: 600), (_) {
+      try {
+        SystemSound.play(SystemSoundType.alert);
+      } catch (_) {}
+
+      _vibrationTimer = Timer.periodic(const Duration(milliseconds: 700), (_) {
         if (!_isRinging) {
           _vibrationTimer?.cancel();
           return;
         }
         _vibratePulse();
+        try {
+          SystemSound.play(SystemSoundType.alert);
+        } catch (_) {}
       });
 
       // Auto stop after duration
@@ -49,7 +58,6 @@ class NotificationSoundService {
       });
     } catch (e) {
       debugPrint('[NotificationSoundService] playRingAlert error: $e');
-      // Hardware fallback
       _vibratePulse();
       try {
         SystemSound.play(SystemSoundType.alert);
