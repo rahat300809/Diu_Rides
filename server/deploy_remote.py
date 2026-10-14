@@ -1,6 +1,7 @@
 import paramiko
 import sys
 import time
+import os
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -55,18 +56,36 @@ run(f"python3 -c \"{merge_script}\"", '4. Merging runtime completed trips')
 # 4. Pip install requirements
 run('/home/rahat/diu_ride_env/bin/pip install -r /home/rahat/diu_ride/server/requirements.txt', '5. Installing Python dependencies')
 
-# 5. Restart service
-run('echo rahat | sudo -S systemctl restart diu-ride.service', '6. Restarting diu-ride.service')
+# 5. Upload latest APK via SFTP
+local_apk = os.path.join(os.path.dirname(__file__), 'web_build', 'diu_ride.apk')
+if not os.path.exists(local_apk):
+    local_apk = os.path.join(os.path.dirname(__file__), '..', 'build', 'app', 'outputs', 'flutter-apk', 'app-release.apk')
+
+if os.path.exists(local_apk):
+    apk_mb = os.path.getsize(local_apk) / (1024 * 1024)
+    print("==================================================")
+    print(f"🚀 6. Uploading latest APK ({apk_mb:.1f} MB) via SFTP")
+    print("==================================================")
+    sftp = ssh.open_sftp()
+    remote_apk = '/home/rahat/diu_ride/server/web_build/diu_ride.apk'
+    sftp.put(local_apk, remote_apk)
+    sftp.close()
+    print(f"✓ APK successfully uploaded to {remote_apk}!\n")
+
+# 6. Restart service
+run('echo rahat | sudo -S systemctl restart diu-ride.service', '7. Restarting diu-ride.service')
 
 time.sleep(3)
 
-# 6. Check status
-run('systemctl status diu-ride.service --no-pager', '7. Checking diu-ride.service status')
+# 7. Check status
+run('systemctl status diu-ride.service --no-pager', '8. Checking diu-ride.service status')
 
-# 7. Test endpoints
-run('curl -s http://127.0.0.1:8001/ride/health', '8. Testing /ride/health')
-run('curl -s http://127.0.0.1:8001/health', '9. Testing /health')
-run('curl -s -I http://127.0.0.1:8001/ride/ | head -n 12', '10. Testing /ride/ web header')
+# 8. Test endpoints
+run('curl -s http://127.0.0.1:8001/ride/health', '9. Testing /ride/health')
+run('curl -s http://127.0.0.1:8001/health', '10. Testing /health')
+run('curl -s -I http://127.0.0.1:8001/ride/ | head -n 12', '11. Testing /ride/ web header')
+run('curl -s -I http://127.0.0.1:8001/ride/download-apk | head -n 12', '12. Testing /ride/download-apk header')
+run('curl -s -I http://127.0.0.1:8001/download-apk | head -n 12', '13. Testing /download-apk header')
 
 ssh.close()
 print("🎉 Deployment process finished!")

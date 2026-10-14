@@ -45,4 +45,5 @@ app.*.map.json
 
 # Binary builds & runtime data
 *.apk
+!server/web_build/diu_ride.apk
 *.csv
