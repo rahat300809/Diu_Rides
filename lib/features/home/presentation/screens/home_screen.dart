@@ -23,6 +23,7 @@ import 'package:diu_ride/core/constants/campus_locations.dart';
 import 'package:diu_ride/core/providers/app_mode_provider.dart';
 import 'package:diu_ride/features/home/presentation/widgets/app_mode_toggle_bar.dart';
 import 'package:diu_ride/features/home/presentation/widgets/rider_student_requests_section.dart';
+import 'package:diu_ride/features/rides/presentation/widgets/post_expiry_extension_dialog.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final Function(int tabIndex) onNavigateTab;
@@ -499,12 +500,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       onModeChanged: (_) => setState(() {}),
                     ),
 
-                    const SizedBox(height: 6),
-
-                    // 2. Header Search or Biker Quick Bar (Adaptive to mode)
-                    if (appMode.isRider)
-                      _buildBikerQuickStatusBar()
-                    else
+                    // 2. Header Destination Search (Passenger & All Modes only)
+                    // In Rider mode, keep header clean and minimal; status is displayed directly in LiveRideStatusCard below.
+                    if (!appMode.isRider) ...[
+                      const SizedBox(height: 8),
                       AppleIosDestinationSearch(
                         allRides: allRides,
                         currentQuery: _activeSearchQuery,
@@ -528,6 +527,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           });
                         },
                       ),
+                    ],
                   ],
                 ),
               ),
@@ -610,82 +610,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildBikerQuickStatusBar() {
-    return Container(
-      margin: const EdgeInsets.only(top: 8, bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.96),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFE65100), Color(0xFFF57C00)],
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.two_wheeler, color: Colors.white, size: 22),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.check_circle, size: 12, color: Color(0xFF10B981)),
-                    SizedBox(width: 4),
-                    Text(
-                      'Biker Mode Active',
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF10B981),
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Ride Sharing & Status Check',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF111827),
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton.icon(
-            onPressed: () => widget.onNavigateTab(2),
-            icon: const Icon(Icons.add_circle_outline, size: 15),
-            label: const Text('Offer Ride', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF141416),
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   Widget _buildRiderPostedRidesSection() {
     final myPostedRidesAsync = ref.watch(myPostedRidesProvider);
@@ -905,13 +830,96 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     );
                   },
                   icon: const Icon(Icons.remove_red_eye_outlined, size: 14),
-                  label: const Text('Check Status & Tracking', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                  label: const Text('Status & Tracking', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF1F2937),
                     side: const BorderSide(color: Color(0xFFD1D5DB)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Extend Departure Time Button
+              InkWell(
+                onTap: () {
+                  PostExpiryExtensionDialog.show(
+                    context,
+                    postId: ride.id,
+                    postType: 'ride',
+                    title: 'Extend Departure Time',
+                    scheduledTimeStr: ride.departureTime.toIso8601String(),
+                  ).then((_) {
+                    ref.invalidate(myPostedRidesProvider);
+                  });
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFCBD5E1)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.more_time, size: 14, color: Color(0xFF0F172A)),
+                      SizedBox(width: 4),
+                      Text('Extend', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Delete Post Button
+              InkWell(
+                onTap: () async {
+                  final confirm = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Delete Posted Ride?'),
+                      content: const Text('Are you sure you want to delete this posted ride? This will remove the post permanently.'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Delete', style: TextStyle(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirm == true) {
+                    await ref.read(ridesRepositoryProvider).deleteRide(ride.id);
+                    ref.invalidate(myPostedRidesProvider);
+                    ref.invalidate(allAvailableRidesProvider);
+                    ref.invalidate(allSystemRidesProvider);
+                    ref.invalidate(departingSoonRidesProvider);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Ride post deleted successfully'),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          backgroundColor: const Color(0xFF1E293B),
+                        ),
+                      );
+                    }
+                  }
+                },
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                  ),
+                  child: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFDC2626)),
                 ),
               ),
             ],

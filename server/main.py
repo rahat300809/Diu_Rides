@@ -372,7 +372,8 @@ async def check_and_cleanup_expired_scheduled_posts(conn=None):
     try:
         cursor.execute("""
             SELECT id, driver_id, driver_phone, origin_name, destination_name, 
-                   departure_time, created_at, status, extension_prompted
+                   departure_time, created_at, status, total_seats, available_seats,
+                   rider_confirmed, passenger_confirmed, passenger_id, extension_prompted
             FROM rides 
             WHERE status = 'published'
         """)
@@ -392,10 +393,33 @@ async def check_and_cleanup_expired_scheduled_posts(conn=None):
             if dep_dt:
                 diff_minutes = (now_local - dep_dt).total_seconds() / 60.0
                 if diff_minutes >= 10:
-                    cursor.execute("DELETE FROM rides WHERE id = ?", (r["id"],))
-                    cursor.execute("DELETE FROM bookings WHERE ride_id = ?", (r["id"],))
-                    cursor.execute("DELETE FROM messages WHERE ride_id = ?", (r["id"],))
-                    deleted_rides.append(r["id"])
+                    # Check if there is ANY confirmed or reserved order on this ride
+                    cursor.execute("""
+                        SELECT COUNT(*) as cnt FROM bookings 
+                        WHERE (ride_id = ? OR ride_id LIKE ?) 
+                          AND status IN ('accepted', 'confirmed', 'requested')
+                    """, (r["id"], f"%{r['id']}%"))
+                    b_cnt = cursor.fetchone()
+                    has_order = (b_cnt and b_cnt["cnt"] > 0)
+                    
+                    if not has_order:
+                        total_s = r["total_seats"] if "total_seats" in r.keys() else 1
+                        avail_s = r["available_seats"] if "available_seats" in r.keys() else 1
+                        if (avail_s < total_s) or (r.get("rider_confirmed")) or (r.get("passenger_confirmed")) or (r.get("passenger_id")):
+                            has_order = True
+
+                    if not has_order:
+                        # Auto delete post if 10 min exceeded and not confirmed or reserved
+                        cursor.execute("DELETE FROM rides WHERE id = ?", (r["id"],))
+                        cursor.execute("DELETE FROM bookings WHERE ride_id = ?", (r["id"],))
+                        cursor.execute("DELETE FROM messages WHERE ride_id = ?", (r["id"],))
+                        try:
+                            cursor.execute("DELETE FROM shared_locations WHERE ride_id = ?", (r["id"],))
+                            cursor.execute("DELETE FROM driver_locations WHERE ride_id = ?", (r["id"],))
+                        except Exception:
+                            pass
+                        deleted_rides.append(r["id"])
+                        print(f"[AUTO-DELETE EXPIRED POST] Ride {r['id']} exceeded 10 mins without confirmed/reserved order. Purged.")
                 elif diff_minutes >= 0:
                     prompt_flag = r["extension_prompted"] if "extension_prompted" in r.keys() else 0
                     if not prompt_flag:
@@ -1954,12 +1978,12 @@ async def delete_ride_endpoint(
 
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM rides WHERE id = ?", (target_id,))
-    cursor.execute("DELETE FROM bookings WHERE ride_id = ?", (target_id,))
-    cursor.execute("DELETE FROM messages WHERE ride_id = ?", (target_id,))
+    cursor.execute("DELETE FROM rides WHERE id = ? OR id LIKE ?", (target_id, f"%{target_id}%"))
+    cursor.execute("DELETE FROM bookings WHERE ride_id = ? OR ride_id LIKE ?", (target_id, f"%{target_id}%"))
+    cursor.execute("DELETE FROM messages WHERE ride_id = ? OR ride_id LIKE ?", (target_id, f"%{target_id}%"))
     try:
-        cursor.execute("DELETE FROM shared_locations WHERE ride_id = ?", (target_id,))
-        cursor.execute("DELETE FROM driver_locations WHERE ride_id = ?", (target_id,))
+        cursor.execute("DELETE FROM shared_locations WHERE ride_id = ? OR ride_id LIKE ?", (target_id, f"%{target_id}%"))
+        cursor.execute("DELETE FROM driver_locations WHERE ride_id = ? OR ride_id LIKE ?", (target_id, f"%{target_id}%"))
     except Exception:
         pass
     conn.commit()
@@ -2110,6 +2134,11 @@ async def complete_ride(ride_id: str, payload: Optional[Dict[str, Any]] = None):
             "completed_time": now,
         })
 
+        # If complete, auto-delete the post from active rides table
+        cursor.execute("DELETE FROM rides WHERE id = ?", (ride_id,))
+        cursor.execute("DELETE FROM bookings WHERE ride_id = ?", (ride_id,))
+        conn.commit()
+
     conn.close()
     if row:
         updated = map_ride(row)
@@ -2136,7 +2165,8 @@ async def complete_ride(ride_id: str, payload: Optional[Dict[str, Any]] = None):
             "fare": float(row["fare_per_seat"]),
             "endMapsLink": end_maps,
         })
-        await manager.broadcast("ride_updated", updated)
+        await manager.broadcast("ride_deleted", {"id": ride_id, "reason": "completed"})
+        await manager.broadcast("post_deleted", {"id": ride_id, "type": "ride", "reason": "completed"})
         return updated
     raise HTTPException(status_code=404, detail="Ride not found")
 
@@ -2830,7 +2860,17 @@ async def cancel_booking(booking_id: str):
     seats = row["seats_booked"]
     ride_id = row["ride_id"]
     cursor.execute("UPDATE bookings SET status = 'cancelled' WHERE id = ?", (booking_id,))
-    cursor.execute("UPDATE rides SET available_seats = available_seats + ? WHERE id = ?", (seats, ride_id))
+    # Cancel in time: do not delete the post, make the post refreshed with open seats and published status
+    cursor.execute("""
+        UPDATE rides 
+        SET available_seats = MIN(total_seats, available_seats + ?),
+            status = 'published',
+            rider_confirmed = 0,
+            passenger_confirmed = 0,
+            passenger_id = NULL,
+            passenger_name = NULL
+        WHERE id = ?
+    """, (seats, ride_id))
     conn.commit()
 
     cursor.execute("SELECT * FROM bookings WHERE id = ?", (booking_id,))
@@ -2842,7 +2882,9 @@ async def cancel_booking(booking_id: str):
     updated = map_booking(updated_row)
     await manager.broadcast("booking_status_updated", updated)
     if ride_row:
-        await manager.broadcast("ride_updated", map_ride(ride_row))
+        refreshed_ride = map_ride(ride_row)
+        await manager.broadcast("ride_updated", refreshed_ride)
+        print(f"[BOOKING CANCELLED] Ride {ride_id} refreshed and reopened for booking.")
     return updated
 
 # =====================================================================
@@ -2985,14 +3027,25 @@ async def cancel_ride_session(payload: Dict[str, Any]):
         raise HTTPException(status_code=404, detail="Ride not found")
 
     now = datetime.utcnow().isoformat()
+    # Cancel in time: do not delete the post, make the post refreshed for new passengers!
     cursor.execute("""
         UPDATE rides 
-        SET status = 'cancelled', available_seats = total_seats, rider_confirmed = 0, passenger_confirmed = 0, cancel_reason = ? 
+        SET status = 'published',
+            available_seats = total_seats,
+            rider_confirmed = 0,
+            passenger_confirmed = 0,
+            passenger_id = NULL,
+            passenger_name = NULL,
+            start_time = NULL,
+            start_maps_link = NULL,
+            cancel_reason = ? 
         WHERE id = ?
     """, (reason, ride_id))
     cursor.execute("UPDATE bookings SET status = 'cancelled', trip_status = 'cancelled', cancel_reason = ? WHERE ride_id = ?", (reason, ride_id))
     conn.commit()
 
+    cursor.execute("SELECT * FROM rides WHERE id = ?", (ride_id,))
+    refreshed_ride_row = cursor.fetchone()
     cursor.execute("SELECT * FROM bookings WHERE ride_id = ? LIMIT 1", (ride_id,))
     b_row = cursor.fetchone()
     conn.close()
@@ -3018,7 +3071,7 @@ async def cancel_ride_session(payload: Dict[str, Any]):
     })
 
     # System message
-    sys_msg = f"❌ Trip cancelled by {user_name} ({role.title()}). Reason: {reason}. Ride was not confirmed."
+    sys_msg = f"❌ Trip cancelled by {user_name} ({role.title()}). Reason: {reason}. Post has been refreshed and reopened for bookings."
     await _save_and_broadcast_message(ride_id, {
         "rideId": ride_id,
         "senderId": "system",
@@ -3036,7 +3089,9 @@ async def cancel_ride_session(payload: Dict[str, Any]):
         "role": role,
     }
     await manager.broadcast("ride_session_status_changed", session_event)
-    await manager.broadcast("ride_updated", {"id": ride_id, "status": "cancelled"})
+    if refreshed_ride_row:
+        await manager.broadcast("ride_updated", map_ride(refreshed_ride_row))
+        print(f"[RIDE SESSION CANCELLED IN TIME] Post {ride_id} refreshed and republished.")
 
     return session_event
 
@@ -3135,6 +3190,14 @@ async def complete_ride_session(payload: Dict[str, Any]):
         "completed_time": now,
     })
 
+    # If complete, auto-delete the post from active rides table
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM rides WHERE id = ?", (ride_id,))
+    cursor.execute("DELETE FROM bookings WHERE ride_id = ?", (ride_id,))
+    conn.commit()
+    conn.close()
+
     # Automated chat message
     try:
         time_formatted = datetime.fromisoformat(now.replace("Z", "+00:00")).strftime("%I:%M %p, %b %d")
@@ -3160,7 +3223,8 @@ async def complete_ride_session(payload: Dict[str, Any]):
         "role": role,
     }
     await manager.broadcast("ride_session_status_changed", session_event)
-    await manager.broadcast("ride_updated", {"id": ride_id, "status": "completed"})
+    await manager.broadcast("ride_deleted", {"id": ride_id, "reason": "completed"})
+    await manager.broadcast("post_deleted", {"id": ride_id, "type": "ride", "reason": "completed"})
 
     return session_event
 

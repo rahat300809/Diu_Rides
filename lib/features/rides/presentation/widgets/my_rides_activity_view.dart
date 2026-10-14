@@ -505,36 +505,6 @@ class _MyRidesActivityViewState extends ConsumerState<MyRidesActivityView> {
                         label: const Text('Extend', style: TextStyle(fontSize: 11.5)),
                       ),
                       const SizedBox(width: 8),
-                      // Delete / Cancel Button
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline, size: 18, color: Color(0xFFDC2626)),
-                        tooltip: 'Cancel and Delete Post',
-                        onPressed: () async {
-                          final confirm = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Delete Posted Ride?'),
-                              content: const Text('Are you sure you want to delete this posted ride?'),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
-                                ElevatedButton(
-                                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
-                                  onPressed: () => Navigator.pop(ctx, true),
-                                  child: const Text('Delete', style: TextStyle(color: Colors.white)),
-                                ),
-                              ],
-                            ),
-                          );
-                          if (confirm == true) {
-                            await ref.read(ridesRepositoryProvider).deleteRide(ride.id);
-                            ref.invalidate(myPostedRidesProvider);
-                            ref.invalidate(allAvailableRidesProvider);
-                            ref.invalidate(departingSoonRidesProvider);
-                            ref.invalidate(departingSoonRidesStreamProvider);
-                            ref.invalidate(allSystemRidesProvider);
-                          }
-                        },
-                      ),
                     ] else ...[
                       // Finished state badge
                       Expanded(
@@ -547,7 +517,49 @@ class _MyRidesActivityViewState extends ConsumerState<MyRidesActivityView> {
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                     ],
+
+                    // Delete / Purge Button (Available on all posts!)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFDC2626)),
+                      tooltip: 'Delete Post',
+                      onPressed: () async {
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (ctx) => AlertDialog(
+                            title: const Text('Delete Posted Ride?'),
+                            content: const Text('Are you sure you want to delete this posted ride? This will permanently remove the post.'),
+                            actions: [
+                              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFDC2626)),
+                                onPressed: () => Navigator.pop(ctx, true),
+                                child: const Text('Delete', style: TextStyle(color: Colors.white)),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (confirm == true) {
+                          await ref.read(ridesRepositoryProvider).deleteRide(ride.id);
+                          ref.invalidate(myPostedRidesProvider);
+                          ref.invalidate(allAvailableRidesProvider);
+                          ref.invalidate(departingSoonRidesProvider);
+                          ref.invalidate(departingSoonRidesStreamProvider);
+                          ref.invalidate(allSystemRidesProvider);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: const Text('Post deleted successfully'),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                backgroundColor: const Color(0xFF1E293B),
+                              ),
+                            );
+                          }
+                        }
+                      },
+                    ),
                   ],
                 ),
               ],

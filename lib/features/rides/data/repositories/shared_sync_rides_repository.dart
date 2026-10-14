@@ -301,26 +301,40 @@ class SharedSyncRidesRepository implements RidesRepository {
 
   @override
   Future<bool> deleteRide(String rideId) async {
+    // 1. Immediately purge from local fallback and preferences cache
+    try {
+      await _localFallback.deleteRide(rideId);
+      final cached = preferences.getSharedRides();
+      if (cached != null && cached.isNotEmpty) {
+        final decoded = jsonDecode(cached) as List<dynamic>;
+        final updated = decoded.where((item) {
+          if (item is Map) {
+            final id = item['id']?.toString() ?? '';
+            return id != rideId && !id.contains(rideId);
+          }
+          return true;
+        }).toList();
+        await preferences.saveSharedRides(jsonEncode(updated));
+      }
+    } catch (_) {}
+
+    // 2. Call backend DELETE endpoints
     try {
       await _dio.delete('$_apiBase/rides/$rideId');
       debugPrint('Ride deleted from central backend: $rideId');
     } catch (e) {
       try {
-        await _dio.delete('$_apiBase/rides?id=$rideId');
+        await _dio.delete('$_apiBase/rides', queryParameters: {'id': rideId});
       } catch (_) {
         try {
           await _dio.post('$_apiBase/rides/$rideId/delete');
-        } catch (_) {}
+        } catch (_) {
+          try {
+            await _dio.post('$_apiBase/rides/delete', data: {'id': rideId});
+          } catch (_) {}
+        }
       }
     }
-
-    // Update preferences cache & local fallback
-    try {
-      await _localFallback.deleteRide(rideId);
-      final currentList = await getAllAvailableRides();
-      final updated = currentList.where((r) => r.id != rideId).toList();
-      await preferences.saveSharedRides(jsonEncode(updated.map((r) => r.toJson()).toList()));
-    } catch (_) {}
 
     return true;
   }
