@@ -69,6 +69,14 @@ if os.path.exists(local_apk):
     sftp = ssh.open_sftp()
     remote_apk = '/home/rahat/diu_ride/server/web_build/diu_ride.apk'
     sftp.put(local_apk, remote_apk)
+    
+    # Upload ai_config.json
+    local_ai_cfg = os.path.join(os.path.dirname(__file__), 'ai_config.json')
+    if os.path.exists(local_ai_cfg):
+        remote_ai_cfg = '/home/rahat/diu_ride/server/ai_config.json'
+        sftp.put(local_ai_cfg, remote_ai_cfg)
+        print(f"✓ AI Config successfully uploaded to {remote_ai_cfg}!")
+        
     sftp.close()
     print(f"✓ APK successfully uploaded to {remote_apk}!\n")
 
@@ -82,7 +90,8 @@ run('systemctl status diu-ride.service --no-pager', '8. Checking diu-ride.servic
 
 # 8. Test endpoints
 run('curl -s http://127.0.0.1:8001/ride/health', '9. Testing /ride/health')
-# run('curl -s -X POST http://127.0.0.1:8001/ride/api/admin/clear-all-records', '11. Purging all previous test rides from database to make app brand new')
+run('curl -s http://127.0.0.1:8001/ride/api/admin/ai-settings', '10. Testing /ride/api/admin/ai-settings')
+run('curl -s -X POST http://127.0.0.1:8001/ride/api/ai/chat -H "Content-Type: application/json" -d \'{"user_name":"Rahat","message":"Assalamu Alaikum"}\'', '11. Testing /ride/api/ai/chat endpoint')
 run('curl -s -I http://127.0.0.1:8001/ride/ | head -n 12', '12. Testing /ride/ web header')
 run('curl -s -I http://127.0.0.1:8001/ride/download-apk | head -n 12', '13. Testing /ride/download-apk header')
 run('curl -s -I http://127.0.0.1:8001/download-apk | head -n 12', '14. Testing /download-apk header')
