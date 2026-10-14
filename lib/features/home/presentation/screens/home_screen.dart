@@ -501,30 +501,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                     const SizedBox(height: 6),
 
-                    // 2. Apple iOS 3D Floating Destination Search Bar
-                    AppleIosDestinationSearch(
-                      allRides: allRides,
-                      currentQuery: _activeSearchQuery,
-                      onQueryChanged: (query) {
-                        setState(() {
-                          _activeSearchQuery = query;
-                        });
-                      },
-                      onDestinationSelected: (destination) {
-                        setState(() {
-                          _activeSearchQuery = destination;
-                        });
-                        _showToast(
-                          'Checking bikes to $destination...',
-                          'Scanning peers heading in this direction',
-                        );
-                      },
-                      onClear: () {
-                        setState(() {
-                          _activeSearchQuery = '';
-                        });
-                      },
-                    ),
+                    // 2. Header Search or Biker Quick Bar (Adaptive to mode)
+                    if (appMode.isRider)
+                      _buildBikerQuickStatusBar()
+                    else
+                      AppleIosDestinationSearch(
+                        allRides: allRides,
+                        currentQuery: _activeSearchQuery,
+                        onQueryChanged: (query) {
+                          setState(() {
+                            _activeSearchQuery = query;
+                          });
+                        },
+                        onDestinationSelected: (destination) {
+                          setState(() {
+                            _activeSearchQuery = destination;
+                          });
+                          _showToast(
+                            'Checking bikes to $destination...',
+                            'Scanning peers heading in this direction',
+                          );
+                        },
+                        onClear: () {
+                          setState(() {
+                            _activeSearchQuery = '';
+                          });
+                        },
+                      ),
                   ],
                 ),
               ),
@@ -534,8 +537,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onNavigateTab: widget.onNavigateTab,
               ),
 
-              // 3. Live Destination Bike Matching Results View (When typing e.g. "Uttara")
-              if (trimmedQuery.isNotEmpty)
+              // 3. Live Destination Bike Matching Results View (Passenger only)
+              if (trimmedQuery.isNotEmpty && !appMode.isRider)
                 DestinationMatchingBikesView(
                   query: _activeSearchQuery,
                   matchingRides: matchingBikes,
@@ -561,7 +564,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
               const SizedBox(height: 12),
 
-              // 5. Rider Student Pickup Requests (Shown in Rider & All Modes)
+              // 5. Rider Mode: Biker's Posted Rides & Live Status Checking Section
+              if (appMode.isRider)
+                _buildRiderPostedRidesSection(),
+
+              // 6. Rider Student Pickup Requests (Shown in Rider & All Modes)
               if (appMode.showRiderFeatures)
                 RiderStudentRequestsSection(
                   onSeeAll: () => widget.onNavigateTab(1),
@@ -570,8 +577,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               if (appMode.showRiderFeatures && appMode.showPassengerFeatures)
                 const SizedBox(height: 16),
 
-              // 6. Live Departing Peer Motorbikes Carousel (Shown in Passenger & All Modes)
-              if (appMode.showPassengerFeatures || appMode.isAll)
+              // 7. Live Departing Peer Motorbikes Carousel (Shown ONLY in Passenger & All Modes, strictly hidden in Rider mode!)
+              if (!appMode.isRider && (appMode.showPassengerFeatures || appMode.isAll))
                 departingRidesAsync.when(
                   data: (rides) {
                     final bikeRides = rides.where((r) => r.vehicle.type == VehicleType.bike).toList();
@@ -599,6 +606,317 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildBikerQuickStatusBar() {
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFE65100), Color(0xFFF57C00)],
+              ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.two_wheeler, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.check_circle, size: 12, color: Color(0xFF10B981)),
+                    SizedBox(width: 4),
+                    Text(
+                      'Biker Mode Active',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF10B981),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Ride Sharing & Status Check',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111827),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: () => widget.onNavigateTab(2),
+            icon: const Icon(Icons.add_circle_outline, size: 15),
+            label: const Text('Offer Ride', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF141416),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRiderPostedRidesSection() {
+    final myPostedRidesAsync = ref.watch(myPostedRidesProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.assignment_outlined, color: Color(0xFFE65100), size: 18),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'My Shared Rides & Status',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: Color(0xFF141416),
+                    ),
+                  ),
+                ],
+              ),
+              InkWell(
+                onTap: () => widget.onNavigateTab(1),
+                child: const Text(
+                  'Manage All',
+                  style: TextStyle(
+                    color: Color(0xFFE65100),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        myPostedRidesAsync.when(
+          data: (rides) {
+            if (rides.isEmpty) {
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFF0F0F2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.two_wheeler, color: Color(0xFF8E8E93), size: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'No Rides Shared Yet',
+                            style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF1F2937)),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Share an empty bike seat on your way to campus and check passenger statuses here.',
+                            style: TextStyle(fontSize: 11.5, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: Column(
+                children: rides.take(3).map((ride) => _buildRiderRideStatusItem(ride)).toList(),
+              ),
+            );
+          },
+          loading: () => const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Center(child: CircularProgressIndicator(color: Color(0xFFE65100))),
+          ),
+          error: (err, _) => Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text('Unable to load shared rides: $err', style: AppTypography.bodyMd),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
+  }
+
+  Widget _buildRiderRideStatusItem(RideModel ride) {
+    final isCompleted = ride.status == RideStatus.completed;
+    final isActive = ride.status == RideStatus.active;
+    final isCancelled = ride.status == RideStatus.cancelled;
+
+    Color statusColor;
+    String statusText;
+    if (isCompleted) {
+      statusColor = const Color(0xFF64748B);
+      statusText = 'COMPLETED';
+    } else if (isActive) {
+      statusColor = const Color(0xFF0284C7);
+      statusText = 'TRIP ON THE WAY';
+    } else if (isCancelled) {
+      statusColor = const Color(0xFFDC2626);
+      statusText = 'CANCELLED';
+    } else {
+      statusColor = ride.availableSeats < ride.totalSeats ? const Color(0xFFD97706) : const Color(0xFF059669);
+      statusText = ride.availableSeats < ride.totalSeats ? 'PASSENGER BOOKED' : 'WAITING FOR RIDERS';
+    }
+
+    final formattedTime = '${ride.departureTime.hour.toString().padLeft(2, '0')}:${ride.departureTime.minute.toString().padLeft(2, '0')}';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x06000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              Text(
+                '৳${ride.farePerSeat.toInt()} / seat',
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFFE65100),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.navigation, size: 14, color: Color(0xFF10B981)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '${ride.originName} ➔ ${ride.destinationName}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1F2937)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.access_time, size: 13, color: Color(0xFF6B7280)),
+              const SizedBox(width: 4),
+              Text(
+                'Leaving at $formattedTime',
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(width: 10),
+              const Icon(Icons.event_seat, size: 13, color: Color(0xFF6B7280)),
+              const SizedBox(width: 4),
+              Text(
+                '${ride.totalSeats - ride.availableSeats}/${ride.totalSeats} seats booked',
+                style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => RideDetailsTrackingScreen(rideId: ride.id),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.remove_red_eye_outlined, size: 14),
+                  label: const Text('Check Status & Tracking', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF1F2937),
+                    side: const BorderSide(color: Color(0xFFD1D5DB)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

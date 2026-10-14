@@ -9,6 +9,7 @@ import 'package:diu_ride/features/chat/presentation/screens/chat_screen.dart';
 import 'package:diu_ride/features/rides/data/models/ride_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 import 'package:diu_ride/features/rides/presentation/widgets/post_expiry_extension_dialog.dart';
+import 'package:diu_ride/core/providers/app_mode_provider.dart';
 
 class MyRidesActivityView extends ConsumerStatefulWidget {
   final VoidCallback onOfferRide;
@@ -27,18 +28,76 @@ class _MyRidesActivityViewState extends ConsumerState<MyRidesActivityView> {
 
   @override
   Widget build(BuildContext context) {
+    final appMode = ref.watch(appModeProvider);
+    final effectiveSegment = appMode.isRider
+        ? 0
+        : (appMode.isPassenger ? 1 : _activeSegment);
+
     return Column(
       children: [
-        // Top Sub-segment switcher: Posted as Driver vs Booked as Passenger
-        Container(
-          margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF1F5F9),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-          ),
-          child: Row(
+        if (appMode.isRider)
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFFFCC80)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.two_wheeler, color: Color(0xFFE65100), size: 18),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Biker Ride Sharing Status & Booking Management',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFE65100),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else if (appMode.isPassenger)
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F5E9),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFA5D6A7)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.bookmark_outline, color: Color(0xFF2E7D32), size: 18),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'My Booked Passenger Commutes',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF2E7D32),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          // Top Sub-segment switcher: Posted as Driver vs Booked as Passenger
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
             children: [
               Expanded(
                 child: GestureDetector(
@@ -134,7 +193,7 @@ class _MyRidesActivityViewState extends ConsumerState<MyRidesActivityView> {
               ref.invalidate(myBookingsProvider);
               ref.invalidate(allSystemRidesProvider);
             },
-            child: _activeSegment == 0
+            child: effectiveSegment == 0
                 ? _buildPostedRidesList()
                 : _buildBookedRidesList(),
           ),

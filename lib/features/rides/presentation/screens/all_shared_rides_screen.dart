@@ -88,6 +88,14 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
   @override
   Widget build(BuildContext context) {
     final allRidesAsync = ref.watch(allAvailableRidesProvider);
+    final appMode = ref.watch(appModeProvider);
+
+    // In Rider mode: only Ride Sharing Status (1) & Student Requests (2)
+    // In Passenger mode: only Find Rides (0) & My Bookings (1)
+    // In All mode: Find Rides (0), My Rides & Status (1), Requests (2)
+    final effectiveMode = appMode.isRider
+        ? (_selectedMode == 2 ? 2 : 1)
+        : (appMode.isPassenger ? (_selectedMode == 1 ? 1 : 0) : _selectedMode);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -117,7 +125,9 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'All Shared Moto Rides',
+                            appMode.isRider
+                                ? 'Biker Hub & Ride Status'
+                                : (appMode.isPassenger ? 'Find DIU Peer Bikes' : 'All Shared Moto Rides'),
                             style: AppTypography.headlineSm.copyWith(
                               fontWeight: FontWeight.w800,
                               color: const Color(0xFF1C1C1E),
@@ -125,30 +135,32 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Verified peer bikes commuting across Dhaka',
+                            appMode.isRider
+                                ? 'Check ride sharing status & manage passenger bookings'
+                                : 'Verified peer bikes commuting across Dhaka',
                             style: AppTypography.labelSm.copyWith(
                               color: const Color(0xFF8E8E93),
                             ),
                           ),
                         ],
                       ),
-                      // Bikes Only Pill
+                      // Mode Pill
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
+                          color: appMode.isRider ? const Color(0xFFFFF3E0) : const Color(0xFFE8F5E9),
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.two_wheeler, size: 14, color: Color(0xFF2E7D32)),
-                            SizedBox(width: 4),
+                            Icon(Icons.two_wheeler, size: 14, color: appMode.isRider ? const Color(0xFFE65100) : const Color(0xFF2E7D32)),
+                            const SizedBox(width: 4),
                             Text(
-                              'Bikes Only',
+                              appMode.isRider ? 'Biker Mode' : 'Bikes Only',
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF2E7D32),
+                                color: appMode.isRider ? const Color(0xFFE65100) : const Color(0xFF2E7D32),
                               ),
                             ),
                           ],
@@ -158,7 +170,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Sub-tab switcher: Find Rides vs My Rides & Status vs Student Requests
+                  // Sub-tab switcher: Mode-aware (Rider has ONLY Ride Sharing Status & Student Requests)
                   Container(
                     margin: const EdgeInsets.only(bottom: 12),
                     padding: const EdgeInsets.all(3),
@@ -168,146 +180,243 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                     ),
                     child: Row(
                       children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => _selectedMode = 0),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: _selectedMode == 0 ? Colors.white : Colors.transparent,
-                                borderRadius: BorderRadius.circular(11),
-                                boxShadow: _selectedMode == 0
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.06),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 1),
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              alignment: Alignment.center,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.two_wheeler,
-                                    size: 15,
-                                    color: _selectedMode == 0
-                                        ? const Color(0xFFE65100)
-                                        : const Color(0xFF8E8E93),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Find Rides',
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: _selectedMode == 0 ? FontWeight.bold : FontWeight.w600,
-                                      color: _selectedMode == 0
-                                          ? const Color(0xFF141416)
+                        if (appMode.isRider) ...[
+                          // 1. Ride Sharing Status (Biker posted rides & passengers)
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _selectedMode = 1),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: effectiveMode == 1 ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(11),
+                                  boxShadow: effectiveMode == 1
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.06),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 1),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.assignment_outlined,
+                                      size: 15,
+                                      color: effectiveMode == 1
+                                          ? const Color(0xFFE65100)
                                           : const Color(0xFF8E8E93),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Ride Sharing Status',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: effectiveMode == 1 ? FontWeight.bold : FontWeight.w600,
+                                        color: effectiveMode == 1
+                                            ? const Color(0xFF141416)
+                                            : const Color(0xFF8E8E93),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => _selectedMode = 1),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: _selectedMode == 1 ? Colors.white : Colors.transparent,
-                                borderRadius: BorderRadius.circular(11),
-                                boxShadow: _selectedMode == 1
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.06),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 1),
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              alignment: Alignment.center,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.assignment_outlined,
-                                    size: 15,
-                                    color: _selectedMode == 1
-                                        ? const Color(0xFFE65100)
-                                        : const Color(0xFF8E8E93),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'My Rides & Status',
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: _selectedMode == 1 ? FontWeight.bold : FontWeight.w600,
-                                      color: _selectedMode == 1
-                                          ? const Color(0xFF141416)
+                          // 2. Student Pickup Requests
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _selectedMode = 2),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: effectiveMode == 2 ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(11),
+                                  boxShadow: effectiveMode == 2
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.06),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 1),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.hail,
+                                      size: 15,
+                                      color: effectiveMode == 2
+                                          ? const Color(0xFFE65100)
                                           : const Color(0xFF8E8E93),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Student Requests',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: effectiveMode == 2 ? FontWeight.bold : FontWeight.w600,
+                                        color: effectiveMode == 2
+                                            ? const Color(0xFF141416)
+                                            : const Color(0xFF8E8E93),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => setState(() => _selectedMode = 2),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              decoration: BoxDecoration(
-                                color: _selectedMode == 2 ? Colors.white : Colors.transparent,
-                                borderRadius: BorderRadius.circular(11),
-                                boxShadow: _selectedMode == 2
-                                    ? [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.06),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 1),
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              alignment: Alignment.center,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.hail,
-                                    size: 15,
-                                    color: _selectedMode == 2
-                                        ? const Color(0xFFE65100)
-                                        : const Color(0xFF8E8E93),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Requests',
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: _selectedMode == 2 ? FontWeight.bold : FontWeight.w600,
-                                      color: _selectedMode == 2
-                                          ? const Color(0xFF141416)
+                        ] else ...[
+                          // Passenger and All Mode Tabs
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _selectedMode = 0),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: effectiveMode == 0 ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(11),
+                                  boxShadow: effectiveMode == 0
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.06),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 1),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.two_wheeler,
+                                      size: 15,
+                                      color: effectiveMode == 0
+                                          ? const Color(0xFFE65100)
                                           : const Color(0xFF8E8E93),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Find Rides',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: effectiveMode == 0 ? FontWeight.bold : FontWeight.w600,
+                                        color: effectiveMode == 0
+                                            ? const Color(0xFF141416)
+                                            : const Color(0xFF8E8E93),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _selectedMode = 1),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: effectiveMode == 1 ? Colors.white : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(11),
+                                  boxShadow: effectiveMode == 1
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.06),
+                                            blurRadius: 4,
+                                            offset: const Offset(0, 1),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.assignment_outlined,
+                                      size: 15,
+                                      color: effectiveMode == 1
+                                          ? const Color(0xFFE65100)
+                                          : const Color(0xFF8E8E93),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      appMode.isPassenger ? 'My Bookings' : 'My Rides & Status',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: effectiveMode == 1 ? FontWeight.bold : FontWeight.w600,
+                                        color: effectiveMode == 1
+                                            ? const Color(0xFF141416)
+                                            : const Color(0xFF8E8E93),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (appMode.isAll)
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() => _selectedMode = 2),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: effectiveMode == 2 ? Colors.white : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(11),
+                                    boxShadow: effectiveMode == 2
+                                        ? [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.06),
+                                              blurRadius: 4,
+                                              offset: const Offset(0, 1),
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.hail,
+                                        size: 15,
+                                        color: effectiveMode == 2
+                                            ? const Color(0xFFE65100)
+                                            : const Color(0xFF8E8E93),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Requests',
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: effectiveMode == 2 ? FontWeight.bold : FontWeight.w600,
+                                          color: effectiveMode == 2
+                                              ? const Color(0xFF141416)
+                                              : const Color(0xFF8E8E93),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ],
                     ),
                   ),
 
-                  if (_selectedMode != 1) ...[
+                  if (effectiveMode != 1) ...[
 
                   // Search input
                   Container(
@@ -442,7 +551,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
 
             // 2. Rides List or My Rides & Status or Student Requests
             Expanded(
-              child: _selectedMode == 1
+              child: effectiveMode == 1
                   ? MyRidesActivityView(
                       onOfferRide: () {
                         Navigator.of(context).push(
@@ -457,7 +566,7 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                         );
                       },
                     )
-                  : _selectedMode == 2
+                  : effectiveMode == 2
                       ? _buildStudentRequestsView()
                       : allRidesAsync.when(
                       data: (rides) {

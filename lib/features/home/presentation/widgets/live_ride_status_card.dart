@@ -9,6 +9,7 @@ import 'package:diu_ride/features/rides/presentation/providers/rides_provider.da
 import 'package:diu_ride/features/tracking/presentation/screens/ride_details_tracking_screen.dart';
 import 'package:diu_ride/features/chat/presentation/screens/chat_screen.dart';
 import 'package:diu_ride/core/utils/direct_call_service.dart';
+import 'package:diu_ride/core/providers/app_mode_provider.dart';
 
 /// LiveRideStatusCard
 /// Displays real-time ride and booking status directly on the Home Screen,
@@ -23,23 +24,38 @@ class LiveRideStatusCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final appMode = ref.watch(appModeProvider);
     final bookingsAsync = ref.watch(myBookingsProvider);
     final allRidesAsync = ref.watch(allAvailableRidesProvider);
     final allRides = allRidesAsync.value ?? [];
+    final myPostedRidesAsync = ref.watch(myPostedRidesProvider);
+    final myPostedRides = myPostedRidesAsync.value ?? [];
 
-    // Find active booking for passenger (even if scheduled for later)
-    final activeBooking = bookingsAsync.value?.cast<BookingModel?>().firstWhere(
-          (b) => b?.status == BookingStatus.accepted || b?.status == BookingStatus.requested,
-          orElse: () => null,
-        );
+    // Find active booking for passenger:
+    // In Rider mode, passenger bookings are strictly ignored so biker only sees ride sharing status!
+    final activeBooking = appMode.isRider
+        ? null
+        : bookingsAsync.value?.cast<BookingModel?>().firstWhere(
+              (b) => b?.status == BookingStatus.accepted || b?.status == BookingStatus.requested,
+              orElse: () => null,
+            );
 
     final currentUser = ref.watch(authNotifierProvider).user;
-    final activeOfferedRide = allRides.cast<RideModel?>().firstWhere(
-          (r) => (r?.status == RideStatus.active || r?.status == RideStatus.published) &&
-                 currentUser != null &&
-                 (r?.driverId == currentUser.id || r?.driverId == currentUser.studentId || (currentUser.phone.isNotEmpty && r?.driverPhone == currentUser.phone)),
-          orElse: () => null,
-        );
+
+    // Find active offered ride for biker/driver:
+    // In Passenger mode, driver offered rides are ignored.
+    final activeOfferedRide = appMode.isPassenger
+        ? null
+        : (myPostedRides.cast<RideModel?>().firstWhere(
+              (r) => (r?.status == RideStatus.active || r?.status == RideStatus.published),
+              orElse: () => null,
+            ) ??
+            allRides.cast<RideModel?>().firstWhere(
+              (r) => (r?.status == RideStatus.active || r?.status == RideStatus.published) &&
+                     currentUser != null &&
+                     (r?.driverId == currentUser.id || r?.driverId == currentUser.studentId || (currentUser.phone.isNotEmpty && r?.driverPhone == currentUser.phone)),
+              orElse: () => null,
+            ));
 
     // 1. PASSENGER VIEW: Toplist Confirmed Commute / Requested Seat
     if (activeBooking != null) {
@@ -553,6 +569,127 @@ class LiveRideStatusCard extends ConsumerWidget {
                 ],
               ),
             ],
+          ],
+        ),
+      );
+    }
+
+    // In Rider Mode: Dedicated Ride Sharing Status Check Card when no active trip is running
+    if (appMode.isRider) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE65100).withOpacity(0.35), width: 1.5),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE65100).withOpacity(0.08),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.two_wheeler, size: 14, color: Color(0xFFE65100)),
+                      SizedBox(width: 6),
+                      Text(
+                        'RIDE SHARING STATUS: IDLE',
+                        style: TextStyle(
+                          color: Color(0xFFE65100),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF10B981),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'Biker Ready',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF10B981),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'No active bike ride shared for today yet',
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1F2937),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Post your commute route to take campus peers, earn fuel fare, and track passenger booking statuses right here.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => onNavigateTab(2),
+                    icon: const Icon(Icons.add_circle_outline, size: 16),
+                    label: const Text(
+                      'Offer / Share Bike Ride',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE65100),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                OutlinedButton.icon(
+                  onPressed: () => onNavigateTab(1),
+                  icon: const Icon(Icons.assignment_outlined, size: 15),
+                  label: const Text('Past Rides', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF374151),
+                    side: const BorderSide(color: Color(0xFFD1D5DB)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       );

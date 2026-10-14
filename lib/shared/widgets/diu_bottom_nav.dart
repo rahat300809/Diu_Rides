@@ -58,7 +58,7 @@ class DiuBottomNav extends ConsumerWidget {
                     : Icons.two_wheeler,
                 label: appMode.isPassenger
                     ? 'Find Rides'
-                    : (appMode.isRider ? 'All Rides' : 'All Rides'),
+                    : (appMode.isRider ? 'Ride Status' : 'All Rides'),
               ),
 
               // 2. Center Action (Adapts: Request Ride for Passenger, Offer Ride for Rider/All)
