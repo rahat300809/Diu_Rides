@@ -42,13 +42,21 @@ class BookingConfirmationSheet extends ConsumerStatefulWidget {
 class _BookingConfirmationSheetState
     extends ConsumerState<BookingConfirmationSheet> {
   int _seats = 1;
+  String? _selectedDropoffPoint;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedDropoffPoint = widget.ride.destinationName;
+  }
 
   void _confirmBooking() async {
     final total = widget.ride.farePerSeat * _seats;
+    final dropoff = _selectedDropoffPoint ?? widget.ride.destinationName;
     final success = await ref.read(bookingNotifierProvider.notifier).bookSeat(
           rideId: widget.ride.id,
           pickupPoint: widget.ride.originName,
-          dropoffPoint: widget.ride.destinationName,
+          dropoffPoint: dropoff,
           seatsBooked: _seats,
           totalFare: total,
           ride: widget.ride, // pass ride so driver name is in notification
@@ -221,8 +229,50 @@ class _BookingConfirmationSheetState
                 _buildRouteRow(
                   icon: Icons.location_on,
                   color: AppColors.error,
-                  text: widget.ride.destinationName,
+                  text: _selectedDropoffPoint ?? widget.ride.destinationName,
                 ),
+                if (widget.ride.destinationChoices.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  const Divider(height: 1),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Choose Your Specific Destination Stop:',
+                      style: AppTypography.labelSm.copyWith(
+                        color: AppColors.secondary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: {
+                        widget.ride.destinationName,
+                        ...widget.ride.destinationChoices,
+                      }.map((choice) {
+                        final isSelected = (_selectedDropoffPoint ?? widget.ride.destinationName) == choice;
+                        return ChoiceChip(
+                          label: Text(choice),
+                          selected: isSelected,
+                          onSelected: (_) {
+                            setState(() => _selectedDropoffPoint = choice);
+                          },
+                          selectedColor: AppColors.primaryContainer,
+                          labelStyle: TextStyle(
+                            fontSize: 12,
+                            color: isSelected ? AppColors.onPrimaryContainer : AppColors.onSurface,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

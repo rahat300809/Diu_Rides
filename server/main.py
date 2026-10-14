@@ -3,9 +3,9 @@ import json
 import sqlite3
 import asyncio
 import csv
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
@@ -125,9 +125,22 @@ def init_db():
         ("cancel_reason", "TEXT"),
         ("passenger_id", "TEXT"),
         ("passenger_name", "TEXT"),
+        ("destination_choices", "TEXT"),
+        ("extension_prompted", "INTEGER DEFAULT 0"),
+        ("extended_at", "TEXT"),
     ]:
         try:
             cursor.execute(f"ALTER TABLE rides ADD COLUMN {col} {c_type}")
+        except Exception:
+            pass
+
+    for col, c_type in [
+        ("destination_choices", "TEXT"),
+        ("extension_prompted", "INTEGER DEFAULT 0"),
+        ("extended_at", "TEXT"),
+    ]:
+        try:
+            cursor.execute(f"ALTER TABLE passenger_requests ADD COLUMN {col} {c_type}")
         except Exception:
             pass
 
@@ -337,6 +350,143 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+async def check_and_cleanup_expired_scheduled_posts(conn=None):
+    close_at_end = False
+    if conn is None:
+        conn = get_db()
+        close_at_end = True
+    cursor = conn.cursor()
+    # Use local time (datetime.now()) because departure_time/requested_time is stored
+    # in local Bangladesh time (UTC+6) without timezone offset from the Flutter client.
+    now_local = datetime.now()
+    
+    deleted_rides = []
+    prompt_rides = []
+    
+    # 1. Rides: check published rides
+    try:
+        cursor.execute("""
+            SELECT id, driver_id, driver_phone, origin_name, destination_name, 
+                   departure_time, created_at, status, extension_prompted
+            FROM rides 
+            WHERE status = 'published'
+        """)
+        rides = cursor.fetchall()
+        for r in rides:
+            dep_str = r["departure_time"]
+            dep_dt = None
+            try:
+                # Strip timezone info and treat as local time
+                dep_dt = datetime.fromisoformat(dep_str.replace("Z", "")).replace(tzinfo=None)
+            except Exception:
+                try:
+                    dep_dt = datetime.strptime(dep_str, "%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    pass
+            
+            if dep_dt:
+                diff_minutes = (now_local - dep_dt).total_seconds() / 60.0
+                if diff_minutes >= 30:
+                    cursor.execute("DELETE FROM rides WHERE id = ?", (r["id"],))
+                    cursor.execute("DELETE FROM bookings WHERE ride_id = ?", (r["id"],))
+                    deleted_rides.append(r["id"])
+                elif diff_minutes >= 0:
+                    prompt_flag = r["extension_prompted"] if "extension_prompted" in r.keys() else 0
+                    if not prompt_flag:
+                        cursor.execute("UPDATE rides SET extension_prompted = 1 WHERE id = ?", (r["id"],))
+                        remaining = max(1, int(30 - diff_minutes))
+                        prompt_rides.append({
+                            "id": r["id"],
+                            "type": "ride",
+                            "ownerId": r["driver_id"],
+                            "ownerPhone": r["driver_phone"] or "",
+                            "origin": r["origin_name"],
+                            "destination": r["destination_name"],
+                            "scheduledTime": dep_str,
+                            "graceMinutesLeft": remaining,
+                        })
+    except Exception as e:
+        print(f"[Cleanup Error Rides] {e}")
+
+    # 2. Passenger Requests: check open requests
+    deleted_reqs = []
+    prompt_reqs = []
+    try:
+        cursor.execute("""
+            SELECT id, passenger_id, passenger_phone, pickup, dropoff, 
+                   requested_time, created_at, status, extension_prompted 
+            FROM passenger_requests 
+            WHERE status = 'open'
+        """)
+        requests = cursor.fetchall()
+        for req in requests:
+            req_str = req["requested_time"]
+            req_dt = None
+            try:
+                req_dt = datetime.fromisoformat(req_str.replace("Z", "")).replace(tzinfo=None)
+            except Exception:
+                try:
+                    req_dt = datetime.strptime(req_str, "%Y-%m-%d %H:%M:%S")
+                except Exception:
+                    try:
+                        c_str = req["created_at"]
+                        req_dt = datetime.fromisoformat(c_str.replace("Z", "")).replace(tzinfo=None)
+                    except Exception:
+                        pass
+            
+            if req_dt:
+                diff_minutes = (now_local - req_dt).total_seconds() / 60.0
+                if diff_minutes >= 30:
+                    cursor.execute("DELETE FROM passenger_requests WHERE id = ?", (req["id"],))
+                    deleted_reqs.append(req["id"])
+                elif diff_minutes >= 0:
+                    prompt_flag = req["extension_prompted"] if "extension_prompted" in req.keys() else 0
+                    if not prompt_flag:
+                        cursor.execute("UPDATE passenger_requests SET extension_prompted = 1 WHERE id = ?", (req["id"],))
+                        remaining = max(1, int(30 - diff_minutes))
+                        prompt_reqs.append({
+                            "id": req["id"],
+                            "type": "passenger_request",
+                            "ownerId": req["passenger_id"],
+                            "ownerPhone": req["passenger_phone"] or "",
+                            "origin": req["pickup"],
+                            "destination": req["dropoff"],
+                            "scheduledTime": req_str,
+                            "graceMinutesLeft": remaining,
+                        })
+    except Exception as e:
+        print(f"[Cleanup Error Requests] {e}")
+
+    conn.commit()
+    if close_at_end:
+        conn.close()
+
+    for r_id in deleted_rides:
+        await manager.broadcast("ride_deleted", {"id": r_id, "reason": "expired_unextended"})
+    for req_id in deleted_reqs:
+        await manager.broadcast("passenger_request_deleted", {"id": req_id, "reason": "expired_unextended"})
+    for p in prompt_rides:
+        await manager.broadcast("schedule_time_expired_needs_extension", p)
+    for p in prompt_reqs:
+        await manager.broadcast("schedule_time_expired_needs_extension", p)
+
+    return deleted_rides, deleted_reqs
+
+async def periodic_expiry_cleanup_task():
+    while True:
+        try:
+            conn = get_db()
+            await check_and_cleanup_expired_scheduled_posts(conn)
+            conn.close()
+        except Exception:
+            pass
+        await asyncio.sleep(25)
+
+@app.on_event("startup")
+async def startup_event():
+    init_db()
+    asyncio.create_task(periodic_expiry_cleanup_task())
+
 from admin_portal import admin_router, set_ws_manager, ADMIN_HTML
 set_ws_manager(manager)
 app.include_router(admin_router)
@@ -416,6 +566,14 @@ def map_ride(row) -> Dict[str, Any]:
         "cancelReason": row["cancel_reason"] if ("cancel_reason" in row.keys()) else None,
         "passengerId": row["passenger_id"] if ("passenger_id" in row.keys()) else None,
         "passengerName": row["passenger_name"] if ("passenger_name" in row.keys()) else None,
+        "createdAt": row["created_at"] if "created_at" in row.keys() else None,
+        "destinationChoices": (
+            json.loads(row["destination_choices"]) if ("destination_choices" in row.keys() and row["destination_choices"])
+            else []
+        ) if ("destination_choices" in row.keys() and isinstance(row["destination_choices"], str) and str(row["destination_choices"]).startswith("["))
+        else ([c.strip() for c in row["destination_choices"].split(",") if c.strip()] if ("destination_choices" in row.keys() and row["destination_choices"]) else []),
+        "extensionPrompted": bool(row["extension_prompted"]) if "extension_prompted" in row.keys() else False,
+        "extendedAt": row["extended_at"] if "extended_at" in row.keys() else None,
     }
 
 def map_booking(row) -> Dict[str, Any]:
@@ -474,6 +632,13 @@ def map_passenger_request(row) -> Dict[str, Any]:
         "acceptedByDriverPhone": row["accepted_by_driver_phone"],
         "acceptedByDriverBike": row["accepted_by_driver_bike"],
         "createdAt": row["created_at"],
+        "destinationChoices": (
+            json.loads(row["destination_choices"]) if ("destination_choices" in row.keys() and row["destination_choices"])
+            else []
+        ) if ("destination_choices" in row.keys() and isinstance(row["destination_choices"], str) and str(row["destination_choices"]).startswith("["))
+        else ([c.strip() for c in row["destination_choices"].split(",") if c.strip()] if ("destination_choices" in row.keys() and row["destination_choices"]) else []),
+        "extensionPrompted": bool(row["extension_prompted"]) if "extension_prompted" in row.keys() else False,
+        "extendedAt": row["extended_at"] if "extended_at" in row.keys() else None,
     }
 
 def map_completed_ride(row) -> Dict[str, Any]:
@@ -1497,7 +1662,7 @@ async def stop_alert_ring(payload: Dict[str, Any]):
 
 @app.get("/ride/api/rides")
 @app.get("/api/rides")
-def get_rides(
+async def get_rides(
     status: Optional[str] = None,
     pickup: Optional[str] = None,
     dropoff: Optional[str] = None,
@@ -1508,6 +1673,11 @@ def get_rides(
     exclude_user_id: Optional[str] = None,
     exclude_phone: Optional[str] = None,
 ):
+    try:
+        await check_and_cleanup_expired_scheduled_posts()
+    except Exception:
+        pass
+
     conn = get_db()
     cursor = conn.cursor()
     sql = "SELECT * FROM rides WHERE 1=1"
@@ -1546,23 +1716,23 @@ def get_rides(
                 OR LOWER(origin_name) LIKE ? OR LOWER(origin_subtitle) LIKE ? 
                 OR LOWER(route_corridor) LIKE ? OR LOWER(waypoint_name) LIKE ?
                 OR LOWER(driver_name) LIKE ? OR LOWER(origin_name) LIKE ?
-                OR LOWER(destination_name) LIKE ?
+                OR LOWER(destination_name) LIKE ? OR LOWER(destination_choices) LIKE ?
             )"""
-            params.extend([q_val, q_val, q_val, q_val, q_val, q_val, q_val, ab4_val, ab4_val])
+            params.extend([q_val, q_val, q_val, q_val, q_val, q_val, q_val, ab4_val, ab4_val, q_val])
         else:
             sql += """ AND (
                 LOWER(destination_name) LIKE ? OR LOWER(destination_subtitle) LIKE ? 
                 OR LOWER(origin_name) LIKE ? OR LOWER(origin_subtitle) LIKE ? 
                 OR LOWER(route_corridor) LIKE ? OR LOWER(waypoint_name) LIKE ?
-                OR LOWER(driver_name) LIKE ?
+                OR LOWER(driver_name) LIKE ? OR LOWER(destination_choices) LIKE ?
             )"""
-            params.extend([q_val, q_val, q_val, q_val, q_val, q_val, q_val])
+            params.extend([q_val, q_val, q_val, q_val, q_val, q_val, q_val, q_val])
     else:
         target_dest = (destination or dropoff or "").strip()
         if target_dest:
             d_val = f"%{target_dest.lower()}%"
-            sql += " AND (LOWER(destination_name) LIKE ? OR LOWER(destination_subtitle) LIKE ? OR LOWER(route_corridor) LIKE ?)"
-            params.extend([d_val, d_val, d_val])
+            sql += " AND (LOWER(destination_name) LIKE ? OR LOWER(destination_subtitle) LIKE ? OR LOWER(route_corridor) LIKE ? OR LOWER(destination_choices) LIKE ?)"
+            params.extend([d_val, d_val, d_val, d_val])
 
         if pickup and pickup.strip():
             p_val = f"%{pickup.strip().lower()}%"
@@ -1587,6 +1757,14 @@ async def create_ride(ride_data: Dict[str, Any]):
     ride_id = ride_data.get("id") or f"ride_{int(datetime.utcnow().timestamp()*1000)}"
     vehicle = ride_data.get("vehicle", {})
 
+    dest_choices = ride_data.get("destinationChoices") or []
+    if isinstance(dest_choices, list):
+        dest_choices_str = json.dumps(dest_choices)
+    elif isinstance(dest_choices, str):
+        dest_choices_str = dest_choices
+    else:
+        dest_choices_str = "[]"
+
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
@@ -1596,8 +1774,8 @@ async def create_ride(ride_data: Dict[str, Any]):
         destination_name, destination_subtitle, destination_lat, destination_lng,
         waypoint_name, departure_time, fare_per_seat, total_seats, available_seats, is_female_only,
         status, vehicle_model, vehicle_type, vehicle_plate, vehicle_color,
-        route_corridor, distance_km, duration_minutes, created_at
-    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        route_corridor, distance_km, duration_minutes, destination_choices, created_at
+    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     """, (
         ride_id,
         ride_data.get("driverId", "drv_usr"),
@@ -1629,6 +1807,7 @@ async def create_ride(ride_data: Dict[str, Any]):
         ride_data.get("routeCorridor", "Campus Highway Corridor"),
         float(ride_data.get("distanceKm", 14.0)),
         int(ride_data.get("durationMinutes", 30)),
+        dest_choices_str,
         datetime.utcnow().isoformat(),
     ))
     conn.commit()
@@ -1638,9 +1817,50 @@ async def create_ride(ride_data: Dict[str, Any]):
     conn.close()
 
     created = map_ride(row)
-    # Broadcast to ALL connected mobile & web clients!
     await manager.broadcast("ride_created", created)
     return created
+
+@app.post("/ride/api/rides/{ride_id}/extend-time")
+@app.post("/api/rides/{ride_id}/extend-time")
+async def extend_ride_departure_time(ride_id: str, payload: Dict[str, Any] = Body(...)):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM rides WHERE id = ?", (ride_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Ride not found")
+    
+    minutes = int(payload.get("minutes", 30))
+    new_departure_time = payload.get("newDepartureTime")
+    if not new_departure_time:
+        try:
+            cur_dt = datetime.fromisoformat(row["departure_time"].replace("Z", "+00:00")).replace(tzinfo=None)
+            base_dt = max(datetime.utcnow(), cur_dt)
+        except Exception:
+            base_dt = datetime.utcnow()
+        new_dt = base_dt + timedelta(minutes=minutes)
+        new_departure_time = new_dt.isoformat()
+    
+    now_iso = datetime.utcnow().isoformat()
+    cursor.execute("""
+        UPDATE rides 
+        SET departure_time = ?, extended_at = ?, extension_prompted = 0, status = 'published'
+        WHERE id = ?
+    """, (new_departure_time, now_iso, ride_id))
+    conn.commit()
+    cursor.execute("SELECT * FROM rides WHERE id = ?", (ride_id,))
+    updated_row = cursor.fetchone()
+    conn.close()
+
+    updated = map_ride(updated_row)
+    await manager.broadcast("ride_updated", updated)
+    await manager.broadcast("ride_time_extended", {
+        "id": ride_id,
+        "departureTime": new_departure_time,
+        "minutes": minutes
+    })
+    return {"status": "success", "ride": updated, "newDepartureTime": new_departure_time}
 
 @app.get("/ride/api/rides/{ride_id}")
 @app.get("/api/rides/{ride_id}")
@@ -1985,11 +2205,18 @@ class PassengerRequestPayload(BaseModel):
 
 @app.get("/ride/api/passenger-requests")
 @app.get("/api/passenger-requests")
-def get_passenger_requests(
+async def get_passenger_requests(
     status: Optional[str] = "open",
+    query: Optional[str] = None,
+    location: Optional[str] = None,
     exclude_user_id: Optional[str] = None,
     exclude_phone: Optional[str] = None,
 ):
+    try:
+        await check_and_cleanup_expired_scheduled_posts()
+    except Exception:
+        pass
+
     conn = get_db()
     cursor = conn.cursor()
     sql = "SELECT * FROM passenger_requests WHERE 1=1"
@@ -1998,6 +2225,20 @@ def get_passenger_requests(
     if status and status.lower() != "all":
         sql += " AND status = ?"
         params.append(status)
+
+    if query and query.strip():
+        q_val = f"%{query.strip().lower()}%"
+        sql += """ AND (
+            LOWER(pickup) LIKE ? OR LOWER(dropoff) LIKE ? 
+            OR LOWER(passenger_name) LIKE ? OR LOWER(passenger_dept) LIKE ? 
+            OR LOWER(notes) LIKE ?
+        )"""
+        params.extend([q_val, q_val, q_val, q_val, q_val])
+
+    if location and location.strip() and location.strip().lower() != "all":
+        loc_val = f"%{location.strip().lower()}%"
+        sql += " AND (LOWER(pickup) LIKE ? OR LOWER(dropoff) LIKE ?)"
+        params.extend([loc_val, loc_val])
 
     if exclude_user_id:
         sql += " AND (passenger_id != ? AND passenger_id NOT LIKE ?)"
@@ -2018,6 +2259,48 @@ def get_passenger_requests(
     rows = cursor.fetchall()
     conn.close()
     return [map_passenger_request(r) for r in rows]
+
+@app.post("/ride/api/passenger-requests/{request_id}/extend-time")
+@app.post("/api/passenger-requests/{request_id}/extend-time")
+async def extend_passenger_request_time(request_id: str, payload: Dict[str, Any] = Body(...)):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM passenger_requests WHERE id = ?", (request_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Passenger request not found")
+    
+    minutes = int(payload.get("minutes", 30))
+    new_requested_time = payload.get("newRequestedTime")
+    if not new_requested_time:
+        try:
+            cur_dt = datetime.fromisoformat(row["requested_time"].replace("Z", "+00:00")).replace(tzinfo=None)
+            base_dt = max(datetime.utcnow(), cur_dt)
+        except Exception:
+            base_dt = datetime.utcnow()
+        new_dt = base_dt + timedelta(minutes=minutes)
+        new_requested_time = new_dt.isoformat()
+    
+    now_iso = datetime.utcnow().isoformat()
+    cursor.execute("""
+        UPDATE passenger_requests 
+        SET requested_time = ?, extended_at = ?, extension_prompted = 0, status = 'open'
+        WHERE id = ?
+    """, (new_requested_time, now_iso, request_id))
+    conn.commit()
+    cursor.execute("SELECT * FROM passenger_requests WHERE id = ?", (request_id,))
+    updated_row = cursor.fetchone()
+    conn.close()
+
+    updated = map_passenger_request(updated_row)
+    await manager.broadcast("passenger_request_updated", updated)
+    await manager.broadcast("passenger_request_extended", {
+        "id": request_id,
+        "requestedTime": new_requested_time,
+        "minutes": minutes
+    })
+    return {"status": "success", "request": updated, "newRequestedTime": new_requested_time}
 
 @app.post("/ride/api/passenger-requests")
 @app.post("/api/passenger-requests")
@@ -2382,13 +2665,28 @@ async def accept_booking(booking_id: str):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("UPDATE bookings SET status = 'accepted' WHERE id = ?", (booking_id,))
+    # Confirm the ride destination on that location where the passenger requested
+    cursor.execute("""
+        UPDATE rides 
+        SET destination_name = COALESCE((SELECT dropoff_point FROM bookings WHERE id = ?), destination_name),
+            passenger_id = (SELECT passenger_id FROM bookings WHERE id = ?),
+            passenger_name = (SELECT passenger_name FROM bookings WHERE id = ?)
+        WHERE id = (SELECT ride_id FROM bookings WHERE id = ?)
+    """, (booking_id, booking_id, booking_id, booking_id))
     cursor.execute("""
         SELECT b.*, r.driver_id, r.driver_name, r.origin_name, r.destination_name
         FROM bookings b LEFT JOIN rides r ON b.ride_id = r.id WHERE b.id = ?
     """, (booking_id,))
     row = cursor.fetchone()
+    ride_id = row["ride_id"] if row else None
+    ride_row = None
+    if ride_id:
+        cursor.execute("SELECT * FROM rides WHERE id = ?", (ride_id,))
+        ride_row = cursor.fetchone()
     conn.commit()
     conn.close()
+    if ride_row:
+        await manager.broadcast("ride_updated", map_ride(ride_row))
     if row:
         updated = map_booking(row)
         await manager.broadcast("booking_status_updated", updated)
@@ -2834,6 +3132,8 @@ def get_ride_session_status(ride_id: str):
 # =====================================================================
 
 def _fetch_messages(target_ride_id: Optional[str]):
+    """Fetch messages strictly for the given ride_id only.
+    No cross-ride joining — each conversation is isolated."""
     conn = get_db()
     cursor = conn.cursor()
     if not target_ride_id:
@@ -2842,52 +3142,12 @@ def _fetch_messages(target_ride_id: Optional[str]):
         conn.close()
         return [map_message(m) for m in rows]
 
-    if target_ride_id in ("campus_community", "support_campus", "ride_general"):
-        cursor.execute("SELECT * FROM messages WHERE ride_id = ? ORDER BY timestamp ASC", (target_ride_id,))
-        rows = cursor.fetchall()
-        conn.close()
-        return [map_message(m) for m in rows]
-
-    cursor.execute("SELECT * FROM rides WHERE id = ?", (target_ride_id,))
-    ride_row = cursor.fetchone()
-
-    cursor.execute("SELECT * FROM bookings WHERE ride_id = ?", (target_ride_id,))
-    bookings = cursor.fetchall()
-
-    shared_ride_ids = {target_ride_id}
-    if ride_row:
-        d_id = str(ride_row["driver_id"] or "")
-        d_ph = str(ride_row["driver_phone"] or "") if "driver_phone" in ride_row.keys() else ""
-        
-        # Collect peer IDs associated with this ride
-        p_ids = [str(b["passenger_id"]) for b in bookings if b["passenger_id"]]
-        
-        cursor.execute("SELECT DISTINCT sender_id FROM messages WHERE ride_id = ? AND sender_id != ? AND sender_id != 'system'", (target_ride_id, d_id))
-        msg_senders = [str(r["sender_id"]) for r in cursor.fetchall() if r["sender_id"]]
-        p_ids.extend(msg_senders)
-
-        # For regular commuters: Find all rides shared between this driver and passenger(s)
-        for pid in set(p_ids):
-            cursor.execute("""
-                SELECT DISTINCT r.id as rid FROM rides r
-                JOIN bookings b ON b.ride_id = r.id
-                WHERE (r.driver_id = ? OR (r.driver_phone IS NOT NULL AND r.driver_phone = ?))
-                  AND (b.passenger_id = ? OR (b.passenger_phone IS NOT NULL AND b.passenger_phone = ?))
-            """, (d_id, d_ph, pid, pid))
-            for r in cursor.fetchall():
-                if r["rid"]: shared_ride_ids.add(r["rid"])
-            
-            cursor.execute("""
-                SELECT DISTINCT m1.ride_id as rid FROM messages m1
-                JOIN messages m2 ON m1.ride_id = m2.ride_id
-                WHERE m1.sender_id = ? AND m2.sender_id = ?
-            """, (d_id, pid))
-            for r in cursor.fetchall():
-                if r["rid"]: shared_ride_ids.add(r["rid"])
-
-    id_list = list(shared_ride_ids)
-    placeholders = ",".join(["?"] * len(id_list))
-    cursor.execute(f"SELECT * FROM messages WHERE ride_id IN ({placeholders}) ORDER BY timestamp ASC", id_list)
+    # Always fetch only messages belonging to this exact ride_id.
+    # This prevents messages bleeding between different ride conversations.
+    cursor.execute(
+        "SELECT * FROM messages WHERE ride_id = ? ORDER BY timestamp ASC",
+        (target_ride_id,)
+    )
     rows = cursor.fetchall()
     conn.close()
     return [map_message(m) for m in rows]

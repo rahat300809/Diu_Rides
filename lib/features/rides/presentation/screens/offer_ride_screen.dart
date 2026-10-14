@@ -36,6 +36,7 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
   final _bikeColorController = TextEditingController(text: 'Black Metallic');
   final _manualDateController = TextEditingController();
   final _manualTimeController = TextEditingController();
+  final List<TextEditingController> _extraDestinationControllers = [];
 
   bool _isWaypointOpen = false;
   int _selectedDateIndex = 0; // 0: Today, 1: Tomorrow, 2: Custom
@@ -103,6 +104,9 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
     _bikeColorController.dispose();
     _manualDateController.dispose();
     _manualTimeController.dispose();
+    for (final c in _extraDestinationControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -240,6 +244,14 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
       );
     }
 
+    final allDestChoices = <String>[dest];
+    for (final c in _extraDestinationControllers) {
+      final t = c.text.trim();
+      if (t.isNotEmpty && !allDestChoices.contains(t)) {
+        allDestChoices.add(t);
+      }
+    }
+
     final currentUser = ref.read(authNotifierProvider).user;
 
     await ref.read(ridesRepositoryProvider).createRide(
@@ -259,6 +271,7 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
           availableSeats: _seats,
           farePerSeat: fare,
           isFemaleOnly: _isFemaleOnly,
+          destinationChoices: allDestChoices,
         );
 
     if (currentUser != null) {
@@ -472,6 +485,76 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                           _buildPresetChip('Mohakhali', 'Mohakhali Flyover', _destinationController),
                           _buildPresetChip('ECB', 'ECB Chattar', _destinationController),
                         ],
+                      ),
+                    ),
+
+                    // Multi-Choice Drop-off Stops
+                    if (_extraDestinationControllers.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text('Alternative Drop-off Choices', 
+                        style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      for (int i = 0; i < _extraDestinationControllers.length; i++) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _extraDestinationControllers[i],
+                                  decoration: InputDecoration(
+                                    prefixIcon: const Icon(Icons.alt_route, color: AppColors.secondary, size: 20),
+                                    hintText: 'Drop-off stop #${i + 2} (e.g. Farmgate, Mirpur 10)...',
+                                    labelText: 'Drop-off Choice #${i + 2}',
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                icon: const Icon(Icons.cancel_outlined, color: AppColors.error),
+                                tooltip: 'Remove this stop',
+                                onPressed: () {
+                                  setState(() {
+                                    _extraDestinationControllers[i].dispose();
+                                    _extraDestinationControllers.removeAt(i);
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _extraDestinationControllers.add(TextEditingController());
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondary.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.add_location_alt_outlined, size: 16, color: AppColors.secondary),
+                            const SizedBox(width: 6),
+                            Text(
+                              '+ Add Multiple Choice of Destination / Drop-off Stop',
+                              style: AppTypography.labelSm.copyWith(
+                                color: AppColors.secondary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

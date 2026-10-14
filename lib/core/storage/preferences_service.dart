@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:diu_ride/core/constants/app_constants.dart';
+import 'package:diu_ride/features/auth/data/models/user_model.dart';
 
 class PreferencesService {
   final SharedPreferences _prefs;
@@ -76,6 +77,35 @@ class PreferencesService {
     }
   }
 
+  Future<void> seedDefaultAccounts() async {
+    const demoStudentId = '201-15-14285';
+    const demoEmail = 'student@diu.edu.bd';
+    final existing = getAccountCredentials(demoStudentId);
+    if (existing == null) {
+      final user = UserModel(
+        id: 'usr_201_15_14285',
+        studentId: demoStudentId,
+        name: 'DIU Student (Demo)',
+        email: demoEmail,
+        phone: '01712345678',
+        department: 'CSE',
+        batch: 'Batch 201',
+        isDiuVerified: true,
+        rating: 4.9,
+        totalRidesAsPassenger: 5,
+        totalRidesAsDriver: 12,
+        isDriverRegistered: true,
+      );
+      await saveStudentAccount(
+        studentId: demoStudentId,
+        email: demoEmail,
+        password: 'password123',
+        userJson: jsonEncode(user.toJson()),
+        isVerified: true,
+      );
+    }
+  }
+
   Map<String, dynamic>? getAccountCredentials(String identifier) {
     final clean = identifier.trim();
     String studentId = clean;
@@ -137,10 +167,6 @@ class PreferencesService {
 
   String? getLastLoginIdentifier() {
     return _prefs.getString('saved_login_identifier');
-  }
-
-  Future<void> seedDefaultAccounts() async {
-    // Production Mode: Do not seed mock demo accounts
   }
 
   Future<void> clearAllDemoRecords() async {

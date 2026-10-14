@@ -39,7 +39,11 @@ abstract class RidesRepository {
     required int availableSeats,
     required double farePerSeat,
     required bool isFemaleOnly,
+    List<String>? destinationChoices,
   });
+
+  Future<bool> extendRideTime(String rideId, {int minutes = 30, DateTime? newDepartureTime});
+  Future<bool> extendPassengerRequestTime(String requestId, {int minutes = 30, DateTime? newRequestedTime});
 
   Future<List<RideModel>> getMyOfferedRides(String driverId);
 

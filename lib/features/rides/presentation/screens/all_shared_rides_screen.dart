@@ -10,6 +10,7 @@ import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 import 'package:diu_ride/features/rides/presentation/widgets/post_ride_request_sheet.dart';
 import 'package:diu_ride/features/tracking/presentation/screens/ride_details_tracking_screen.dart';
+import 'package:diu_ride/core/utils/direct_call_service.dart';
 
 class AllSharedRidesScreen extends ConsumerStatefulWidget {
   const AllSharedRidesScreen({super.key});
@@ -574,6 +575,20 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                const Icon(Icons.schedule, size: 11, color: Color(0xFF8E8E93)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  'Posted: ${DateTimeUtils.formatPostingTime(ride.createdAt)}',
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: const Color(0xFF8E8E93),
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                       ],
@@ -676,6 +691,19 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
+                          if (ride.destinationChoices.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '📍 Drop-off choices: ${{ride.destinationName, ...ride.destinationChoices}.join(" • ")}',
+                              style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFE65100),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -733,6 +761,26 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                       ),
                     ),
                     const Spacer(),
+
+                    // Direct Phone Call button
+                    IconButton(
+                      onPressed: () {
+                        DirectCallService.showCallOptions(
+                          context,
+                          phoneNumber: ride.driverPhone ?? '',
+                          peerName: ride.driverName,
+                        );
+                      },
+                      icon: const Icon(Icons.call, size: 15, color: Color(0xFF2E7D32)),
+                      tooltip: 'Direct Call Driver',
+                      style: IconButton.styleFrom(
+                        backgroundColor: const Color(0xFFE8F5E9),
+                        padding: const EdgeInsets.all(7),
+                        minimumSize: Size.zero,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
 
                     // Direct SMS button
                     OutlinedButton.icon(
@@ -802,7 +850,41 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
         child: Text('Failed to load requests: $e', style: const TextStyle(color: Colors.grey)),
       ),
       data: (rawRequests) {
-        final requests = rawRequests.where((req) => !isCurrentUserPassengerRequest(req, user)).toList();
+        var requests = rawRequests.where((req) => !isCurrentUserPassengerRequest(req, user)).toList();
+
+        // 1. Filter by location
+        if (_selectedLocation != 'All') {
+          final query = _selectedLocation.toLowerCase();
+          requests = requests.where((req) {
+            final isMap = req is Map<String, dynamic>;
+            final pickup = (isMap ? (req['pickup'] ?? '') : (req.pickup ?? '')).toString().toLowerCase();
+            final dropoff = (isMap ? (req['dropoff'] ?? '') : (req.dropoff ?? '')).toString().toLowerCase();
+            return pickup.contains(query) || dropoff.contains(query);
+          }).toList();
+        }
+
+        // 2. Filter by search keywords
+        final search = _searchController.text.trim().toLowerCase();
+        if (search.isNotEmpty) {
+          requests = requests.where((req) {
+            final isMap = req is Map<String, dynamic>;
+            final pName = (isMap ? (req['passengerName'] ?? '') : (req.passengerName ?? '')).toString().toLowerCase();
+            final pDept = (isMap ? (req['passengerDept'] ?? '') : (req.passengerDept ?? '')).toString().toLowerCase();
+            final pickup = (isMap ? (req['pickup'] ?? '') : (req.pickup ?? '')).toString().toLowerCase();
+            final dropoff = (isMap ? (req['dropoff'] ?? '') : (req.dropoff ?? '')).toString().toLowerCase();
+            final notes = (isMap ? (req['notes'] ?? '') : (req.notes ?? '')).toString().toLowerCase();
+            return pName.contains(search) || pDept.contains(search) || pickup.contains(search) || dropoff.contains(search) || notes.contains(search);
+          }).toList();
+        }
+
+        // 3. Sort by lowest price
+        if (_sortByLowestPrice) {
+          requests.sort((a, b) {
+            final fareA = (a is Map ? (a['proposedFare'] ?? 0.0) : (a.proposedFare ?? 0.0)) as num;
+            final fareB = (b is Map ? (b['proposedFare'] ?? 0.0) : (b.proposedFare ?? 0.0)) as num;
+            return fareA.compareTo(fareB);
+          });
+        }
 
         if (requests.isEmpty) {
           return Center(
@@ -921,7 +1003,27 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                                   ],
                                 ],
                               ),
-                              Text('$pDept • Requested: $time', style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93))),
+                              Builder(
+                                builder: (_) {
+                                  final createdAtRaw = isMap ? (req['createdAt'] ?? req['created_at']) : (req.createdAt);
+                                  final createdDt = createdAtRaw != null ? DateTime.tryParse(createdAtRaw.toString()) : null;
+                                  final postTimeStr = DateTimeUtils.formatPostingTime(createdDt);
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '$pDept • 🕒 Posted: $postTimeStr',
+                                        style: const TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
+                                      ),
+                                      if (time.isNotEmpty)
+                                        Text(
+                                          '⏰ Scheduled: $time',
+                                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600, color: Color(0xFFE65100)),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              ),
                             ],
                           ),
                         ),
@@ -969,6 +1071,26 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
+                        if (pPhone.isNotEmpty) ...[
+                          IconButton(
+                            onPressed: () {
+                              DirectCallService.showCallOptions(
+                                context,
+                                phoneNumber: pPhone,
+                                peerName: pName,
+                              );
+                            },
+                            icon: const Icon(Icons.call, size: 16, color: Color(0xFF2E7D32)),
+                            tooltip: 'Direct Call $pName',
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFFE8F5E9),
+                              padding: const EdgeInsets.all(8),
+                              minimumSize: Size.zero,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
                         if (isMyRequest) ...[
                           Expanded(
                             child: OutlinedButton.icon(

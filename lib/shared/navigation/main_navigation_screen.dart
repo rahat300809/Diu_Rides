@@ -20,6 +20,7 @@ import 'package:diu_ride/core/config/app_config.dart';
 import 'package:diu_ride/core/services/system_notification_service.dart';
 import 'package:diu_ride/features/notifications/data/models/notification_model.dart';
 import 'package:diu_ride/core/services/notification_sound_service.dart';
+import 'package:diu_ride/features/rides/presentation/widgets/post_expiry_extension_dialog.dart';
 import 'package:diu_ride/shared/widgets/diu_app_header.dart';
 import 'package:diu_ride/shared/widgets/diu_bottom_nav.dart';
 
@@ -140,9 +141,86 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
         if (event == 'university_notice' || event == 'announcement') {
           _handleUniversityNotice(data);
         }
+
+        // 7. Scheduled ride / request time arrived - prompt extension
+        if (event == 'schedule_time_expired_needs_extension') {
+          _handleScheduleTimeExpiredNeedsExtension(data);
+        }
+
+        // 8. Post expired and deleted from server/database
+        if (event == 'post_expired_and_deleted') {
+          _handlePostExpiredAndDeleted(data);
+        }
       });
     } catch (e) {
       debugPrint('[MainNavigation] WebSocket live update init error: $e');
+    }
+  }
+
+  void _handleScheduleTimeExpiredNeedsExtension(Map<String, dynamic> data) {
+    if (!mounted) return;
+    final currentAuth = ref.read(authNotifierProvider).user;
+    if (currentAuth == null) return;
+
+    final targetUserId = (data['userId'] ?? '').toString().trim();
+    final targetUserName = (data['userName'] ?? '').toString().trim();
+    final isOwner = targetUserId.isNotEmpty && (
+      targetUserId == currentAuth.id ||
+      targetUserId == currentAuth.studentId ||
+      (currentAuth.phone.isNotEmpty && targetUserId == currentAuth.phone) ||
+      (targetUserName.isNotEmpty && targetUserName.toLowerCase() == currentAuth.name.toLowerCase())
+    );
+
+    if (!isOwner) return;
+
+    final postId = (data['id'] ?? '').toString();
+    final postType = (data['post_type'] ?? 'ride').toString();
+    final title = (data['title'] ?? 'Commute Post').toString();
+    final timeStr = data['time_str']?.toString();
+    final minutesRemaining = (data['minutes_remaining'] as num?)?.toInt() ?? 30;
+
+    NotificationSoundService.playMessageChime();
+    SystemNotificationService.showNotification(
+      title: '⚠️ Scheduled Ride Time Reached: Extend Time',
+      body: 'Your post ($title) reached its departure time. Please extend within 30 mins or it will be deleted.',
+      id: 'ext_$postId',
+    );
+
+    PostExpiryExtensionDialog.show(
+      context,
+      postId: postId,
+      postType: postType,
+      title: title,
+      scheduledTimeStr: timeStr,
+      initialMinutesRemaining: minutesRemaining,
+    );
+  }
+
+  void _handlePostExpiredAndDeleted(Map<String, dynamic> data) {
+    ref.invalidate(allAvailableRidesProvider);
+    ref.invalidate(departingSoonRidesProvider);
+    ref.invalidate(passengerRequestsProvider);
+
+    if (!mounted) return;
+    final currentAuth = ref.read(authNotifierProvider).user;
+    if (currentAuth == null) return;
+
+    final targetUserId = (data['userId'] ?? '').toString().trim();
+    final isOwner = targetUserId.isNotEmpty && (
+      targetUserId == currentAuth.id ||
+      targetUserId == currentAuth.studentId ||
+      (currentAuth.phone.isNotEmpty && targetUserId == currentAuth.phone)
+    );
+
+    if (isOwner) {
+      final title = (data['title'] ?? 'Post').toString();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⚠️ Scheduled post "$title" expired after 30 mins and was automatically removed.'),
+          backgroundColor: const Color(0xFFDC2626),
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 

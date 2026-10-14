@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
+import 'package:diu_ride/core/utils/direct_call_service.dart';
 
 class CampusVoiceCallDialog extends StatefulWidget {
   final String peerName;
@@ -128,17 +128,11 @@ class _CampusVoiceCallDialogState extends State<CampusVoiceCallDialog>
   }
 
   Future<void> _dialPhone() async {
-    final cleanPhone = widget.peerPhone.replaceAll(RegExp(r'[^\d+]'), '');
-    final uri = Uri.parse('tel:$cleanPhone');
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri);
-      } else {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    } catch (_) {
-      _copyPhone();
-    }
+    await DirectCallService.makeDirectPhoneCall(
+      context,
+      phoneNumber: widget.peerPhone,
+      peerName: widget.peerName,
+    );
   }
 
   @override

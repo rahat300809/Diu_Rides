@@ -29,4 +29,22 @@ class DateTimeUtils {
       return formatDate(dt);
     }
   }
+
+  static String formatPostingTime(DateTime? dt) {
+    if (dt == null) return 'Posted recently';
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+
+    if (diff.isNegative || diff.inSeconds < 45) {
+      return 'Just now';
+    } else if (diff.inMinutes < 60) {
+      return '${diff.inMinutes}m ago';
+    } else if (diff.inHours < 24 && dt.day == now.day) {
+      return 'Today, ${formatTime(dt)}';
+    } else if (diff.inHours < 48 && dt.day == now.subtract(const Duration(days: 1)).day) {
+      return 'Yesterday, ${formatTime(dt)}';
+    } else {
+      return DateFormat('d MMM, hh:mm a').format(dt);
+    }
+  }
 }

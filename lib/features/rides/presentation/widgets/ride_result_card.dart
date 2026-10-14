@@ -123,6 +123,39 @@ class RideResultCard extends StatelessWidget {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              const Icon(Icons.schedule, size: 12, color: AppColors.outline),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Posted ${DateTimeUtils.formatPostingTime(ride.createdAt)}',
+                                style: AppTypography.labelSm.copyWith(
+                                  color: AppColors.outline,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              if (ride.destinationChoices.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.secondary.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '+${ride.destinationChoices.length} Drop-offs',
+                                    style: AppTypography.labelSm.copyWith(
+                                      color: AppColors.secondary,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -275,6 +308,39 @@ class RideResultCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                if (ride.destinationChoices.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        'Drop-offs:',
+                        style: AppTypography.labelSm.copyWith(
+                          fontSize: 10,
+                          color: AppColors.secondary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      for (final dest in ride.destinationChoices)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            dest,
+                            style: AppTypography.labelSm.copyWith(
+                              fontSize: 10,
+                              color: AppColors.onSurface,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 14),
 
                 // Price & Instant Book CTA

@@ -108,10 +108,12 @@ class SharedSyncRidesRepository implements RidesRepository {
           r.destinationName.toLowerCase().contains('academic building 4') ||
           (r.destinationSubtitle?.toLowerCase().contains('academic building 4') ?? false)
         );
+        final destChoicesMatch = r.destinationChoices.any((c) => c.toLowerCase().contains(g));
         return r.originName.toLowerCase().contains(g) ||
           (r.originSubtitle?.toLowerCase().contains(g) ?? false) ||
           r.destinationName.toLowerCase().contains(g) ||
           (r.destinationSubtitle?.toLowerCase().contains(g) ?? false) ||
+          destChoicesMatch ||
           r.driverName.toLowerCase().contains(g) ||
           r.driverDept.toLowerCase().contains(g) ||
           r.routeCorridor.toLowerCase().contains(g) ||
@@ -131,7 +133,8 @@ class SharedSyncRidesRepository implements RidesRepository {
       final q = dropoffQuery.trim().toLowerCase();
       results = results.where((r) =>
           r.destinationName.toLowerCase().contains(q) ||
-          (r.destinationSubtitle?.toLowerCase().contains(q) ?? false)).toList();
+          (r.destinationSubtitle?.toLowerCase().contains(q) ?? false) ||
+          r.destinationChoices.any((c) => c.toLowerCase().contains(q))).toList();
     }
 
     if (seatsNeeded != null && seatsNeeded > 1) {
@@ -181,6 +184,7 @@ class SharedSyncRidesRepository implements RidesRepository {
     required int availableSeats,
     required double farePerSeat,
     required bool isFemaleOnly,
+    List<String>? destinationChoices,
   }) async {
     final dist = H3Utils.calculateDistanceKm(originLat, originLng, destinationLat, destinationLng);
     final duration = H3Utils.estimateDurationMinutes(dist);
@@ -205,6 +209,8 @@ class SharedSyncRidesRepository implements RidesRepository {
       totalSeats: availableSeats,
       availableSeats: availableSeats,
       isFemaleOnly: isFemaleOnly,
+      destinationChoices: destinationChoices ?? const [],
+      createdAt: DateTime.now(),
       status: RideStatus.published,
       vehicle: vehicle,
       h3OriginIndex: H3Utils.latLngToH3(originLat, originLng),
@@ -234,6 +240,40 @@ class SharedSyncRidesRepository implements RidesRepository {
     } catch (_) {}
 
     return newRide;
+  }
+
+  @override
+  Future<bool> extendRideTime(String rideId, {int minutes = 30, DateTime? newDepartureTime}) async {
+    try {
+      final newTime = newDepartureTime ?? DateTime.now().add(Duration(minutes: minutes));
+      final newTimeStr = '${newTime.hour.toString().padLeft(2, '0')}:${newTime.minute.toString().padLeft(2, '0')}';
+      final res = await _dio.post('$_apiBase/rides/$rideId/extend-time', data: {
+        'minutes': minutes,
+        'newTime': newTimeStr,
+        'newDepartureTime': newTime.toIso8601String(),
+      });
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('extendRideTime error: $e');
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> extendPassengerRequestTime(String requestId, {int minutes = 30, DateTime? newRequestedTime}) async {
+    try {
+      final newTime = newRequestedTime ?? DateTime.now().add(Duration(minutes: minutes));
+      final newTimeStr = '${newTime.hour.toString().padLeft(2, '0')}:${newTime.minute.toString().padLeft(2, '0')}';
+      final res = await _dio.post('$_apiBase/passenger-requests/$requestId/extend-time', data: {
+        'minutes': minutes,
+        'newTime': newTimeStr,
+        'newRequestedTime': newTime.toIso8601String(),
+      });
+      return res.statusCode == 200;
+    } catch (e) {
+      debugPrint('extendPassengerRequestTime error: $e');
+      return false;
+    }
   }
 
   @override

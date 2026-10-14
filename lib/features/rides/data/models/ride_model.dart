@@ -44,6 +44,8 @@ class RideModel {
   final DateTime? endTime;
   final String? endMapsLink;
   final String? routeMapsLink;
+  final DateTime? createdAt;
+  final List<String> destinationChoices;
 
   const RideModel({
     required this.id,
@@ -84,6 +86,8 @@ class RideModel {
     this.endTime,
     this.endMapsLink,
     this.routeMapsLink,
+    this.createdAt,
+    this.destinationChoices = const [],
   });
 
   String get googleMapsRouteUrl {
@@ -165,6 +169,12 @@ class RideModel {
       endTime: json['endTime'] != null ? DateTime.tryParse(json['endTime'] as String) : null,
       endMapsLink: json['endMapsLink'] as String?,
       routeMapsLink: json['routeMapsLink'] as String?,
+      createdAt: json['createdAt'] != null ? DateTime.tryParse(json['createdAt'] as String) : null,
+      destinationChoices: (json['destinationChoices'] is List)
+          ? (json['destinationChoices'] as List).map((e) => e.toString()).toList()
+          : ((json['destinationChoices'] is String && (json['destinationChoices'] as String).isNotEmpty)
+              ? (json['destinationChoices'] as String).split(',').map((e) => e.trim()).toList()
+              : const []),
     );
   }
 
@@ -208,6 +218,8 @@ class RideModel {
       'endTime': endTime?.toIso8601String(),
       'endMapsLink': endMapsLink,
       'routeMapsLink': routeMapsLink,
+      'createdAt': createdAt?.toIso8601String(),
+      'destinationChoices': destinationChoices,
     };
   }
 
@@ -224,6 +236,9 @@ class RideModel {
     DateTime? endTime,
     String? endMapsLink,
     String? routeMapsLink,
+    DateTime? departureTime,
+    DateTime? createdAt,
+    List<String>? destinationChoices,
   }) {
     return RideModel(
       id: id,
@@ -243,7 +258,7 @@ class RideModel {
       destinationLat: destinationLat,
       destinationLng: destinationLng,
       waypointName: waypointName,
-      departureTime: departureTime,
+      departureTime: departureTime ?? this.departureTime,
       farePerSeat: farePerSeat,
       totalSeats: totalSeats,
       availableSeats: availableSeats ?? this.availableSeats,
@@ -264,6 +279,8 @@ class RideModel {
       endTime: endTime ?? this.endTime,
       endMapsLink: endMapsLink ?? this.endMapsLink,
       routeMapsLink: routeMapsLink ?? this.routeMapsLink,
+      createdAt: createdAt ?? this.createdAt,
+      destinationChoices: destinationChoices ?? this.destinationChoices,
     );
   }
 }

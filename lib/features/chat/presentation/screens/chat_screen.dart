@@ -12,7 +12,7 @@ import 'package:diu_ride/core/utils/gps_location_service.dart';
 import 'package:diu_ride/features/auth/presentation/providers/auth_provider.dart';
 import 'package:diu_ride/features/chat/presentation/providers/chat_provider.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
-import 'package:diu_ride/features/safety/presentation/widgets/campus_voice_call_dialog.dart';
+import 'package:diu_ride/core/utils/direct_call_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:diu_ride/core/services/notification_sound_service.dart';
 import 'package:diu_ride/features/chat/data/models/chat_message.dart';
@@ -60,6 +60,27 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   String _originName = 'DIU Campus';
   String _destinationName = 'Destination';
   double _totalDurationMinutes = 0.0;
+  String? _resolvedPeerPhone;
+
+  final List<String> _quickReplies = const [
+    '📍 At pickup point',
+    '🏍️ On my way!',
+    '⏱️ Arriving in 2 mins',
+    '🚦 Stuck in traffic',
+    '👋 Where are you?',
+    '✅ Thank you!',
+  ];
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  String _formatDateDivider(DateTime dt) {
+    final now = DateTime.now();
+    if (_isSameDay(dt, now)) return 'Today';
+    if (_isSameDay(dt, now.subtract(const Duration(days: 1)))) return 'Yesterday';
+    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
+  }
 
   @override
   void initState() {
@@ -217,11 +238,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             if (d['startTime'] != null) {
               _rideStartTime = DateTime.tryParse(d['startTime'].toString());
             }
+            if (d['driverPhone'] != null && d['driverPhone'].toString().isNotEmpty) {
+              _resolvedPeerPhone = d['driverPhone'].toString();
+            }
+            if (d['passengerPhone'] != null && d['passengerPhone'].toString().isNotEmpty && widget.peerRole == 'Passenger') {
+              _resolvedPeerPhone = d['passengerPhone'].toString();
+            }
           });
           if (_sessionStatus == 'in_progress') {
             _startProgressTimer();
           }
         }
+      }
+
+      // Also try fetching ride details to get driverPhone if missing
+      if (_resolvedPeerPhone == null && widget.peerPhone == null) {
+        try {
+          final rRes = await dio.get('$_apiBase/rides/${widget.rideId}');
+          if (rRes.statusCode == 200 && rRes.data is Map) {
+            final rData = Map<String, dynamic>.from(rRes.data as Map);
+            final phone = rData['driverPhone'] ?? rData['driver_phone'];
+            if (mounted && phone != null && phone.toString().isNotEmpty) {
+              setState(() {
+                _resolvedPeerPhone = phone.toString();
+              });
+            }
+          }
+        } catch (_) {}
       }
     } catch (_) {}
   }
@@ -949,7 +992,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final displayName = widget.displayName;
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
       appBar: AppBar(
         backgroundColor: AppColors.surfaceContainerLowest,
         elevation: 0.5,
@@ -995,18 +1037,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.call, color: AppColors.primary),
-            tooltip: 'Campus Voice Call',
+            tooltip: 'Direct Call $displayName',
             onPressed: () {
-              CampusVoiceCallDialog.show(
+              DirectCallService.showCallOptions(
                 context,
+                phoneNumber: _resolvedPeerPhone ?? widget.peerPhone ?? '',
                 peerName: displayName,
-                peerPhone: widget.peerPhone ?? '01712345678',
                 peerRole: widget.peerRole ?? 'Ride Companion',
               );
             },
           ),
         ],
       ),
+      backgroundColor: const Color(0xFFF4F6F8),
       body: Column(
         children: [
           _buildRideSessionControlBar(),
@@ -1014,98 +1057,166 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Expanded(
             child: chatState.isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    itemCount: chatState.messages.length,
-                    itemBuilder: (context, index) {
-                      final msg = chatState.messages[index];
-                      if (_isTripCompletedMessage(msg)) {
-                        return _buildTripCompletedBox(msg);
-                      }
-                      return Align(
-                        alignment: msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                          constraints: BoxConstraints(
-                            maxWidth: MediaQuery.of(context).size.width * 0.78,
-                          ),
-                          decoration: BoxDecoration(
-                            color: msg.isMe ? AppColors.primary : AppColors.surfaceContainerLowest,
-                            borderRadius: BorderRadius.only(
-                              topLeft: const Radius.circular(16),
-                              topRight: const Radius.circular(16),
-                              bottomLeft: Radius.circular(msg.isMe ? 16 : 4),
-                              bottomRight: Radius.circular(msg.isMe ? 4 : 16),
-                            ),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: AppColors.cardShadow,
-                                blurRadius: 4,
-                                offset: Offset(0, 1),
-                              ),
-                            ],
-                          ),
-                          child: Column(
+                : chatState.messages.isEmpty
+                    ? _buildEmptyChatIntroCard()
+                    : ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        itemCount: chatState.messages.length,
+                        itemBuilder: (context, index) {
+                          final msg = chatState.messages[index];
+                          final showDateDivider = index == 0 ||
+                              !_isSameDay(msg.timestamp, chatState.messages[index - 1].timestamp);
+
+                          if (_isTripCompletedMessage(msg)) {
+                            return Column(
+                              children: [
+                                if (showDateDivider) _buildDateDivider(msg.timestamp),
+                                _buildTripCompletedBox(msg),
+                              ],
+                            );
+                          }
+
+                          return Column(
                             crossAxisAlignment:
                                 msg.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                             children: [
-                              if (msg.isLocationShare || msg.text.contains('google.com/maps') || msg.text.contains('maps.google.com') || msg.sharedLat != null) ...[
-                                _buildLocationCard(msg),
-                              ],
-                              if (!msg.isMe && msg.senderName.isNotEmpty) ...[
-                                Text(
-                                  msg.senderName,
-                                  style: AppTypography.labelSm.copyWith(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 10.5,
+                              if (showDateDivider) _buildDateDivider(msg.timestamp),
+                              Align(
+                                alignment: msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
+                                child: Container(
+                                  margin: const EdgeInsets.only(bottom: 6),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  constraints: BoxConstraints(
+                                    maxWidth: MediaQuery.of(context).size.width * 0.78,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: msg.isMe
+                                        ? const LinearGradient(
+                                            colors: [Color(0xFFE65100), Color(0xFFFF6D00)],
+                                            begin: Alignment.topLeft,
+                                            end: Alignment.bottomRight,
+                                          )
+                                        : null,
+                                    color: msg.isMe ? null : Colors.white,
+                                    borderRadius: BorderRadius.only(
+                                      topLeft: const Radius.circular(18),
+                                      topRight: const Radius.circular(18),
+                                      bottomLeft: Radius.circular(msg.isMe ? 18 : 3),
+                                      bottomRight: Radius.circular(msg.isMe ? 3 : 18),
+                                    ),
+                                    border: msg.isMe ? null : Border.all(color: const Color(0xFFE5E7EB)),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.04),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        msg.isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                                    children: [
+                                      if (msg.isLocationShare || msg.text.contains('google.com/maps') || msg.text.contains('maps.google.com') || msg.sharedLat != null) ...[
+                                        _buildLocationCard(msg),
+                                      ],
+                                      if (!msg.isMe && msg.senderName.isNotEmpty) ...[
+                                        Text(
+                                          msg.senderName,
+                                          style: AppTypography.labelSm.copyWith(
+                                            color: const Color(0xFFE65100),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                      ],
+                                      _buildClickableMessageText(msg),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            DateTimeUtils.formatTime(msg.timestamp),
+                                            style: TextStyle(
+                                              color: msg.isMe
+                                                  ? Colors.white.withOpacity(0.85)
+                                                  : const Color(0xFF9CA3AF),
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          if (msg.isMe) ...[
+                                            const SizedBox(width: 4),
+                                            const Icon(
+                                              Icons.done_all,
+                                              size: 14,
+                                              color: Colors.white,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(height: 2),
-                              ],
-                              _buildClickableMessageText(msg),
-                              const SizedBox(height: 4),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    DateTimeUtils.formatTime(msg.timestamp),
-                                    style: AppTypography.labelSm.copyWith(
-                                      color: msg.isMe
-                                          ? AppColors.onPrimary.withOpacity(0.7)
-                                          : AppColors.outline,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                  if (msg.isMe) ...[
-                                    const SizedBox(width: 4),
-                                    const Icon(
-                                      Icons.done_all,
-                                      size: 13,
-                                      color: AppColors.primaryFixed,
-                                    ),
-                                  ],
-                                ],
                               ),
                             ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                          );
+                        },
+                      ),
           ),
+
+          // Quick commute suggestion chips bar
+          Container(
+            height: 40,
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              itemCount: _quickReplies.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (ctx, i) {
+                final chip = _quickReplies[i];
+                return InkWell(
+                  onTap: () {
+                    _messageController.text = chip;
+                    _sendMessage();
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F4F6),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      chip,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF374151),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE5E7EB)),
 
           // Message input bar
           SafeArea(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: const BoxDecoration(
-                color: AppColors.surfaceContainerLowest,
+                color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.cardShadow,
+                    color: Color(0x0A000000),
                     blurRadius: 8,
                     offset: Offset(0, -2),
                   ),
@@ -1114,33 +1225,58 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.my_location, color: AppColors.secondary),
-                    tooltip: 'Share Campus Location',
+                    icon: const Icon(Icons.my_location, color: Color(0xFFE65100)),
+                    tooltip: 'Share Live Campus GPS Location',
                     onPressed: _shareLocation,
                   ),
                   Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        hintText: 'Type a message...',
-                        hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
-                        filled: true,
-                        fillColor: AppColors.surfaceContainerLow,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                          borderSide: BorderSide.none,
-                        ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
                       ),
-                      onSubmitted: (_) => _sendMessage(),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _messageController,
+                              textCapitalization: TextCapitalization.sentences,
+                              decoration: const InputDecoration(
+                                hintText: 'Type a message to companion...',
+                                hintStyle: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13.5),
+                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                border: InputBorder.none,
+                              ),
+                              onSubmitted: (_) => _sendMessage(),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  CircleAvatar(
-                    backgroundColor: AppColors.primary,
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFE65100), Color(0xFFFF6D00)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFE65100).withOpacity(0.3),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
                     child: IconButton(
-                      icon: const Icon(Icons.send, color: AppColors.onPrimary, size: 18),
+                      icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                      tooltip: 'Send Message',
                       onPressed: _sendMessage,
                     ),
                   ),
@@ -1468,6 +1604,202 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
 
     return Text.rich(TextSpan(children: spans));
+  }
+
+  Widget _buildDateDivider(DateTime dt) {
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE2E8F0),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          _formatDateDivider(dt),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF475569),
+            letterSpacing: 0.2,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyChatIntroCard() {
+    final displayName = widget.displayName;
+    final role = widget.peerRole ?? 'Companion';
+
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFE65100), Color(0xFFFF9800)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFE65100).withOpacity(0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  displayName.isNotEmpty ? displayName[0].toUpperCase() : 'C',
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  displayName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.verified, size: 16, color: Color(0xFF0284C7)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7ED),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFFEDD5)),
+              ),
+              child: Text(
+                '$role • ${widget.vehicleModel}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFC2410C),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.shield_outlined, size: 18, color: Color(0xFF10B981)),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Verified DIU Commute Chat',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Chat directly to coordinate pickup point, timing, and helmet arrangements. Live coordinates can be shared with the GPS button below.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF64748B),
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFE65100),
+                    side: const BorderSide(color: Color(0xFFFFCC80)),
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                  icon: const Icon(Icons.waving_hand, size: 14),
+                  label: const Text('Say Hi', style: TextStyle(fontSize: 12)),
+                  onPressed: () {
+                    _messageController.text = 'Hi ${displayName.split(" ").first}! 👋';
+                    _sendMessage();
+                  },
+                ),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0284C7),
+                    side: const BorderSide(color: Color(0xFFBAE6FD)),
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                  icon: const Icon(Icons.my_location, size: 14),
+                  label: const Text('Share Location', style: TextStyle(fontSize: 12)),
+                  onPressed: _shareLocation,
+                ),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF059669),
+                    side: const BorderSide(color: Color(0xFFA7F3D0)),
+                    backgroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                  icon: const Icon(Icons.phone, size: 14),
+                  label: const Text('Call', style: TextStyle(fontSize: 12)),
+                  onPressed: () {
+                    DirectCallService.showCallOptions(
+                      context,
+                      phoneNumber: _resolvedPeerPhone ?? widget.peerPhone ?? '',
+                      peerName: displayName,
+                      peerRole: role,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
