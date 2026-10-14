@@ -20,6 +20,9 @@ import 'package:diu_ride/features/chat/presentation/screens/campus_messages_scre
 import 'package:diu_ride/features/profile/presentation/screens/profile_screen.dart';
 import 'package:diu_ride/features/home/presentation/widgets/live_ride_status_card.dart';
 import 'package:diu_ride/core/constants/campus_locations.dart';
+import 'package:diu_ride/core/providers/app_mode_provider.dart';
+import 'package:diu_ride/features/home/presentation/widgets/app_mode_toggle_bar.dart';
+import 'package:diu_ride/features/home/presentation/widgets/rider_student_requests_section.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final Function(int tabIndex) onNavigateTab;
@@ -187,6 +190,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authNotifierProvider).user;
+    final appMode = ref.watch(appModeProvider);
     final departingRidesAsync = ref.watch(departingSoonRidesStreamProvider);
     final allRidesAsync = ref.watch(allAvailableRidesProvider);
     final List<RideModel> allRides = allRidesAsync.value ?? [];
@@ -478,7 +482,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Explore Campus Comfortably',
+                      appMode.isPassenger
+                          ? 'Passenger Mode • Find rides & request seats'
+                          : (appMode.isRider
+                              ? 'Rider Mode • Ready to offer rides & pick up peers'
+                              : 'Explore Campus Comfortably'),
                       style: TextStyle(
                         fontSize: 13.5,
                         color: Colors.white.withOpacity(0.92),
@@ -486,7 +494,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 16),
+                    // Modern Segmented Mode Toggle Bar (All | Passenger | Rider)
+                    AppModeToggleBar(
+                      onModeChanged: (_) => setState(() {}),
+                    ),
+
+                    const SizedBox(height: 6),
 
                     // 2. Apple iOS 3D Floating Destination Search Bar
                     AppleIosDestinationSearch(
@@ -543,26 +556,253 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   },
                 ),
 
-              // 4. "Choose Your Ride" Segmented Dual-Pill Card (Directly Matching Reference 2)
-              Container(
-                margin: const EdgeInsets.fromLTRB(20, 16, 20, 10),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: const Color(0xFFF0F0F2)),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x0C000000),
-                      blurRadius: 16,
-                      offset: Offset(0, 6),
+              // 4. "Choose Your Ride" Segmented Dual-Pill Card (Adaptive to AppMode)
+              _buildChooseRideCard(appMode),
+
+              const SizedBox(height: 12),
+
+              // 5. Rider Student Pickup Requests (Shown in Rider & All Modes)
+              if (appMode.showRiderFeatures)
+                RiderStudentRequestsSection(
+                  onSeeAll: () => widget.onNavigateTab(1),
+                ),
+
+              if (appMode.showRiderFeatures && appMode.showPassengerFeatures)
+                const SizedBox(height: 16),
+
+              // 6. Live Departing Peer Motorbikes Carousel (Shown in Passenger & All Modes)
+              if (appMode.showPassengerFeatures || appMode.isAll)
+                departingRidesAsync.when(
+                  data: (rides) {
+                    final bikeRides = rides.where((r) => r.vehicle.type == VehicleType.bike).toList();
+                    return DepartingRidesCarousel(
+                      rides: bikeRides.isNotEmpty ? bikeRides : rides,
+                      onRequestSeat: _handleRequestSeat,
+                      onSeeAll: () {
+                        widget.onNavigateTab(1);
+                      },
+                    );
+                  },
+                  loading: () => const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24.0),
+                      child: CircularProgressIndicator(color: Color(0xFFE65100)),
+                    ),
+                  ),
+                  error: (err, _) => Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Text('Failed to load rides: $err', style: AppTypography.bodyMd),
+                  ),
+                ),
+
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChooseRideCard(AppMode appMode) {
+    if (appMode.isRider) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFF0F0F2)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0C000000),
+              blurRadius: 16,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Rider & Biker Hub',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF141416),
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    SizedBox(height: 1),
+                    Text(
+                      'Offer Rides & Pick Up Peers',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFF8E8E93),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
-                child: Column(
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.two_wheeler, size: 14, color: Color(0xFFE65100)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Rider Mode',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFE65100),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                // Left: Offer Ride (Radiant Sunset Amber Gradient)
+                Expanded(
+                  child: InkWell(
+                    onTap: () => widget.onNavigateTab(2),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFE65100), Color(0xFFF57C00)],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFE65100).withOpacity(0.35),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Offer Ride',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Icon(Icons.add_circle_outline, size: 20, color: Colors.white),
+                            ],
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Publish bike route & seats',
+                            style: TextStyle(fontSize: 11, color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Right: Student Requests (Pitch obsidian black)
+                Expanded(
+                  child: InkWell(
+                    onTap: () => widget.onNavigateTab(1),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF141416),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Pickup Requests',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Icon(Icons.hail_rounded, size: 17, color: Color(0xFFFFA000)),
+                            ],
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Peers needing a ride',
+                            style: TextStyle(fontSize: 11, color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (appMode.isPassenger) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFF0F0F2)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0C000000),
+              blurRadius: 16,
+              offset: Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Choose Your Ride',
                       style: TextStyle(
                         fontSize: 16,
@@ -571,140 +811,266 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         letterSpacing: -0.3,
                       ),
                     ),
-                    const SizedBox(height: 1),
-                    const Text(
-                      'Campus Peer Commute',
+                    SizedBox(height: 1),
+                    Text(
+                      'Campus Peer Commute Booking',
                       style: TextStyle(
                         fontSize: 11.5,
                         color: Color(0xFF8E8E93),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        // Left: Ride (White pill with subtle border)
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => widget.onNavigateTab(1),
-                            borderRadius: BorderRadius.circular(16),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8F9FA),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: const Color(0xFFE5E7EB)),
-                              ),
-                              child: const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Ride',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 14,
-                                          color: Color(0xFF141416),
-                                        ),
-                                      ),
-                                      Icon(Icons.two_wheeler, size: 20, color: Color(0xFFE65100)),
-                                    ],
-                                  ),
-                                  SizedBox(height: 6),
-                                  Text(
-                                    'Bikes arrive in 3-5m',
-                                    style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.hail_rounded, size: 14, color: Color(0xFF2E7D32)),
+                      SizedBox(width: 4),
+                      Text(
+                        'Passenger Mode',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2E7D32),
                         ),
-                        const SizedBox(width: 12),
-
-                        // Right: Schedule / Request (Pitch obsidian black pill matching reference 2!)
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => PostRideRequestSheet.show(context),
-                            borderRadius: BorderRadius.circular(16),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF141416),
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                // Left: Find Ride (White pill with subtle border)
+                Expanded(
+                  child: InkWell(
+                    onTap: () => widget.onNavigateTab(1),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8F9FA),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Find Ride',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: Color(0xFF141416),
+                                ),
                               ),
-                              child: const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Schedule',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 14,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      Icon(Icons.calendar_today, size: 17, color: Color(0xFFFFA000)),
-                                    ],
-                                  ),
-                                  SizedBox(height: 6),
-                                  Text(
-                                    'Book / Throw request',
-                                    style: TextStyle(fontSize: 11, color: Colors.white70),
-                                  ),
-                                ],
+                              Icon(Icons.explore_outlined, size: 20, color: Color(0xFFE65100)),
+                            ],
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Bikes arrive in 3-5m',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+
+                // Right: Request / Schedule (Pitch obsidian black)
+                Expanded(
+                  child: InkWell(
+                    onTap: () => PostRideRequestSheet.show(context),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF141416),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Request Ride',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Icon(Icons.calendar_today, size: 17, color: Color(0xFFFFA000)),
+                            ],
+                          ),
+                          SizedBox(height: 6),
+                          Text(
+                            'Book / Throw request',
+                            style: TextStyle(fontSize: 11, color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Default / All Mode
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF0F0F2)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0C000000),
+            blurRadius: 16,
+            offset: Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Choose Your Ride',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF141416),
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 1),
+          const Text(
+            'Campus Peer Commute',
+            style: TextStyle(
+              fontSize: 11.5,
+              color: Color(0xFF8E8E93),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              // Left: Ride (White pill with subtle border)
+              Expanded(
+                child: InkWell(
+                  onTap: () => widget.onNavigateTab(1),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8F9FA),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                    ),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Ride',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                color: Color(0xFF141416),
                               ),
                             ),
-                          ),
+                            Icon(Icons.two_wheeler, size: 20, color: Color(0xFFE65100)),
+                          ],
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          'Bikes arrive in 3-5m',
+                          style: TextStyle(fontSize: 11, color: Color(0xFF8E8E93)),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 12),
-
-              // 6. Live Departing Peer Motorbikes Carousel (Realtime Synced)
-              departingRidesAsync.when(
-                data: (rides) {
-                  final bikeRides = rides.where((r) => r.vehicle.type == VehicleType.bike).toList();
-                  return DepartingRidesCarousel(
-                    rides: bikeRides.isNotEmpty ? bikeRides : rides,
-                    onRequestSeat: _handleRequestSeat,
-                    onSeeAll: () {
-                      widget.onNavigateTab(1);
-                    },
-                  );
-                },
-                loading: () => const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24.0),
-                    child: CircularProgressIndicator(color: Color(0xFFE65100)),
                   ),
                 ),
-                error: (err, _) => Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Text('Failed to load rides: $err', style: AppTypography.bodyMd),
+              ),
+              const SizedBox(width: 12),
+
+              // Right: Schedule / Request (Pitch obsidian black pill matching reference 2!)
+              Expanded(
+                child: InkWell(
+                  onTap: () => PostRideRequestSheet.show(context),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF141416),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Schedule',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Icon(Icons.calendar_today, size: 17, color: Color(0xFFFFA000)),
+                          ],
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          'Book / Throw request',
+                          style: TextStyle(fontSize: 11, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
-
-              const SizedBox(height: 16),
             ],
           ),
-        ),
+        ],
       ),
     );
   }

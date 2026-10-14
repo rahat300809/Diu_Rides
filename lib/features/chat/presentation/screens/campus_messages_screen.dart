@@ -13,6 +13,7 @@ import 'package:diu_ride/features/rides/data/models/vehicle_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 import 'package:diu_ride/core/services/notification_sound_service.dart';
 import 'package:diu_ride/core/utils/direct_call_service.dart';
+import 'package:diu_ride/core/providers/app_mode_provider.dart';
 
 class CampusMessagesScreen extends ConsumerStatefulWidget {
   final VoidCallback onExploreRides;
@@ -27,6 +28,8 @@ class CampusMessagesScreen extends ConsumerStatefulWidget {
 }
 
 class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
+  AppMode? _selectedFilter;
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authNotifierProvider).user;
@@ -34,6 +37,8 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
     final myBookingsAsync = ref.watch(myBookingsProvider);
     final allRidesAsync = ref.watch(allAvailableRidesProvider);
     final ridesRepo = ref.watch(ridesRepositoryProvider);
+    final appMode = ref.watch(appModeProvider);
+    final effectiveMode = _selectedFilter ?? appMode;
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -98,14 +103,50 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
                 ),
               ),
 
+              // Filter Chips for Mode (All | Rider | Passenger)
+              _buildFilterChips(effectiveMode),
+              const SizedBox(height: 6),
+
               // Central & Realtime Messenger Conversations (Sorted with newest at top)
               convosAsync.when(
                 data: (convos) {
                   if (convos.isNotEmpty) {
                     final sorted = List<CampusConversationModel>.from(convos);
                     sorted.sort((a, b) => (b.lastTimestamp).compareTo(a.lastTimestamp));
+
+                    List<CampusConversationModel> filtered = sorted;
+                    if (effectiveMode == AppMode.rider) {
+                      filtered = sorted.where((c) => c.peerRole.toLowerCase() == 'passenger').toList();
+                    } else if (effectiveMode == AppMode.passenger) {
+                      filtered = sorted.where((c) => c.peerRole.toLowerCase() == 'driver' || c.peerRole.toLowerCase() == 'rider').toList();
+                    }
+
+                    if (filtered.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.all(32.0),
+                        child: Center(
+                          child: Column(
+                            children: [
+                              Icon(
+                                effectiveMode == AppMode.rider ? Icons.two_wheeler : Icons.hail_rounded,
+                                size: 40,
+                                color: Colors.grey[400],
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                effectiveMode == AppMode.rider
+                                    ? 'No rider messages with passengers yet'
+                                    : 'No passenger messages with bikers yet',
+                                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+
                     return Column(
-                      children: sorted.map((c) => _buildUnifiedConversationTile(c)).toList(),
+                      children: filtered.map((c) => _buildUnifiedConversationTile(c)).toList(),
                     );
                   }
 
@@ -117,12 +158,15 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
                         future: ridesRepo.getMyOfferedRides(user?.id ?? ''),
                         builder: (context, snapshot) {
                           final myOfferedRides = snapshot.data ?? [];
-                          if (bookings.isEmpty && myOfferedRides.isEmpty) {
+                          final showBookings = (effectiveMode == AppMode.all || effectiveMode == AppMode.passenger) && bookings.isNotEmpty;
+                          final showOffered = (effectiveMode == AppMode.all || effectiveMode == AppMode.rider) && myOfferedRides.isNotEmpty;
+
+                          if (!showBookings && !showOffered) {
                             return _buildEmptyState();
                           }
                           return Column(
                             children: [
-                              if (bookings.isNotEmpty)
+                              if (showBookings)
                                 ...bookings.map((booking) {
                                   final ride = allRides.firstWhere(
                                     (r) => r.id == booking.rideId,
@@ -158,7 +202,7 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
                                   );
                                   return _buildPassengerConversationTile(booking, ride);
                                 }),
-                              if (myOfferedRides.isNotEmpty)
+                              if (showOffered)
                                 ...myOfferedRides.map((ride) => _DriverRideConversationsSection(ride: ride)),
                             ],
                           );
@@ -189,6 +233,73 @@ class _CampusMessagesScreenState extends ConsumerState<CampusMessagesScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChips(AppMode effectiveMode) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        children: [
+          _buildFilterChip('All Messages', AppMode.all, effectiveMode, Icons.tune),
+          const SizedBox(width: 8),
+          _buildFilterChip('Rider Chats (with Passengers)', AppMode.rider, effectiveMode, Icons.two_wheeler),
+          const SizedBox(width: 8),
+          _buildFilterChip('Passenger Chats (with Bikers)', AppMode.passenger, effectiveMode, Icons.hail_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, AppMode mode, AppMode effectiveMode, IconData icon) {
+    final isSelected = effectiveMode == mode;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedFilter = mode;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF141416) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF141416) : const Color(0xFFE5E7EB),
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? const Color(0xFFFFA000) : Colors.grey[700],
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? Colors.white : const Color(0xFF141416),
+              ),
+            ),
+          ],
         ),
       ),
     );

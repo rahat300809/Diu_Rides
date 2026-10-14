@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
+import 'package:diu_ride/core/providers/app_mode_provider.dart';
 
 class DiuBottomNav extends ConsumerWidget {
   final int currentIndex;
@@ -17,6 +18,8 @@ class DiuBottomNav extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final appMode = ref.watch(appModeProvider);
+
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.bottomNavBackground,
@@ -44,16 +47,22 @@ class DiuBottomNav extends ConsumerWidget {
                 label: 'Home',
               ),
 
-              // 1. All Shared Rides
+              // 1. All Shared Rides (Adapts based on mode)
               _buildNavItem(
                 index: 1,
-                icon: Icons.two_wheeler_outlined,
-                activeIcon: Icons.two_wheeler,
-                label: 'All Rides',
+                icon: appMode.isPassenger
+                    ? Icons.explore_outlined
+                    : Icons.two_wheeler_outlined,
+                activeIcon: appMode.isPassenger
+                    ? Icons.explore
+                    : Icons.two_wheeler,
+                label: appMode.isPassenger
+                    ? 'Find Rides'
+                    : (appMode.isRider ? 'All Rides' : 'All Rides'),
               ),
 
-              // 2. Offer Ride (Center Elevated Action with Radiant Amber Gradient)
-              _buildCenterAction(),
+              // 2. Center Action (Adapts: Request Ride for Passenger, Offer Ride for Rider/All)
+              _buildCenterAction(appMode),
 
               // 3. Community SMS & Messages
               _buildNavItemWithBadge(
@@ -79,8 +88,10 @@ class DiuBottomNav extends ConsumerWidget {
     );
   }
 
-  Widget _buildCenterAction() {
+  Widget _buildCenterAction(AppMode appMode) {
     final isSelected = currentIndex == 2;
+    final isPassenger = appMode.isPassenger;
+
     return GestureDetector(
       onTap: () => onTap(2),
       child: Column(
@@ -92,34 +103,39 @@ class DiuBottomNav extends ConsumerWidget {
               width: 52,
               height: 52,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
+                gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFFFFA000), // Golden amber
-                    Color(0xFFE65100), // Sunset orange
-                  ],
+                  colors: isPassenger
+                      ? [
+                          const Color(0xFF10B981), // Emerald Teal
+                          const Color(0xFF059669),
+                        ]
+                      : [
+                          const Color(0xFFFFA000), // Golden amber
+                          const Color(0xFFE65100), // Sunset orange
+                        ],
                 ),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFFE65100).withOpacity(0.45),
+                    color: (isPassenger ? const Color(0xFF10B981) : const Color(0xFFE65100)).withOpacity(0.45),
                     blurRadius: 14,
                     offset: const Offset(0, 6),
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.add,
+              child: Icon(
+                isPassenger ? Icons.hail_rounded : (appMode.isRider ? Icons.two_wheeler : Icons.add),
                 color: Colors.white,
-                size: 30,
+                size: isPassenger ? 27 : 29,
               ),
             ),
           ),
           Transform.translate(
             offset: const Offset(0, -8),
             child: Text(
-              'Offer Ride',
+              isPassenger ? 'Request Ride' : 'Offer Ride',
               style: AppTypography.labelSm.copyWith(
                 color: isSelected ? AppColors.bottomNavSelected : Colors.white70,
                 fontWeight: FontWeight.w600,

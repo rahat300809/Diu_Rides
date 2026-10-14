@@ -14,6 +14,7 @@ import 'package:diu_ride/features/rides/presentation/widgets/my_rides_activity_v
 import 'package:diu_ride/features/rides/presentation/screens/offer_ride_screen.dart';
 import 'package:diu_ride/features/tracking/presentation/screens/ride_details_tracking_screen.dart';
 import 'package:diu_ride/core/utils/direct_call_service.dart';
+import 'package:diu_ride/core/providers/app_mode_provider.dart';
 
 class AllSharedRidesScreen extends ConsumerStatefulWidget {
   const AllSharedRidesScreen({super.key});
@@ -38,6 +39,17 @@ class _AllSharedRidesScreenState extends ConsumerState<AllSharedRidesScreen> {
     'Savar',
     'Mohakhali',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final appMode = ref.read(appModeProvider);
+      if (appMode.isRider && mounted) {
+        setState(() => _selectedMode = 1);
+      }
+    });
+  }
 
   @override
   void dispose() {

@@ -21,6 +21,8 @@ import 'package:diu_ride/core/services/system_notification_service.dart';
 import 'package:diu_ride/features/notifications/data/models/notification_model.dart';
 import 'package:diu_ride/core/services/notification_sound_service.dart';
 import 'package:diu_ride/features/rides/presentation/widgets/post_expiry_extension_dialog.dart';
+import 'package:diu_ride/features/rides/presentation/widgets/post_ride_request_sheet.dart';
+import 'package:diu_ride/core/providers/app_mode_provider.dart';
 import 'package:diu_ride/shared/widgets/diu_app_header.dart';
 import 'package:diu_ride/shared/widgets/diu_bottom_nav.dart';
 
@@ -800,6 +802,11 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
   }
 
   void _onTabSelected(int index) {
+    final appMode = ref.read(appModeProvider);
+    if (index == 2 && appMode.isPassenger) {
+      PostRideRequestSheet.show(context);
+      return;
+    }
     setState(() {
       _currentTab = index;
       if (index == 3) {

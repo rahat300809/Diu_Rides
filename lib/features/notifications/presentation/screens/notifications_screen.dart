@@ -7,16 +7,53 @@ import 'package:diu_ride/features/notifications/data/models/notification_model.d
 import 'package:diu_ride/features/notifications/presentation/providers/notifications_provider.dart';
 import 'package:diu_ride/features/booking/presentation/providers/booking_provider.dart';
 
-class NotificationsScreen extends ConsumerWidget {
+import 'package:diu_ride/core/providers/app_mode_provider.dart';
+
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  AppMode? _selectedFilter;
+
+  @override
+  Widget build(BuildContext context) {
     final notifications = ref.watch(notificationsProvider);
-    final pendingRequests =
-        notifications.where((n) => n.requiresAction && !n.isRead).toList();
+    final appMode = ref.watch(appModeProvider);
+    final effectiveMode = _selectedFilter ?? appMode;
+
+    List<NotificationModel> filteredNotifications = notifications;
+    if (effectiveMode == AppMode.rider) {
+      filteredNotifications = notifications.where((n) {
+        return n.requiresAction ||
+            n.type == NotificationType.rideRequest ||
+            n.type == NotificationType.ridePublished ||
+            n.type == NotificationType.rideCancelled ||
+            n.type == NotificationType.chatMessage ||
+            n.type == NotificationType.safetyAlert;
+      }).toList();
+    } else if (effectiveMode == AppMode.passenger) {
+      filteredNotifications = notifications.where((n) {
+        return !n.requiresAction && (
+            n.type == NotificationType.rideAccepted ||
+            n.type == NotificationType.rideRejected ||
+            n.type == NotificationType.driverArriving ||
+            n.type == NotificationType.rideStarted ||
+            n.type == NotificationType.rideCompleted ||
+            n.type == NotificationType.chatMessage ||
+            n.type == NotificationType.safetyAlert
+        );
+      }).toList();
+    }
+
+    final pendingRequests = effectiveMode == AppMode.passenger
+        ? <NotificationModel>[]
+        : filteredNotifications.where((n) => n.requiresAction && !n.isRead).toList();
     final otherNotifications =
-        notifications.where((n) => !n.requiresAction).toList();
+        filteredNotifications.where((n) => !n.requiresAction).toList();
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -29,7 +66,7 @@ class NotificationsScreen extends ConsumerWidget {
               'Notifications',
               style: AppTypography.headlineSm.copyWith(fontWeight: FontWeight.w700),
             ),
-            if (notifications.any((n) => !n.isRead)) ...[
+            if (filteredNotifications.any((n) => !n.isRead)) ...[
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -38,7 +75,7 @@ class NotificationsScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '${notifications.where((n) => !n.isRead).length} new',
+                  '${filteredNotifications.where((n) => !n.isRead).length} new',
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 11,
@@ -50,7 +87,7 @@ class NotificationsScreen extends ConsumerWidget {
           ],
         ),
         actions: [
-          if (notifications.any((n) => !n.isRead))
+          if (filteredNotifications.any((n) => !n.isRead))
             TextButton(
               onPressed: () =>
                   ref.read(notificationsProvider.notifier).markAllAsRead(),
@@ -61,38 +98,112 @@ class NotificationsScreen extends ConsumerWidget {
             ),
         ],
       ),
-      body: notifications.isEmpty
-          ? _buildEmptyState()
-          : ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              children: [
-                // ── ALARM SECTION: Pending Driver Requests ─────────────────
-                if (pendingRequests.isNotEmpty) ...[
-                  _buildSectionHeader(
-                    '🔔 Action Required',
-                    '${pendingRequests.length} ride request(s) need your response',
-                    isAlert: true,
-                  ),
-                  const SizedBox(height: 8),
-                  ...pendingRequests
-                      .map((n) => _RideRequestAlarmCard(notification: n)),
-                  const SizedBox(height: 20),
-                ],
+      body: Column(
+        children: [
+          _buildFilterChips(effectiveMode),
+          Expanded(
+            child: filteredNotifications.isEmpty
+                ? _buildEmptyState(effectiveMode)
+                : ListView(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    children: [
+                      // ── ALARM SECTION: Pending Driver Requests ─────────────────
+                      if (pendingRequests.isNotEmpty) ...[
+                        _buildSectionHeader(
+                          '🔔 Action Required (Rider)',
+                          '${pendingRequests.length} ride request(s) need your response',
+                          isAlert: true,
+                        ),
+                        const SizedBox(height: 8),
+                        ...pendingRequests
+                            .map((n) => _RideRequestAlarmCard(notification: n)),
+                        const SizedBox(height: 20),
+                      ],
 
-                // ── REGULAR NOTIFICATIONS ──────────────────────────────────
-                if (otherNotifications.isNotEmpty) ...[
-                  if (pendingRequests.isNotEmpty)
-                    _buildSectionHeader('Recent Updates', null),
-                  const SizedBox(height: 8),
-                  ...otherNotifications
-                      .map((n) => _NotificationCard(notification: n)),
-                ],
-              ],
-            ),
+                      // ── REGULAR NOTIFICATIONS ──────────────────────────────────
+                      if (otherNotifications.isNotEmpty) ...[
+                        if (pendingRequests.isNotEmpty)
+                          _buildSectionHeader('Recent Updates', null),
+                        const SizedBox(height: 8),
+                        ...otherNotifications
+                            .map((n) => _NotificationCard(notification: n)),
+                      ],
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildFilterChips(AppMode effectiveMode) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          _buildFilterChip('All Alerts', AppMode.all, effectiveMode, Icons.tune),
+          const SizedBox(width: 8),
+          _buildFilterChip('Rider Alerts', AppMode.rider, effectiveMode, Icons.two_wheeler),
+          const SizedBox(width: 8),
+          _buildFilterChip('Passenger Alerts', AppMode.passenger, effectiveMode, Icons.hail_rounded),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, AppMode mode, AppMode effectiveMode, IconData icon) {
+    final isSelected = effectiveMode == mode;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedFilter = mode;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF141416) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF141416) : const Color(0xFFE5E7EB),
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? const Color(0xFFFFA000) : Colors.grey[700],
+            ),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? Colors.white : const Color(0xFF141416),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(AppMode effectiveMode) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -114,7 +225,11 @@ class NotificationsScreen extends ConsumerWidget {
           Text('All caught up!', style: AppTypography.headlineSm),
           const SizedBox(height: 4),
           Text(
-            'Ride requests and updates\nwill appear here.',
+            effectiveMode == AppMode.rider
+                ? 'No rider alerts or pending requests at this moment.'
+                : (effectiveMode == AppMode.passenger
+                    ? 'No passenger trip updates or driver alerts right now.'
+                    : 'Ride requests and campus updates\nwill appear here.'),
             style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
