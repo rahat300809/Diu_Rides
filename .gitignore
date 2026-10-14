@@ -47,3 +47,4 @@ app.*.map.json
 *.apk
 !server/web_build/diu_ride.apk
 *.csv
+server/ai_config.json

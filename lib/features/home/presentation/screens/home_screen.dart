@@ -24,6 +24,8 @@ import 'package:diu_ride/core/providers/app_mode_provider.dart';
 import 'package:diu_ride/features/home/presentation/widgets/app_mode_toggle_bar.dart';
 import 'package:diu_ride/features/home/presentation/widgets/rider_student_requests_section.dart';
 import 'package:diu_ride/features/rides/presentation/widgets/post_expiry_extension_dialog.dart';
+import 'package:diu_ride/features/ai_assistant/presentation/widgets/mini_floating_ai_badge.dart';
+import 'package:diu_ride/features/ai_assistant/presentation/widgets/diu_ai_chat_sheet.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final Function(int tabIndex) onNavigateTab;
@@ -236,6 +238,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
+      floatingActionButton: const MiniFloatingAiBadge(),
       body: RefreshIndicator(
         color: const Color(0xFFE65100),
         onRefresh: () async {
@@ -460,6 +463,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                           ),
                                         ),
                                       ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(width: 8),
+
+                            // Mini AI Assistant Trigger in Header
+                            GestureDetector(
+                              onTap: () => DiuAiChatSheet.show(context),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.24),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.white.withOpacity(0.35)),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.auto_awesome, size: 14, color: Colors.white),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      'AI Guide',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),

@@ -8,6 +8,15 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from ai_service import (
+    init_ai_settings_table,
+    get_all_ai_settings,
+    save_ai_settings,
+    process_ai_chat_request,
+    DEFAULT_SYSTEM_PROMPT,
+    DEFAULT_GROQ_API_KEY,
+    DEFAULT_MODEL_NAME,
+)
 
 admin_router = APIRouter()
 
@@ -71,6 +80,9 @@ def init_admin_tables():
         """, (admin_id, main_admin_email, "Varsity Authority (Main Admin)", pwd_hash, "superadmin", now))
         conn.commit()
         print(f"[ADMIN INIT] Successfully initialized main admin: {main_admin_email}")
+
+    # Initialize AI settings table
+    init_ai_settings_table(conn)
 
     conn.close()
 
@@ -504,6 +516,62 @@ async def admin_get_notices():
         "priority": r["priority"],
         "createdAt": r["created_at"]
     } for r in rows]
+
+# =====================================================================
+# REST Endpoints: AI Assistant Settings & Realtime Chat Proxy
+# =====================================================================
+
+@admin_router.get("/ride/api/admin/ai-settings")
+@admin_router.get("/api/admin/ai-settings")
+async def admin_get_ai_settings():
+    conn = get_admin_db()
+    try:
+        settings = get_all_ai_settings(conn)
+        return {"status": "success", "settings": settings}
+    finally:
+        conn.close()
+
+@admin_router.post("/ride/api/admin/ai-settings")
+@admin_router.post("/api/admin/ai-settings")
+async def admin_update_ai_settings(payload: Dict[str, Any]):
+    conn = get_admin_db()
+    try:
+        updated = save_ai_settings(conn, payload)
+        return {
+            "status": "success",
+            "message": "AI Assistant settings updated successfully in database!",
+            "settings": updated
+        }
+    finally:
+        conn.close()
+
+@admin_router.post("/ride/api/admin/ai-reset-prompt")
+@admin_router.post("/api/admin/ai-reset-prompt")
+async def admin_reset_ai_prompt():
+    conn = get_admin_db()
+    try:
+        updated = save_ai_settings(conn, {
+            "system_prompt": DEFAULT_SYSTEM_PROMPT,
+            "groq_api_key": DEFAULT_GROQ_API_KEY,
+            "model_name": DEFAULT_MODEL_NAME,
+        })
+        return {
+            "status": "success",
+            "message": "System prompt reset to default cordial DIU Ride companion prompt",
+            "settings": updated
+        }
+    finally:
+        conn.close()
+
+@admin_router.post("/ride/api/ai/chat")
+@admin_router.post("/api/ai/chat")
+async def public_ai_chat_endpoint(payload: Dict[str, Any]):
+    conn = get_admin_db()
+    try:
+        res = process_ai_chat_request(conn, payload)
+        return res
+    finally:
+        conn.close()
 
 # =====================================================================
 # REST Endpoints: CSV & PDF Data Export
@@ -1045,6 +1113,7 @@ ADMIN_HTML = """<!DOCTYPE html>
             <div class="nav-tab" onclick="switchTab('sos')">🚨 Emergency SOS Logs</div>
             <div class="nav-tab" onclick="switchTab('notices')">📢 University Notices</div>
             <div class="nav-tab" onclick="switchTab('admins')">🛡️ Authority Admins</div>
+            <div class="nav-tab" onclick="switchTab('ai_assistant')">🤖 DIU AI Agent Settings</div>
         </nav>
 
         <!-- MAIN AREA -->
@@ -1273,6 +1342,7 @@ ADMIN_HTML = """<!DOCTYPE html>
             else if (tab === 'sos') renderSosTab(container);
             else if (tab === 'notices') renderNoticesTab(container);
             else if (tab === 'admins') renderAdminsTab(container);
+            else if (tab === 'ai_assistant') renderAiAssistantTab(container);
         }
 
         // =================================================================
@@ -1774,6 +1844,222 @@ ADMIN_HTML = """<!DOCTYPE html>
                 const text = r.innerText.toLowerCase();
                 r.style.display = text.includes(q) ? '' : 'none';
             });
+        }
+
+        // =================================================================
+        // AI Assistant Settings Management
+        // =================================================================
+
+        async function renderAiAssistantTab(container) {
+            container.innerHTML = `
+                <div class="content-card">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">🤖 DIU Ride AI Companion & Prompt Control Center</div>
+                            <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+                                Manage Groq Cloud LLM engine, customize the cordial student system prompt, edit app knowledge base, and test responses live.
+                            </div>
+                        </div>
+                        <div class="toolbar">
+                            <button class="btn btn-outline" onclick="resetAiPromptToDefault()">↺ Reset to Default Prompt</button>
+                            <button class="btn btn-accent" onclick="saveAiSettingsFromAdmin()">💾 Save AI Settings</button>
+                        </div>
+                    </div>
+                    <div style="padding: 24px; display: flex; flex-direction: column; gap: 24px;">
+                        <div style="background: #EFF6FF; border: 1.5px solid #93C5FD; border-radius: 12px; padding: 14px 18px; color: #1E40AF; font-size: 13px; line-height: 1.5;">
+                            💡 <strong>Realtime AI Control:</strong> Any edits made to the System Prompt, Model, or Knowledge Base are saved to the SQLite database and immediately update all student mobile chatboxes and web terminals in real time without needing to restart the server or recompile the app.
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <!-- Left: Engine Config & Live Test Playground -->
+                            <div style="display: flex; flex-direction: column; gap: 16px;">
+                                <div style="border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: white;">
+                                    <h4 style="font-size: 14px; font-weight: 800; color: #1E293B; margin-bottom: 12px;">⚙️ Engine & API Configuration</h4>
+                                    <div class="form-group" style="margin-bottom: 12px;">
+                                        <label style="font-size: 12px; font-weight: 700;">Groq API Key</label>
+                                        <input type="password" id="aiGroqKey" class="form-control" placeholder="gsk_..." style="font-family: monospace; font-size: 12px;" />
+                                        <div style="display: flex; justify-content: flex-end; margin-top: 4px;">
+                                            <button class="btn btn-outline" type="button" style="padding: 2px 8px; font-size: 11px;" onclick="toggleKeyVisibility()">Show / Hide Key</button>
+                                        </div>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 12px;">
+                                        <label style="font-size: 12px; font-weight: 700;">Active AI Model</label>
+                                        <input type="text" id="aiModelName" class="form-control" placeholder="openai/gpt-oss-120b" style="font-family: monospace; font-size: 12px;" />
+                                        <span style="font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px;">Recommended: openai/gpt-oss-120b, qwen/qwen3.8-27b, openai/gpt-oss-20b</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                                        <span style="width: 10px; height: 10px; border-radius: 50%; background: #22C55E; display: inline-block;"></span>
+                                        <span style="font-size: 12px; font-weight: 700; color: #166534;">Groq Cloud Proxy Connected & Ready</span>
+                                    </div>
+                                </div>
+
+                                <!-- Live Interactive Playground -->
+                                <div style="border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: white;">
+                                    <h4 style="font-size: 14px; font-weight: 800; color: var(--primary); margin-bottom: 10px;">🧪 Live AI Prompt Playground</h4>
+                                    <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
+                                        Test how the AI greets students by name and sorts active rides/requests with your current prompt:
+                                    </p>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                                        <div>
+                                            <label style="font-size: 11px; font-weight: 700;">Student Name</label>
+                                            <input type="text" id="testAiStudentName" class="form-control" value="Rahat" style="font-size: 12px;" />
+                                        </div>
+                                        <div>
+                                            <label style="font-size: 11px; font-weight: 700;">App Role</label>
+                                            <select id="testAiRole" class="form-control" style="font-size: 12px;">
+                                                <option value="passenger">Passenger (Commuter)</option>
+                                                <option value="rider">Biker / Rider</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 10px;">
+                                        <label style="font-size: 11px; font-weight: 700;">Student Query / Message</label>
+                                        <input type="text" id="testAiMessage" class="form-control" value="Mirpur 10 theke 9:30 AM e DSC jabo, kono biker ache?" style="font-size: 12px;" />
+                                    </div>
+                                    <button class="btn btn-secondary" style="width: 100%; margin-bottom: 12px;" onclick="runAdminAiTest()">🚀 Send Test Message & Evaluate</button>
+                                    <div id="testAiResult" style="min-height: 120px; max-height: 250px; overflow-y: auto; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px; font-size: 12px; line-height: 1.5; color: #334155; white-space: pre-wrap;">
+                                        <em>AI response will appear here...</em>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right: System Prompt & Knowledge Base -->
+                            <div style="display: flex; flex-direction: column; gap: 16px;">
+                                <div style="border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: white;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                        <h4 style="font-size: 14px; font-weight: 800; color: #1E293B;">📜 System Prompt (Editable)</h4>
+                                        <span id="promptCharCount" style="font-size: 11px; color: var(--text-muted);">0 chars</span>
+                                    </div>
+                                    <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">
+                                        Instructs the AI on tone (polite, respectful, cordial), language style, greeting students by name, and matchmaking rules.
+                                    </p>
+                                    <textarea id="aiSystemPrompt" class="form-control" style="height: 220px; font-family: monospace; font-size: 11.5px; line-height: 1.45; resize: vertical;" oninput="updatePromptCount()"></textarea>
+                                </div>
+
+                                <div style="border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: white;">
+                                    <h4 style="font-size: 14px; font-weight: 800; color: #1E293B; margin-bottom: 8px;">📖 App Knowledge Base & Tutorial (README)</h4>
+                                    <p style="font-size: 11.5px; color: var(--text-muted); margin-bottom: 8px;">
+                                        App guidelines, campus landmarks, passenger/rider tutorials, and fuel sharing rules provided to the AI.
+                                    </p>
+                                    <textarea id="aiKnowledgeBase" class="form-control" style="height: 160px; font-family: monospace; font-size: 11.5px; line-height: 1.45; resize: vertical;"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            loadAiSettingsIntoForm();
+        }
+
+        async function loadAiSettingsIntoForm() {
+            try {
+                const res = await fetch('/ride/api/admin/ai-settings');
+                const data = await res.json();
+                if (data.status === 'success' && data.settings) {
+                    const s = data.settings;
+                    if (document.getElementById('aiGroqKey')) document.getElementById('aiGroqKey').value = s.groq_api_key || '';
+                    if (document.getElementById('aiModelName')) document.getElementById('aiModelName').value = s.model_name || '';
+                    if (document.getElementById('aiSystemPrompt')) {
+                        document.getElementById('aiSystemPrompt').value = s.system_prompt || '';
+                        updatePromptCount();
+                    }
+                    if (document.getElementById('aiKnowledgeBase')) document.getElementById('aiKnowledgeBase').value = s.app_knowledge_base || '';
+                }
+            } catch (e) {
+                console.error('Failed to load AI settings:', e);
+            }
+        }
+
+        function toggleKeyVisibility() {
+            const el = document.getElementById('aiGroqKey');
+            if (el) {
+                el.type = el.type === 'password' ? 'text' : 'password';
+            }
+        }
+
+        function updatePromptCount() {
+            const promptEl = document.getElementById('aiSystemPrompt');
+            const countEl = document.getElementById('promptCharCount');
+            if (promptEl && countEl) {
+                countEl.innerText = `${promptEl.value.length} chars`;
+            }
+        }
+
+        async function saveAiSettingsFromAdmin() {
+            const groq_api_key = (document.getElementById('aiGroqKey')?.value || '').trim();
+            const model_name = (document.getElementById('aiModelName')?.value || '').trim();
+            const system_prompt = document.getElementById('aiSystemPrompt')?.value || '';
+            const app_knowledge_base = document.getElementById('aiKnowledgeBase')?.value || '';
+
+            if (!groq_api_key) {
+                alert('Groq API Key is required.');
+                return;
+            }
+
+            try {
+                const res = await fetch('/ride/api/admin/ai-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        groq_api_key,
+                        model_name,
+                        system_prompt,
+                        app_knowledge_base
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Failed to save');
+                alert('✓ ' + (data.message || 'AI Settings saved successfully!'));
+            } catch (e) {
+                alert('Error saving AI settings: ' + e.message);
+            }
+        }
+
+        async function resetAiPromptToDefault() {
+            if (!confirm('Are you sure you want to reset the system prompt to the default polite DIU Ride prompt?')) {
+                return;
+            }
+            try {
+                const res = await fetch('/ride/api/admin/ai-reset-prompt', { method: 'POST' });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.detail || 'Reset failed');
+                alert('✓ ' + (data.message || 'Prompt reset successfully!'));
+                await loadAiSettingsIntoForm();
+            } catch (e) {
+                alert('Error resetting prompt: ' + e.message);
+            }
+        }
+
+        async function runAdminAiTest() {
+            const user_name = (document.getElementById('testAiStudentName')?.value || 'Student').trim();
+            const user_role = document.getElementById('testAiRole')?.value || 'passenger';
+            const message = (document.getElementById('testAiMessage')?.value || '').trim();
+            const resultBox = document.getElementById('testAiResult');
+
+            if (!message) {
+                alert('Please enter a query to test.');
+                return;
+            }
+
+            resultBox.innerHTML = '<span style="color: var(--primary);">⏳ Consulting DIU Ride AI Companion...</span>';
+
+            try {
+                const startTime = Date.now();
+                const res = await fetch('/ride/api/ai/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_name, user_role, message, history: [] })
+                });
+                const data = await res.json();
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+
+                if (!res.ok) throw new Error(data.detail || 'AI query error');
+
+                resultBox.innerHTML = `<strong>🤖 AI Response (${elapsed}s | Model: ${data.model || 'Groq'}):</strong>\n\n${data.reply}`;
+            } catch (e) {
+                resultBox.innerHTML = `<span style="color: #DC2626;">❌ Error: ${e.message}</span>`;
+            }
         }
     </script>
 </body>

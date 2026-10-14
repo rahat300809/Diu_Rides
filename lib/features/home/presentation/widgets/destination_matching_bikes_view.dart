@@ -6,6 +6,7 @@ import 'package:diu_ride/features/rides/data/models/ride_model.dart';
 import 'package:diu_ride/features/chat/presentation/screens/chat_screen.dart';
 import 'package:diu_ride/features/tracking/presentation/screens/ride_details_tracking_screen.dart';
 import 'package:diu_ride/features/safety/presentation/widgets/campus_voice_call_dialog.dart';
+import 'package:diu_ride/features/ai_assistant/presentation/widgets/diu_ai_chat_sheet.dart';
 
 class DestinationMatchingBikesView extends StatelessWidget {
   final String query;
@@ -191,18 +192,37 @@ class DestinationMatchingBikesView extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 14),
-          if (onSetAsDefault != null)
-            ElevatedButton.icon(
-              onPressed: () => onSetAsDefault!(query),
-              icon: const Icon(Icons.notification_add, size: 16),
-              label: Text('Save "$query" for Alerts'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF141416),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: [
+              if (onSetAsDefault != null)
+                ElevatedButton.icon(
+                  onPressed: () => onSetAsDefault!(query),
+                  icon: const Icon(Icons.notification_add, size: 16),
+                  label: Text('Save "$query" for Alerts'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF141416),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  ),
+                ),
+              ElevatedButton.icon(
+                onPressed: () => DiuAiChatSheet.show(context),
+                icon: const Icon(Icons.auto_awesome, size: 16, color: Color(0xFFE65100)),
+                label: const Text('Ask DIU AI Assistant'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFF3E0),
+                  foregroundColor: const Color(0xFFE65100),
+                  side: const BorderSide(color: Color(0xFFFFCC80), width: 1.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                ),
               ),
-            ),
+            ],
+          ),
         ],
       ),
     );
