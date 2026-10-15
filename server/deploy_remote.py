@@ -95,6 +95,7 @@ run('curl -s -X POST http://127.0.0.1:8001/ride/api/ai/chat -H "Content-Type: ap
 run('curl -s -I http://127.0.0.1:8001/ride/ | head -n 12', '12. Testing /ride/ web header')
 run('curl -s -I http://127.0.0.1:8001/ride/download-apk | head -n 12', '13. Testing /ride/download-apk header')
 run('curl -s -I http://127.0.0.1:8001/download-apk | head -n 12', '14. Testing /download-apk header')
+run('curl -s http://127.0.0.1:8001/ride/api/ai/live-rides | head -c 180', '15. Testing /ride/api/ai/live-rides')
 
 ssh.close()
 print("🎉 Deployment process finished!")

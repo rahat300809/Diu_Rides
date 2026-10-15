@@ -14,6 +14,15 @@ from pydantic import BaseModel
 DB_FILE = os.path.join(os.path.dirname(__file__), "rides.db")
 CSV_FILE = os.path.join(os.path.dirname(__file__), "completed_trips.csv")
 
+from active_rides_manager import (
+    sync_active_rides_file,
+    add_or_update_ride_in_file,
+    remove_ride_from_file,
+    get_active_rides_from_file,
+    ACTIVE_RIDES_JSON_PATH,
+    ACTIVE_RIDES_MD_PATH,
+)
+
 app = FastAPI(title="DIU Ride Unified Server", version="1.0.0")
 
 app.add_middleware(
@@ -419,6 +428,7 @@ async def check_and_cleanup_expired_scheduled_posts(conn=None):
                         except Exception:
                             pass
                         deleted_rides.append(r["id"])
+                        remove_ride_from_file(r["id"])
                         print(f"[AUTO-DELETE EXPIRED POST] Ride {r['id']} exceeded 10 mins without confirmed/reserved order. Purged.")
                 elif diff_minutes >= 0:
                     prompt_flag = r["extension_prompted"] if "extension_prompted" in r.keys() else 0
@@ -507,6 +517,7 @@ async def periodic_expiry_cleanup_task():
         try:
             conn = get_db()
             await check_and_cleanup_expired_scheduled_posts(conn)
+            sync_active_rides_file(conn)
             conn.close()
         except Exception:
             pass
@@ -515,6 +526,10 @@ async def periodic_expiry_cleanup_task():
 @app.on_event("startup")
 async def startup_event():
     init_db()
+    try:
+        sync_active_rides_file()
+    except Exception as e:
+        print(f"[STARTUP ACTIVE RIDES SYNC ERROR] {e}")
     asyncio.create_task(periodic_expiry_cleanup_task())
 
 from admin_portal import admin_router, set_ws_manager, ADMIN_HTML
@@ -1896,6 +1911,11 @@ async def create_ride(ride_data: Dict[str, Any]):
     conn.close()
 
     created = map_ride(row)
+    if row:
+        try:
+            add_or_update_ride_in_file(dict(row))
+        except Exception as e:
+            print(f"[ACTIVE RIDES FILE ERROR on create_ride] {e}")
     await manager.broadcast("ride_created", created)
     return created
 
@@ -1933,6 +1953,11 @@ async def extend_ride_departure_time(ride_id: str, payload: Dict[str, Any] = Bod
     conn.close()
 
     updated = map_ride(updated_row)
+    if updated_row:
+        try:
+            add_or_update_ride_in_file(dict(updated_row))
+        except Exception as e:
+            print(f"[ACTIVE RIDES FILE ERROR on extend_ride] {e}")
     await manager.broadcast("ride_updated", updated)
     await manager.broadcast("ride_time_extended", {
         "id": ride_id,
@@ -1988,6 +2013,11 @@ async def delete_ride_endpoint(
         pass
     conn.commit()
     conn.close()
+
+    try:
+        remove_ride_from_file(target_id)
+    except Exception as e:
+        print(f"[ACTIVE RIDES FILE ERROR on delete_ride] {e}")
 
     await manager.broadcast("ride_deleted", {"id": target_id})
     await manager.broadcast("post_deleted", {"id": target_id, "type": "ride"})
@@ -2140,6 +2170,11 @@ async def complete_ride(ride_id: str, payload: Optional[Dict[str, Any]] = None):
         conn.commit()
 
     conn.close()
+
+    try:
+        remove_ride_from_file(ride_id)
+    except Exception as e:
+        print(f"[ACTIVE RIDES FILE ERROR on complete_ride] {e}")
     if row:
         updated = map_ride(row)
         end_maps = row["end_maps_link"] or ""
@@ -2180,6 +2215,11 @@ async def cancel_ride(ride_id: str):
     cursor.execute("SELECT * FROM rides WHERE id = ?", (ride_id,))
     row = cursor.fetchone()
     conn.close()
+    try:
+        remove_ride_from_file(ride_id)
+    except Exception as e:
+        print(f"[ACTIVE RIDES FILE ERROR on cancel_ride] {e}")
+
     if row:
         updated = map_ride(row)
         await manager.broadcast("ride_updated", updated)
@@ -2751,6 +2791,13 @@ async def create_booking(booking_data: Dict[str, Any]):
     created = map_booking(row)
     await manager.broadcast("booking_created", created)
     if ride_row:
+        try:
+            if int(ride_row["available_seats"] or 0) <= 0:
+                remove_ride_from_file(ride_id)
+            else:
+                add_or_update_ride_in_file(dict(ride_row))
+        except Exception as e:
+            print(f"[ACTIVE RIDES FILE ERROR on booking] {e}")
         created["driverId"] = ride_row["driver_id"]
         created["driverName"] = ride_row["driver_name"]
         created["origin"] = ride_row["origin_name"]
@@ -2843,6 +2890,10 @@ async def reject_booking(booking_id: str):
     updated = map_booking(updated_row)
     await manager.broadcast("booking_status_updated", updated)
     if ride_row:
+        try:
+            add_or_update_ride_in_file(dict(ride_row))
+        except Exception as e:
+            print(f"[ACTIVE RIDES FILE ERROR on reject_booking] {e}")
         await manager.broadcast("ride_updated", map_ride(ride_row))
     return updated
 
@@ -2882,6 +2933,10 @@ async def cancel_booking(booking_id: str):
     updated = map_booking(updated_row)
     await manager.broadcast("booking_status_updated", updated)
     if ride_row:
+        try:
+            add_or_update_ride_in_file(dict(ride_row))
+        except Exception as e:
+            print(f"[ACTIVE RIDES FILE ERROR on cancel_booking] {e}")
         refreshed_ride = map_ride(ride_row)
         await manager.broadcast("ride_updated", refreshed_ride)
         print(f"[BOOKING CANCELLED] Ride {ride_id} refreshed and reopened for booking.")
@@ -3090,6 +3145,10 @@ async def cancel_ride_session(payload: Dict[str, Any]):
     }
     await manager.broadcast("ride_session_status_changed", session_event)
     if refreshed_ride_row:
+        try:
+            add_or_update_ride_in_file(dict(refreshed_ride_row))
+        except Exception as e:
+            print(f"[ACTIVE RIDES FILE ERROR on cancel_session] {e}")
         await manager.broadcast("ride_updated", map_ride(refreshed_ride_row))
         print(f"[RIDE SESSION CANCELLED IN TIME] Post {ride_id} refreshed and republished.")
 
@@ -3197,6 +3256,11 @@ async def complete_ride_session(payload: Dict[str, Any]):
     cursor.execute("DELETE FROM bookings WHERE ride_id = ?", (ride_id,))
     conn.commit()
     conn.close()
+
+    try:
+        remove_ride_from_file(ride_id)
+    except Exception as e:
+        print(f"[ACTIVE RIDES FILE ERROR on complete_ride_session] {e}")
 
     # Automated chat message
     try:
@@ -3872,6 +3936,27 @@ def download_apk():
             filename="diu_ride.apk"
         )
     raise HTTPException(status_code=404, detail="APK not found")
+
+@app.get("/ride/api/ai/live-rides")
+@app.get("/api/ai/live-rides")
+def get_live_rides_file_endpoint():
+    rides = get_active_rides_from_file()
+    return {
+        "status": "success",
+        "file": os.path.basename(ACTIVE_RIDES_JSON_PATH),
+        "total_active_rides": len(rides),
+        "rides": rides
+    }
+
+@app.get("/ride/api/ai/live-rides-markdown")
+@app.get("/api/ai/live-rides-markdown")
+def get_live_rides_markdown_endpoint():
+    if os.path.exists(ACTIVE_RIDES_MD_PATH):
+        with open(ACTIVE_RIDES_MD_PATH, "r", encoding="utf-8") as f:
+            content = f.read()
+    else:
+        content = "# No active rides file found."
+    return HTMLResponse(content=f"<pre style='font-family: monospace; white-space: pre-wrap; padding: 20px;'>{content}</pre>")
 
 @app.get("/")
 def serve_root():

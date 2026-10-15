@@ -17,6 +17,12 @@ from ai_service import (
     DEFAULT_GROQ_API_KEY,
     DEFAULT_MODEL_NAME,
 )
+from active_rides_manager import (
+    sync_active_rides_file,
+    get_active_rides_from_file,
+    ACTIVE_RIDES_JSON_PATH,
+    ACTIVE_RIDES_MD_PATH,
+)
 
 admin_router = APIRouter()
 
@@ -573,6 +579,32 @@ async def public_ai_chat_endpoint(payload: Dict[str, Any]):
     finally:
         conn.close()
 
+@admin_router.post("/ride/api/admin/sync-active-rides")
+@admin_router.post("/api/admin/sync-active-rides")
+async def admin_sync_active_rides_endpoint():
+    conn = get_admin_db()
+    try:
+        rides = sync_active_rides_file(conn)
+        return {
+            "status": "success",
+            "message": f"Successfully synchronized {len(rides)} active rides into active_rides_data.json",
+            "count": len(rides),
+            "file": os.path.basename(ACTIVE_RIDES_JSON_PATH)
+        }
+    finally:
+        conn.close()
+
+@admin_router.get("/ride/api/admin/active-rides-info")
+@admin_router.get("/api/admin/active-rides-info")
+async def admin_active_rides_info_endpoint():
+    rides = get_active_rides_from_file()
+    return {
+        "status": "success",
+        "count": len(rides),
+        "file": os.path.basename(ACTIVE_RIDES_JSON_PATH),
+        "rides": rides
+    }
+
 # =====================================================================
 # REST Endpoints: CSV & PDF Data Export
 # =====================================================================
@@ -892,7 +924,7 @@ ADMIN_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>DIU Ride - Varsity Authority Admin Portal</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -945,6 +977,7 @@ ADMIN_HTML = """<!DOCTYPE html>
         .btn {
             padding: 8px 16px; border-radius: 10px; font-weight: 700; font-size: 12.5px;
             cursor: pointer; border: none; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px;
+            text-decoration: none;
         }
         .btn-accent { background: var(--accent); color: white; }
         .btn-accent:hover { background: var(--accent-light); transform: translateY(-1px); }
@@ -953,6 +986,66 @@ ADMIN_HTML = """<!DOCTYPE html>
         .btn-secondary { background: #E2E8F0; color: #1E293B; }
         .btn-secondary:hover { background: #CBD5E1; }
         .btn-danger { background: #FEE2E2; color: #991B1B; }
+
+        /* Mobile Hamburger & Actions Drawer */
+        .menu-toggle {
+            display: none;
+            width: 40px; height: 40px;
+            background: rgba(255,255,255,0.18);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 10px;
+            color: white; font-size: 20px;
+            cursor: pointer;
+            align-items: center; justify-content: center;
+            transition: all 0.2s;
+        }
+        .menu-toggle:hover { background: rgba(255,255,255,0.28); }
+
+        .mobile-drawer {
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+            padding: 14px 16px;
+            background: #0B3310;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            position: sticky;
+            top: 60px;
+            z-index: 49;
+        }
+        .mobile-drawer.open { display: flex; }
+        .mobile-drawer .btn {
+            width: 100%; justify-content: center; padding: 11px; font-size: 13px;
+        }
+
+        /* Mobile Section Dropdown */
+        .mobile-section-picker {
+            display: none;
+            width: 100%;
+            padding: 12px 14px;
+            background: white;
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--text-main);
+            outline: none;
+            margin-bottom: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+        }
+        .mobile-section-picker:focus { border-color: var(--primary); }
+
+        /* Horizontal scroll hints for tables */
+        .table-scroll-hint {
+            display: none;
+            padding: 8px 12px;
+            background: #F1F5F9;
+            color: #64748B;
+            font-size: 11.5px;
+            font-weight: 700;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
 
         /* Container Layout */
         .layout { display: flex; flex: 1; max-width: 1600px; width: 100%; margin: 0 auto; padding: 24px; gap: 24px; }
@@ -999,7 +1092,7 @@ ADMIN_HTML = """<!DOCTYPE html>
         }
 
         /* Table Styling */
-        .table-responsive { width: 100%; overflow-x: auto; max-height: 600px; }
+        .table-responsive { width: 100%; overflow-x: auto; max-height: 600px; -webkit-overflow-scrolling: touch; }
         table.data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
         table.data-table th {
             background: #F8FAFC; color: #475569; font-weight: 700; padding: 12px 16px;
@@ -1024,6 +1117,7 @@ ADMIN_HTML = """<!DOCTYPE html>
         .modal {
             background: white; border-radius: 20px; max-width: 540px; width: 100%; padding: 26px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.2); display: flex; flex-direction: column; gap: 16px;
+            max-height: 90vh; overflow-y: auto;
         }
         .modal-header { display: flex; justify-content: space-between; align-items: center; }
         .form-group { display: flex; flex-direction: column; gap: 6px; }
@@ -1043,10 +1137,117 @@ ADMIN_HTML = """<!DOCTYPE html>
             box-shadow: 0 25px 50px rgba(0,0,0,0.3); text-align: center; display: flex; flex-direction: column; gap: 18px;
         }
 
+        /* AI Settings Grid Responsive */
+        .ai-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .ai-test-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        /* Responsive Breakpoints for Mobile & Tablet */
         @media (max-width: 900px) {
-            .layout { flex-direction: column; padding: 12px; }
-            .sidebar { width: 100%; flex-direction: row; overflow-x: auto; padding-bottom: 8px; }
-            .nav-tab { white-space: nowrap; }
+            .navbar { padding: 10px 16px; }
+            .brand-box { gap: 10px; }
+            .brand-icon { width: 36px; height: 36px; font-size: 20px; border-radius: 10px; }
+            .brand-text h1 { font-size: 15px; letter-spacing: -0.2px; }
+            .brand-text p { display: none; }
+            .nav-actions { display: none; }
+            .menu-toggle { display: flex; }
+
+            .layout { flex-direction: column; padding: 12px 14px; gap: 14px; }
+            .mobile-section-picker { display: block; }
+
+            .sidebar {
+                width: 100%;
+                flex-direction: row;
+                overflow-x: auto;
+                padding-bottom: 8px;
+                gap: 8px;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
+            .sidebar::-webkit-scrollbar { display: none; }
+            .nav-tab {
+                white-space: nowrap;
+                padding: 9px 15px;
+                font-size: 12px;
+                border-radius: 20px;
+                background: #F1F5F9;
+                flex-shrink: 0;
+            }
+            .nav-tab.active {
+                background: var(--primary);
+                color: white;
+            }
+
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 10px;
+            }
+            .stat-card {
+                padding: 13px;
+                border-radius: 14px;
+                gap: 4px;
+            }
+            .stat-label { font-size: 10.5px; }
+            .stat-value { font-size: 21px; }
+            .stat-desc { font-size: 10px; }
+
+            .card-header {
+                padding: 14px;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+            .card-title { font-size: 14px; }
+            .toolbar { width: 100%; gap: 6px; }
+            .search-input { width: 100%; min-width: 0; font-size: 13px; }
+            .toolbar .btn { flex: 1; justify-content: center; padding: 8px 10px; font-size: 11.5px; }
+
+            .table-scroll-hint { display: block; }
+            .table-responsive { max-height: 480px; }
+            table.data-table th, table.data-table td {
+                padding: 9px 10px;
+                font-size: 12px;
+                white-space: nowrap;
+            }
+
+            .ai-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            .ai-test-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+
+            .modal-overlay { padding: 12px; }
+            .modal {
+                padding: 20px 16px;
+                border-radius: 16px;
+                max-height: 92vh;
+            }
+            .login-card {
+                padding: 26px 18px;
+                border-radius: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+            .stat-card { padding: 10px 12px; }
+            .stat-value { font-size: 18px; }
+            .stat-label { font-size: 9.5px; }
+            .brand-text h1 { font-size: 13.5px; }
         }
     </style>
 </head>
@@ -1059,8 +1260,8 @@ ADMIN_HTML = """<!DOCTYPE html>
                 🛡️
             </div>
             <div>
-                <h2 style="font-size: 22px; font-weight: 800; color: #0F172A;">Varsity Authority Login</h2>
-                <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Daffodil International University • Transport Management Cell</p>
+                <h2 style="font-size: 20px; font-weight: 800; color: #0F172A;">Varsity Authority Login</h2>
+                <p style="font-size: 12.5px; color: var(--text-muted); margin-top: 4px;">Daffodil International University • Transport Cell</p>
             </div>
             <div style="background: #F1F5F9; border-radius: 12px; padding: 10px 14px; font-size: 12px; color: #475569; text-align: left;">
                 👤 <strong>Super Admin:</strong> <code>252-15-234@diu.edu.bd</code><br>
@@ -1091,16 +1292,43 @@ ADMIN_HTML = """<!DOCTYPE html>
             </div>
         </div>
         <div class="nav-actions">
-            <a href="/download-apk" class="btn btn-outline" style="text-decoration: none; color: white;" download>📥 Download APK (v1.0.1)</a>
+            <a href="/download-apk" class="btn btn-outline" download>📥 Download APK (v1.0.1)</a>
             <button class="btn btn-accent" onclick="openNoticeModal()">📢 Broadcast Notice</button>
             <button class="btn btn-outline" onclick="openPassModal()">🔑 Change Password</button>
             <button class="btn btn-outline" onclick="openAddAdminModal()">➕ Add Admin</button>
             <button class="btn btn-outline" onclick="doLogout()">🚪 Exit</button>
         </div>
+        <button class="menu-toggle" id="menuToggleBtn" onclick="toggleMobileMenu()" aria-label="Toggle Navigation Actions">
+            ☰
+        </button>
     </header>
+
+    <!-- MOBILE ACTIONS COLLAPSIBLE DRAWER -->
+    <div id="mobileDrawer" class="mobile-drawer">
+        <button class="btn btn-accent" onclick="openNoticeModal(); toggleMobileMenu();">📢 Broadcast Varsity Notice</button>
+        <button class="btn btn-outline" onclick="openPassModal(); toggleMobileMenu();">🔑 Change Password</button>
+        <button class="btn btn-outline" onclick="openAddAdminModal(); toggleMobileMenu();">➕ Add Administrator</button>
+        <a href="/download-apk" class="btn btn-outline" download onclick="toggleMobileMenu();">📥 Download APK (v1.0.1)</a>
+        <button class="btn btn-danger" onclick="doLogout()">🚪 Exit / Logout</button>
+    </div>
 
     <!-- CONTENT LAYOUT -->
     <div class="layout">
+        <!-- MOBILE SECTION DROPDOWN PICKER -->
+        <select class="mobile-section-picker" id="mobileSectionPicker" onchange="switchTab(this.value)">
+            <option value="dashboard">📊 Executive Dashboard</option>
+            <option value="users">👥 Students & Commuters</option>
+            <option value="riders">🏍️ Motorbike Riders</option>
+            <option value="passengers">🎒 Passenger Directory</option>
+            <option value="rides">🛣️ Live Rides & Routes</option>
+            <option value="bookings">📑 Booking Orders</option>
+            <option value="completed">🏁 Completed Trips Audit</option>
+            <option value="sos">🚨 Emergency SOS Logs</option>
+            <option value="notices">📢 University Notices</option>
+            <option value="admins">🛡️ Authority Admins</option>
+            <option value="ai_assistant">🤖 DIU AI Agent Settings</option>
+        </select>
+
         <!-- SIDEBAR -->
         <nav class="sidebar">
             <div class="nav-tab active" onclick="switchTab('dashboard')">📊 Executive Dashboard</div>
@@ -1323,11 +1551,33 @@ ADMIN_HTML = """<!DOCTYPE html>
             } catch(e) {}
         }
 
+        function toggleMobileMenu() {
+            const drawer = document.getElementById('mobileDrawer');
+            if (drawer) {
+                drawer.classList.toggle('open');
+            }
+        }
+
         function switchTab(tab) {
             currentTab = tab;
             document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
-            const matchingTab = Array.from(document.querySelectorAll('.nav-tab')).find(el => el.getAttribute('onclick').includes(tab));
-            if (matchingTab) matchingTab.classList.add('active');
+            const matchingTab = Array.from(document.querySelectorAll('.nav-tab')).find(el => el.getAttribute('onclick')?.includes(tab));
+            if (matchingTab) {
+                matchingTab.classList.add('active');
+                try {
+                    matchingTab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+                } catch(e) {}
+            }
+
+            const picker = document.getElementById('mobileSectionPicker');
+            if (picker && picker.value !== tab) {
+                picker.value = tab;
+            }
+
+            const drawer = document.getElementById('mobileDrawer');
+            if (drawer && drawer.classList.contains('open')) {
+                drawer.classList.remove('open');
+            }
 
             const container = document.getElementById('panelContent');
             container.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted); font-weight: bold;">Loading realtime database records...</div>';
@@ -1411,6 +1661,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                         </div>
                     </div>
                     <div class="table-responsive">
+                        <div class="table-scroll-hint">↔ Swipe horizontally to view full table columns</div>
                         <table class="data-table" id="dataTable">
                             <thead>
                                 <tr>
@@ -1465,6 +1716,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                         </div>
                     </div>
                     <div class="table-responsive">
+                        <div class="table-scroll-hint">↔ Swipe horizontally to view full table columns</div>
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -1520,6 +1772,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                         </div>
                     </div>
                     <div class="table-responsive">
+                        <div class="table-scroll-hint">↔ Swipe horizontally to view full table columns</div>
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -1573,6 +1826,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                         </div>
                     </div>
                     <div class="table-responsive">
+                        <div class="table-scroll-hint">↔ Swipe horizontally to view full table columns</div>
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -1618,6 +1872,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                         <div class="card-title">🚨 Campus Emergency SOS Alerts (${alerts.length})</div>
                     </div>
                     <div class="table-responsive">
+                        <div class="table-scroll-hint">↔ Swipe horizontally to view full table columns</div>
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -1663,6 +1918,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                         <button class="btn btn-accent" onclick="openNoticeModal()">+ New Broadcast Notice</button>
                     </div>
                     <div class="table-responsive">
+                        <div class="table-scroll-hint">↔ Swipe horizontally to view full table columns</div>
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -1707,6 +1963,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                         </div>
                     </div>
                     <div class="table-responsive">
+                        <div class="table-scroll-hint">↔ Swipe horizontally to view full table columns</div>
                         <table class="data-table">
                             <thead>
                                 <tr>
@@ -1839,7 +2096,7 @@ ADMIN_HTML = """<!DOCTYPE html>
 
         function filterTableRows(query) {
             const q = query.toLowerCase().trim();
-            const rows = document.querySelectorAll('#dataTable tbody tr');
+            const rows = document.querySelectorAll('.data-table tbody tr');
             rows.forEach(r => {
                 const text = r.innerText.toLowerCase();
                 r.style.display = text.includes(q) ? '' : 'none';
@@ -1857,7 +2114,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                         <div>
                             <div class="card-title">🤖 DIU Ride AI Companion & Prompt Control Center</div>
                             <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
-                                Manage Groq Cloud LLM engine, customize the cordial student system prompt, edit app knowledge base, and test responses live.
+                                Manage Groq Cloud LLM engine, customize the cordial student system prompt, edit app knowledge base, and monitor the live active rides file.
                             </div>
                         </div>
                         <div class="toolbar">
@@ -1865,12 +2122,36 @@ ADMIN_HTML = """<!DOCTYPE html>
                             <button class="btn btn-accent" onclick="saveAiSettingsFromAdmin()">💾 Save AI Settings</button>
                         </div>
                     </div>
-                    <div style="padding: 24px; display: flex; flex-direction: column; gap: 24px;">
+                    <div style="padding: 24px; display: flex; flex-direction: column; gap: 20px;">
                         <div style="background: #EFF6FF; border: 1.5px solid #93C5FD; border-radius: 12px; padding: 14px 18px; color: #1E40AF; font-size: 13px; line-height: 1.5;">
                             💡 <strong>Realtime AI Control:</strong> Any edits made to the System Prompt, Model, or Knowledge Base are saved to the SQLite database and immediately update all student mobile chatboxes and web terminals in real time without needing to restart the server or recompile the app.
                         </div>
 
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <!-- Dedicated Live Active Rides File Inspector Card -->
+                        <div style="background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <h3 style="font-size: 15px; font-weight: 800; color: #166534;">📁 Dedicated Active Rides File (AI Read Surface)</h3>
+                                        <span id="aiActiveRidesBadge" class="pill pill-green" style="font-size: 11px;">Loading...</span>
+                                    </div>
+                                    <p style="font-size: 12px; color: #166534; margin-top: 4px; opacity: 0.9;">
+                                        Persistent File: <code style="font-weight: 700; color: #0F172A; background: rgba(255,255,255,0.8); padding: 2px 6px; border-radius: 4px;">server/active_rides_data.json</code> • Instant direct read access for DIU AI.
+                                    </p>
+                                    <p style="font-size: 11.5px; color: #15803D; margin-top: 2px;">
+                                        ⚡ <strong>Auto-Removal Engine:</strong> Automatically removes entries when rides are completed, fully booked (available seats ≤ 0), cancelled, or departure time has expired.
+                                    </p>
+                                </div>
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn btn-outline" style="color: #166534; border-color: #86EFAC; font-size: 12px;" onclick="window.open('/ride/api/ai/live-rides', '_blank')">🔍 View Live JSON</button>
+                                    <button class="btn btn-outline" style="color: #E65100; border-color: #FDBA74; font-size: 12px;" onclick="window.open('/ride/api/ai/live-rides-markdown', '_blank')">📄 View Markdown</button>
+                                    <button class="btn btn-accent" style="font-size: 12px;" onclick="forceSyncActiveRides()">🔄 Re-Sync File Now</button>
+                                </div>
+                            </div>
+                            <div id="activeRidesStatusMsg" style="font-size: 12px; font-weight: 700; display: none;"></div>
+                        </div>
+
+                        <div class="ai-grid">
                             <!-- Left: Engine Config & Live Test Playground -->
                             <div style="display: flex; flex-direction: column; gap: 16px;">
                                 <div style="border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: white;">
@@ -1897,9 +2178,9 @@ ADMIN_HTML = """<!DOCTYPE html>
                                 <div style="border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: white;">
                                     <h4 style="font-size: 14px; font-weight: 800; color: var(--primary); margin-bottom: 10px;">🧪 Live AI Prompt Playground</h4>
                                     <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-                                        Test how the AI greets students by name and sorts active rides/requests with your current prompt:
+                                        Test how the AI greets students by name and sorts active rides directly from the live rides file:
                                     </p>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                                    <div class="ai-test-row">
                                         <div>
                                             <label style="font-size: 11px; font-weight: 700;">Student Name</label>
                                             <input type="text" id="testAiStudentName" class="form-control" value="Rahat" style="font-size: 12px;" />
@@ -1950,6 +2231,45 @@ ADMIN_HTML = """<!DOCTYPE html>
             `;
 
             loadAiSettingsIntoForm();
+            loadActiveRidesFileBadge();
+        }
+
+        async function loadActiveRidesFileBadge() {
+            try {
+                const res = await fetch('/ride/api/admin/active-rides-info');
+                const d = await res.json();
+                const badge = document.getElementById('aiActiveRidesBadge');
+                if (badge) {
+                    badge.innerText = `${d.count || 0} Live Rides in AI File`;
+                    badge.className = (d.count > 0) ? 'pill pill-green' : 'pill pill-amber';
+                }
+            } catch(e) {
+                const badge = document.getElementById('aiActiveRidesBadge');
+                if (badge) badge.innerText = 'Sync Active';
+            }
+        }
+
+        async function forceSyncActiveRides() {
+            const statusMsg = document.getElementById('activeRidesStatusMsg');
+            if (statusMsg) {
+                statusMsg.style.display = 'block';
+                statusMsg.style.color = '#1D4ED8';
+                statusMsg.innerText = '⏳ Synchronizing active rides database to JSON & Markdown files...';
+            }
+            try {
+                const res = await fetch('/ride/api/admin/sync-active-rides', { method: 'POST' });
+                const d = await res.json();
+                if (statusMsg) {
+                    statusMsg.innerText = `✓ ${d.message} (${d.count} rides currently loaded for AI)`;
+                    statusMsg.style.color = '#166534';
+                }
+                loadActiveRidesFileBadge();
+            } catch(e) {
+                if (statusMsg) {
+                    statusMsg.innerText = `❌ Sync failed: ${e.message}`;
+                    statusMsg.style.color = '#DC2626';
+                }
+            }
         }
 
         async function loadAiSettingsIntoForm() {
