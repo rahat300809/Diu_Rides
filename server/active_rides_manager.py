@@ -122,12 +122,15 @@ def generate_markdown_content(rides: List[Dict[str, Any]]) -> str:
 
     for idx, r in enumerate(rides, 1):
         female_tag = " [👧 Female Only]" if r.get("is_female_only") else ""
+        plate_str = f"({r['vehicle_plate']})" if r.get("vehicle_plate") else ""
+        waypoint_str = f" via {r['waypoint_name']}" if r.get("waypoint_name") else ""
+        bike_str = f"{r['vehicle_model']} {plate_str}".strip()
         lines.extend([
             f"### Ride #{idx}: {r['origin_name']} ➔ {r['destination_name']}{female_tag}",
             f"- **Ride ID:** `{r['id']}`",
             f"- **Biker / Rider:** {r['driver_name']} (Dept: {r['driver_dept']} | Phone: {r['driver_phone'] or 'Provided in app'})",
-            f"- **Vehicle / Bike:** {r['vehicle_model']} {f'({r['vehicle_plate']})' if r.get('vehicle_plate') else ''}",
-            f"- **Route Corridor:** {r['route_corridor']}{f' via {r['waypoint_name']}' if r.get('waypoint_name') else ''}",
+            f"- **Vehicle / Bike:** {bike_str}",
+            f"- **Route Corridor:** {r['route_corridor']}{waypoint_str}",
             f"- **Departure Time:** {r['departure_time_formatted']} (Raw: {r['departure_time']})",
             f"- **Fuel Share Fare:** ৳{r['fare_per_seat']:.0f} BDT",
             f"- **Available Seats:** {r['available_seats']} of {r['total_seats']} seats remaining",
