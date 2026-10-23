@@ -5,12 +5,20 @@ import 'package:diu_ride/core/config/app_config.dart';
 import 'package:diu_ride/core/storage/preferences_service.dart';
 import 'package:diu_ride/core/theme/app_theme.dart';
 import 'package:diu_ride/features/auth/presentation/providers/auth_provider.dart';
+import 'package:diu_ride/core/services/system_notification_service.dart';
 import 'package:diu_ride/features/auth/presentation/screens/splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize System Notification service & permissions (Mobile Notification Bar & Web Browser Tray)
+  try {
+    await SystemNotificationService.initialize();
+  } catch (e) {
+    debugPrint('SystemNotificationService init: $e');
+  }
 
   try {
     await Firebase.initializeApp(

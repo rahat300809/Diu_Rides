@@ -193,13 +193,6 @@ class NotificationsNotifier extends StateNotifier<List<NotificationModel>> {
       timestamp: DateTime.now(),
       isRead: false,
     ));
-
-    // Post to Android system status / notification bar
-    SystemNotificationService.showNotification(
-      id: noticeId,
-      title: '📢 DIU Varsity Notice: $title',
-      body: message,
-    );
   }
 
   /// Sync all recent varsity notices from backend
@@ -264,6 +257,15 @@ class NotificationsNotifier extends StateNotifier<List<NotificationModel>> {
     print('[DIU_NOTIFICATION] ${n.title} - ${n.body}');
     // Prepend so newest is at top
     state = [n, ...state];
+
+    // Trigger Mobile Phone Status Bar & Web Browser Notification Tray
+    if (!n.isRead) {
+      SystemNotificationService.showNotification(
+        id: n.id,
+        title: n.title,
+        body: n.body,
+      );
+    }
   }
 }
 

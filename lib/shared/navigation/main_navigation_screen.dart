@@ -23,6 +23,7 @@ import 'package:diu_ride/core/services/notification_sound_service.dart';
 import 'package:diu_ride/features/rides/presentation/widgets/post_expiry_extension_dialog.dart';
 import 'package:diu_ride/features/rides/presentation/widgets/post_ride_request_sheet.dart';
 import 'package:diu_ride/core/providers/app_mode_provider.dart';
+import 'package:diu_ride/features/notifications/presentation/widgets/diu_stacked_notifications_hud.dart';
 import 'package:diu_ride/shared/widgets/diu_app_header.dart';
 import 'package:diu_ride/shared/widgets/diu_bottom_nav.dart';
 
@@ -840,7 +841,18 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
             ),
       body: Column(
         children: [
-          _buildVarsityNoticeNotificationBar(),
+          DiuStackedNotificationsHud(
+            onNoticeTap: (notice) {
+              if (notice.type == NotificationType.safetyAlert) {
+                _showNoticeDetailsDialog(notice);
+              } else {
+                ref.read(notificationsProvider.notifier).markAsRead(notice.id);
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                );
+              }
+            },
+          ),
           Expanded(
             child: IndexedStack(
               index: _currentTab,
@@ -879,75 +891,6 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
         currentIndex: _currentTab,
         onTap: _onTabSelected,
         unreadChats: _unreadChatCount,
-      ),
-    );
-  }
-
-  Widget _buildVarsityNoticeNotificationBar() {
-    final notifications = ref.watch(notificationsProvider);
-    // Find newest unread varsity notice
-    final unreadNotice = notifications.cast<NotificationModel?>().firstWhere(
-      (n) => n != null && !n.isRead && n.type == NotificationType.safetyAlert && n.title.contains('📢'),
-      orElse: () => null,
-    );
-
-    if (unreadNotice == null) return const SizedBox.shrink();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFFE65100), Color(0xFFF57C00)],
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.campaign, color: Colors.white, size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: InkWell(
-              onTap: () {
-                _showNoticeDetailsDialog(unreadNotice);
-              },
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    unreadNotice.title,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    unreadNotice.body,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.close, color: Colors.white70, size: 16),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            tooltip: 'Dismiss notice banner',
-            onPressed: () {
-              ref.read(notificationsProvider.notifier).markAsRead(unreadNotice.id);
-            },
-          ),
-        ],
       ),
     );
   }

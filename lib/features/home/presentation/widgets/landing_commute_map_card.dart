@@ -9,6 +9,7 @@ import 'package:diu_ride/core/constants/campus_locations.dart';
 import 'package:diu_ride/core/utils/gps_location_service.dart';
 import 'package:diu_ride/features/rides/data/models/ride_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
+import 'package:diu_ride/features/map/presentation/screens/full_screen_commute_map_screen.dart';
 
 class LandingCommuteMapCard extends ConsumerStatefulWidget {
   final Function(String destination) onFindRides;
@@ -304,35 +305,78 @@ class _LandingCommuteMapCardState extends ConsumerState<LandingCommuteMapCard> {
                   ],
                 ),
 
-                // Recenter My Location Button
-                InkWell(
-                  onTap: () {
-                    _fetchLiveLocation();
-                    _animateCameraTo(_currentLocation);
-                  },
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.my_location, size: 14, color: Color(0xFF0284C7)),
-                        SizedBox(width: 4),
-                        Text(
-                          'My Spot',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF0284C7),
+                Row(
+                  children: [
+                    // Full Screen Map View Button
+                    InkWell(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => FullScreenCommuteMapScreen(
+                              initialDestination: _selectedDestination,
+                              initialDestinationName: _destinationName,
+                            ),
                           ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        margin: const EdgeInsets.only(right: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF7ED),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFFFEDD5)),
                         ),
-                      ],
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.fullscreen, size: 16, color: Color(0xFFE65100)),
+                            SizedBox(width: 4),
+                            Text(
+                              'Full Map',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFE65100),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+
+                    // Recenter My Location Button
+                    InkWell(
+                      onTap: () {
+                        _fetchLiveLocation();
+                        _animateCameraTo(_currentLocation);
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.my_location, size: 14, color: Color(0xFF0284C7)),
+                            SizedBox(width: 4),
+                            Text(
+                              'My Spot',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF0284C7),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
