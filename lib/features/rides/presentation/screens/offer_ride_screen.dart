@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -42,6 +44,7 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
   GoogleMapController? _offerMapController;
   LatLng _originLatLng = const LatLng(CampusLocations.diuCenterLat, CampusLocations.diuCenterLng);
   LatLng _destinationLatLng = const LatLng(23.8710, 90.3800);
+  bool _isMapInteractive = false;
 
   bool _isWaypointOpen = false;
   int _selectedDateIndex = 0; // 0: Today, 1: Tomorrow, 2: Custom
@@ -589,6 +592,17 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                               myLocationEnabled: true,
                               zoomControlsEnabled: false,
                               mapToolbarEnabled: false,
+                              scrollGesturesEnabled: _isMapInteractive,
+                              zoomGesturesEnabled: _isMapInteractive,
+                              rotateGesturesEnabled: _isMapInteractive,
+                              tiltGesturesEnabled: _isMapInteractive,
+                              gestureRecognizers: _isMapInteractive
+                                  ? {
+                                      Factory<OneSequenceGestureRecognizer>(
+                                        () => EagerGestureRecognizer(),
+                                      ),
+                                    }
+                                  : <Factory<OneSequenceGestureRecognizer>>{},
                               markers: {
                                 Marker(
                                   markerId: const MarkerId('offer_pickup'),
@@ -618,6 +632,48 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                                       'Map Pin (${latLng.latitude.toStringAsFixed(3)}, ${latLng.longitude.toStringAsFixed(3)})';
                                 });
                               },
+                            ),
+                            // Top Right: Floating Pan / Scroll Toggle Button
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () => setState(() => _isMapInteractive = !_isMapInteractive),
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: _isMapInteractive ? const Color(0xFFE65100) : Colors.white.withOpacity(0.95),
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                                      border: Border.all(
+                                        color: _isMapInteractive ? const Color(0xFFE65100) : const Color(0xFFE2E8F0),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          _isMapInteractive ? Icons.lock_open : Icons.pan_tool_outlined,
+                                          size: 12,
+                                          color: _isMapInteractive ? Colors.white : const Color(0xFF0F172A),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _isMapInteractive ? 'Pan ON' : 'Touch to Pan',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: _isMapInteractive ? Colors.white : const Color(0xFF0F172A),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                             Positioned(
                               bottom: 8,

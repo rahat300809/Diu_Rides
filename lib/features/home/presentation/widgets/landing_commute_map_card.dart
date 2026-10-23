@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -36,6 +38,7 @@ class _LandingCommuteMapCardState extends ConsumerState<LandingCommuteMapCard> {
   );
   bool _isLoadingGps = true;
   String _currentLocationName = 'DIU Smart City, Ashulia';
+  bool _isMapInteractive = false;
 
   // Selected Destination
   LatLng? _selectedDestination;
@@ -356,6 +359,17 @@ class _LandingCommuteMapCardState extends ConsumerState<LandingCommuteMapCard> {
                     myLocationButtonEnabled: false,
                     zoomControlsEnabled: false,
                     compassEnabled: true,
+                    scrollGesturesEnabled: _isMapInteractive,
+                    zoomGesturesEnabled: _isMapInteractive,
+                    rotateGesturesEnabled: _isMapInteractive,
+                    tiltGesturesEnabled: _isMapInteractive,
+                    gestureRecognizers: _isMapInteractive
+                        ? {
+                            Factory<OneSequenceGestureRecognizer>(
+                              () => EagerGestureRecognizer(),
+                            ),
+                          }
+                        : <Factory<OneSequenceGestureRecognizer>>{},
                     markers: _buildMarkers(allRides),
                     polylines: _buildPolylines(),
                     onTap: (point) {
@@ -366,14 +380,67 @@ class _LandingCommuteMapCardState extends ConsumerState<LandingCommuteMapCard> {
                     },
                   ),
 
-                  // Top subtle instruction pill
+                  // Top Right: Floating Pan / Scroll Mode Toggle Button
+                  Positioned(
+                    top: 10,
+                    right: 12,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          setState(() {
+                            _isMapInteractive = !_isMapInteractive;
+                          });
+                        },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: _isMapInteractive ? const Color(0xFFE65100) : Colors.white.withOpacity(0.95),
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.12),
+                                blurRadius: 6,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                            border: Border.all(
+                              color: _isMapInteractive ? const Color(0xFFE65100) : const Color(0xFFE2E8F0),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _isMapInteractive ? Icons.lock_open_rounded : Icons.pan_tool_outlined,
+                                size: 13,
+                                color: _isMapInteractive ? Colors.white : const Color(0xFF0F172A),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _isMapInteractive ? 'Pan Mode ON' : 'Touch to Pan',
+                                style: TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: _isMapInteractive ? Colors.white : const Color(0xFF0F172A),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Top subtle instruction pill (left aligned so it doesn't collide with toggle)
                   if (_selectedDestination == null)
                     Positioned(
                       top: 10,
                       left: 12,
-                      right: 12,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
                           color: Colors.white.withOpacity(0.92),
                           borderRadius: BorderRadius.circular(20),
@@ -385,14 +452,14 @@ class _LandingCommuteMapCardState extends ConsumerState<LandingCommuteMapCard> {
                           ],
                         ),
                         child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.touch_app, size: 14, color: Color(0xFFE65100)),
-                            SizedBox(width: 6),
+                            Icon(Icons.touch_app, size: 13, color: Color(0xFFE65100)),
+                            SizedBox(width: 5),
                             Text(
-                              'Tap any spot on the map to set your destination',
+                              'Tap map to drop destination',
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 10.5,
                                 fontWeight: FontWeight.w600,
                                 color: Color(0xFF1E293B),
                               ),

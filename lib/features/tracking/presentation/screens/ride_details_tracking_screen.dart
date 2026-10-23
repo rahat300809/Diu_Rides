@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -38,6 +40,7 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
   WebSocketClient? _wsClient;
   StreamSubscription? _wsSub;
   GoogleMapController? _trackingMapController;
+  bool _isMapInteractive = false;
 
   double _driverLat = 23.8778;
   double _driverLng = 90.3235;
@@ -374,6 +377,17 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                       zoomControlsEnabled: false,
                       compassEnabled: false,
                       mapToolbarEnabled: false,
+                      scrollGesturesEnabled: _isMapInteractive,
+                      zoomGesturesEnabled: _isMapInteractive,
+                      rotateGesturesEnabled: _isMapInteractive,
+                      tiltGesturesEnabled: _isMapInteractive,
+                      gestureRecognizers: _isMapInteractive
+                          ? {
+                              Factory<OneSequenceGestureRecognizer>(
+                                () => EagerGestureRecognizer(),
+                              ),
+                            }
+                          : <Factory<OneSequenceGestureRecognizer>>{},
                       markers: _buildTrackingMarkers(ride),
                       polylines: _buildTrackingPolylines(ride),
                     ),
@@ -414,13 +428,49 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                       ),
                     ),
 
-                    // Top Right Action Buttons: Recenter, External Google Maps, Campus SOS
+                    // Top Right Action Buttons: Pan Toggle, Recenter, External Google Maps, Campus SOS
                     Positioned(
                       top: 12,
                       right: 12,
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Pan / Scroll Toggle Button
+                          InkWell(
+                            onTap: () => setState(() => _isMapInteractive = !_isMapInteractive),
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: _isMapInteractive ? const Color(0xFFE65100) : Colors.white.withOpacity(0.95),
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                                border: Border.all(
+                                  color: _isMapInteractive ? const Color(0xFFE65100) : const Color(0xFFE2E8F0),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _isMapInteractive ? Icons.lock_open : Icons.pan_tool_outlined,
+                                    size: 13,
+                                    color: _isMapInteractive ? Colors.white : const Color(0xFF0F172A),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _isMapInteractive ? 'Pan ON' : 'Pan',
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.bold,
+                                      color: _isMapInteractive ? Colors.white : const Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
                           // Recenter Camera Button
                           InkWell(
                             onTap: () {

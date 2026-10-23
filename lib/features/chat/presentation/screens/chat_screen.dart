@@ -16,6 +16,8 @@ import 'package:diu_ride/core/utils/direct_call_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:diu_ride/core/services/notification_sound_service.dart';
 import 'package:diu_ride/features/chat/data/models/chat_message.dart';
+import 'package:diu_ride/features/tracking/presentation/screens/ride_details_tracking_screen.dart';
+import 'package:diu_ride/features/safety/presentation/widgets/campus_sos_dialog.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final String rideId;
@@ -90,12 +92,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   String? _resolvedPeerPhone;
 
   final List<String> _quickReplies = const [
-    '📍 At pickup point',
+    '📍 At Gate 1',
+    '🏢 Near AB-4 Academic Building',
+    '☕ Near Campus Cafeteria',
     '🏍️ On my way!',
+    '🪖 Helmet ready!',
     '⏱️ Arriving in 2 mins',
-    '🚦 Stuck in traffic',
-    '👋 Where are you?',
-    '✅ Thank you!',
+    '🚦 Stuck in Birulia traffic',
+    '👋 Waiting at pickup spot',
+    '✅ Arrived safely, thank you!',
   ];
 
   bool _isSameDay(DateTime a, DateTime b) {
@@ -729,6 +734,187 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
+  Widget _buildAppQuickAccessBar() {
+    final isRealRide = baseRideId != 'campus_community' && baseRideId != 'support_campus';
+    final isInProgress = _sessionStatus == 'in_progress';
+    final isCompleted = _sessionStatus == 'completed';
+
+    return Container(
+      height: 48,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+        ),
+      ),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        children: [
+          // 1. Live Map Tracking Button (Instant Access)
+          if (isRealRide) ...[
+            _buildQuickAccessChip(
+              icon: Icons.map_rounded,
+              label: 'Live Map',
+              color: const Color(0xFF0284C7),
+              bgColor: const Color(0xFFF0F9FF),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RideDetailsTrackingScreen(rideId: baseRideId),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 8),
+          ],
+
+          // 2. Direct Call Companion
+          _buildQuickAccessChip(
+            icon: Icons.phone_in_talk_rounded,
+            label: 'Call',
+            color: const Color(0xFF16A34A),
+            bgColor: const Color(0xFFF0FDF4),
+            onTap: () {
+              DirectCallService.showCallOptions(
+                context,
+                phoneNumber: _resolvedPeerPhone ?? widget.peerPhone ?? '',
+                peerName: widget.displayName,
+                peerRole: widget.peerRole ?? 'Ride Companion',
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+
+          // 3. Share Live GPS Location
+          _buildQuickAccessChip(
+            icon: Icons.my_location_rounded,
+            label: 'Share GPS',
+            color: const Color(0xFFE65100),
+            bgColor: const Color(0xFFFFF7ED),
+            onTap: _shareLocation,
+          ),
+          const SizedBox(width: 8),
+
+          // 4. Alert Ring (Buzz)
+          _buildQuickAccessChip(
+            icon: Icons.notifications_active_rounded,
+            label: 'Ring Alert',
+            color: const Color(0xFFD97706),
+            bgColor: const Color(0xFFFFFBEB),
+            onTap: _triggerAlertRing,
+          ),
+          const SizedBox(width: 8),
+
+          // 5. Trip Fare & Details
+          if (isRealRide) ...[
+            _buildQuickAccessChip(
+              icon: Icons.receipt_long_rounded,
+              label: '৳${_rideFare.toStringAsFixed(0)} Fare',
+              color: const Color(0xFF6366F1),
+              bgColor: const Color(0xFFEEF2FF),
+              onTap: _showTripManagementSheet,
+            ),
+            const SizedBox(width: 8),
+          ],
+
+          // 6. Complete Trip (if in-progress)
+          if (isRealRide && isInProgress && !isCompleted) ...[
+            _buildQuickAccessChip(
+              icon: Icons.check_circle_rounded,
+              label: 'Finish Trip',
+              color: const Color(0xFF10B981),
+              bgColor: const Color(0xFFECFDF5),
+              onTap: _completeRideSession,
+            ),
+            const SizedBox(width: 8),
+          ],
+
+          // 7. Campus Emergency SOS
+          _buildQuickAccessChip(
+            icon: Icons.emergency_rounded,
+            label: 'Campus SOS',
+            color: const Color(0xFFDC2626),
+            bgColor: const Color(0xFFFEF2F2),
+            onTap: () {
+              CampusSosDialog.show(
+                context: context,
+                onConfirmed: () async {
+                  try {
+                    final pos = await GpsLocationService.getCurrentLocation();
+                    final dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 5)));
+                    await dio.post('$_apiBase/safety/sos', data: {
+                      'rideId': baseRideId,
+                      'userId': ref.read(authNotifierProvider).user?.id ?? '',
+                      'userName': ref.read(authNotifierProvider).user?.name ?? 'Student',
+                      'latitude': pos?.latitude ?? 23.8765,
+                      'longitude': pos?.longitude ?? 90.3204,
+                      'location': 'DIU Smart City Ashulia Corridor',
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('🚨 Campus SOS Sent! DIU Proctorial Team notified.'),
+                          backgroundColor: Color(0xFFDC2626),
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('SOS failed: $e'), backgroundColor: Colors.red),
+                      );
+                    }
+                  }
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickAccessChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required Color bgColor,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withOpacity(0.35), width: 0.9),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showTripManagementSheet() {
     showModalBottomSheet(
       context: context,
@@ -1095,6 +1281,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       body: Column(
         children: [
           _buildRideSessionControlBar(),
+          _buildAppQuickAccessBar(),
           // Messages list
           Expanded(
             child: chatState.isLoading

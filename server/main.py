@@ -20,9 +20,17 @@ def parse_bd_datetime(dt_str: Optional[str]) -> Optional[datetime]:
         return datetime.fromisoformat(cleaned).replace(tzinfo=None)
     except Exception:
         pass
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%I:%M %p", "%Y-%m-%d"):
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
         try:
             return datetime.strptime(cleaned, fmt).replace(tzinfo=None)
+        except Exception:
+            pass
+    # For time-only format like "%I:%M %p" or "%H:%M", combine with today's date in BD time
+    for fmt in ("%I:%M %p", "%I:%M%p", "%H:%M", "%H:%M:%S"):
+        try:
+            t = datetime.strptime(cleaned, fmt).time()
+            now_bd = get_current_bd_time()
+            return datetime.combine(now_bd.date(), t)
         except Exception:
             pass
     return None
@@ -498,9 +506,11 @@ async def check_and_cleanup_expired_scheduled_posts(conn=None):
 
     for r_id in deleted_rides:
         await manager.broadcast("ride_deleted", {"id": r_id, "reason": "expired"})
+        await manager.broadcast("ride_expired", {"id": r_id, "reason": "expired"})
         await manager.broadcast("post_deleted", {"postId": r_id, "id": r_id, "type": "ride", "reason": "expired"})
     for req_id in deleted_reqs:
         await manager.broadcast("passenger_request_deleted", {"id": req_id, "reason": "expired"})
+        await manager.broadcast("passenger_request_expired", {"id": req_id, "reason": "expired"})
         await manager.broadcast("post_deleted", {"postId": req_id, "id": req_id, "type": "passenger_request", "reason": "expired"})
 
     return deleted_rides, deleted_reqs

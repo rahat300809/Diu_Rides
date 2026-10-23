@@ -929,6 +929,8 @@ ADMIN_HTML = """<!DOCTYPE html>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         :root {
             --primary: #1B5E20;
@@ -1317,6 +1319,7 @@ ADMIN_HTML = """<!DOCTYPE html>
         <!-- MOBILE SECTION DROPDOWN PICKER -->
         <select class="mobile-section-picker" id="mobileSectionPicker" onchange="switchTab(this.value)">
             <option value="dashboard">📊 Executive Dashboard</option>
+            <option value="fleet_map">🗺️ Live Commute & Fleet Radar</option>
             <option value="users">👥 Students & Commuters</option>
             <option value="riders">🏍️ Motorbike Riders</option>
             <option value="passengers">🎒 Passenger Directory</option>
@@ -1332,6 +1335,7 @@ ADMIN_HTML = """<!DOCTYPE html>
         <!-- SIDEBAR -->
         <nav class="sidebar">
             <div class="nav-tab active" onclick="switchTab('dashboard')">📊 Executive Dashboard</div>
+            <div class="nav-tab" onclick="switchTab('fleet_map')">🗺️ Live Fleet Radar & Map</div>
             <div class="nav-tab" onclick="switchTab('users')">👥 Students & Commuters</div>
             <div class="nav-tab" onclick="switchTab('riders')">🏍️ Motorbike Riders</div>
             <div class="nav-tab" onclick="switchTab('passengers')">🎒 Passenger Directory</div>
@@ -1583,6 +1587,7 @@ ADMIN_HTML = """<!DOCTYPE html>
             container.innerHTML = '<div style="padding: 40px; text-align: center; color: var(--text-muted); font-weight: bold;">Loading realtime database records...</div>';
 
             if (tab === 'dashboard') renderDashboardTab(container);
+            else if (tab === 'fleet_map') renderFleetMapTab(container);
             else if (tab === 'users') renderUsersTab(container, 'all');
             else if (tab === 'riders') renderUsersTab(container, 'driver');
             else if (tab === 'passengers') renderUsersTab(container, 'passenger');
@@ -1598,6 +1603,250 @@ ADMIN_HTML = """<!DOCTYPE html>
         // =================================================================
         // Tab Renderers
         // =================================================================
+
+        let leafletMapInstance = null;
+        let fleetAutoRefreshInterval = null;
+        let fleetMarkersLayer = null;
+
+        async function renderFleetMapTab(container) {
+            if (fleetAutoRefreshInterval) {
+                clearInterval(fleetAutoRefreshInterval);
+                fleetAutoRefreshInterval = null;
+            }
+
+            container.innerHTML = `
+                <div class="content-card">
+                    <div class="card-header" style="flex-wrap: wrap; gap: 12px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <div class="card-title">🗺️ Live Commute Fleet Radar & Route Map</div>
+                            <span class="pill pill-green" id="fleetLiveBadge" style="letter-spacing: 0.5px;">● REALTIME ACTIVE</span>
+                        </div>
+                        <div class="toolbar" style="flex-wrap: wrap;">
+                            <select id="mapCorridorFilter" class="search-input" style="padding: 7px 12px; width: auto;" onchange="loadFleetMapData()">
+                                <option value="all">🌐 All Commute Corridors</option>
+                                <option value="ashulia">Ashulia Highway Corridor</option>
+                                <option value="uttara">Uttara Corridor</option>
+                                <option value="mirpur">Mirpur-10 Corridor</option>
+                                <option value="dhanmondi">Dhanmondi Corridor</option>
+                                <option value="savar">Savar / Nabinagar</option>
+                            </select>
+                            <select id="mapTypeFilter" class="search-input" style="padding: 7px 12px; width: auto;" onchange="loadFleetMapData()">
+                                <option value="all">All Fleets (Bikes & Requests)</option>
+                                <option value="rides">🏍️ Motorbike Rides Only</option>
+                                <option value="requests">🎒 Passenger Requests Only</option>
+                            </select>
+                            <button class="btn btn-secondary" onclick="loadFleetMapData()">🔄 Refresh Map</button>
+                            <button class="btn btn-accent" onclick="recenterFleetMap()">🎯 Center Campus</button>
+                        </div>
+                    </div>
+                    
+                    <div style="padding: 16px 20px 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                        <div style="background: #F0FDF4; border: 1px solid #86EFAC; border-radius: 12px; padding: 12px 16px;">
+                            <div style="font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase;">Active Biker Fleets</div>
+                            <div style="font-size: 22px; font-weight: 800; color: #15803D;" id="fleetActiveCount">0</div>
+                            <div style="font-size: 11px; color: #166534;">On road with empty seats</div>
+                        </div>
+                        <div style="background: #FFF7ED; border: 1px solid #FDBA74; border-radius: 12px; padding: 12px 16px;">
+                            <div style="font-size: 11px; font-weight: 700; color: #9A3412; text-transform: uppercase;">Student Requests</div>
+                            <div style="font-size: 22px; font-weight: 800; color: #C2410C;" id="fleetRequestsCount">0</div>
+                            <div style="font-size: 11px; color: #9A3412;">Seeking peer bike share</div>
+                        </div>
+                        <div style="background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 12px; padding: 12px 16px;">
+                            <div style="font-size: 11px; font-weight: 700; color: #0369A1; text-transform: uppercase;">Hub Center</div>
+                            <div style="font-size: 14px; font-weight: 800; color: #0284C7; margin-top: 4px;">DIU Smart City</div>
+                            <div style="font-size: 11px; color: #0369A1;">Ashulia, Dhaka-1341</div>
+                        </div>
+                    </div>
+
+                    <div style="padding: 16px 20px 20px;">
+                        <div id="fleetMapContainer" style="height: 580px; width: 100%; border-radius: 16px; border: 1.5px solid var(--border); box-shadow: 0 4px 14px rgba(0,0,0,0.06); z-index: 1;"></div>
+                    </div>
+                </div>
+            `;
+
+            initFleetMap();
+            loadFleetMapData();
+            fleetAutoRefreshInterval = setInterval(() => {
+                if (currentTab === 'fleet_map') {
+                    loadFleetMapData();
+                } else {
+                    clearInterval(fleetAutoRefreshInterval);
+                    fleetAutoRefreshInterval = null;
+                }
+            }, 10000);
+        }
+
+        function initFleetMap() {
+            if (leafletMapInstance) {
+                try {
+                    leafletMapInstance.remove();
+                } catch(e) {}
+                leafletMapInstance = null;
+            }
+
+            const diuCenter = [23.8765, 90.3204];
+            try {
+                leafletMapInstance = L.map('fleetMapContainer', {
+                    center: diuCenter,
+                    zoom: 12,
+                    zoomControl: true
+                });
+
+                // Clean Carto Voyager tiles
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; OpenStreetMap, &copy; CARTO | DIU Ride Authority Fleet Radar',
+                    maxZoom: 19
+                }).addTo(leafletMapInstance);
+
+                // Prominent DIU Campus Marker
+                const campusIcon = L.divIcon({
+                    className: 'custom-campus-icon',
+                    html: `
+                        <div style="background: linear-gradient(135deg, #1B5E20, #2E7D32); color: white; padding: 6px 10px; border-radius: 20px; font-weight: 800; font-size: 11px; display: flex; align-items: center; gap: 5px; box-shadow: 0 4px 12px rgba(27,94,32,0.45); border: 2px solid white; white-space: nowrap;">
+                            🏛️ DIU Smart Campus (HQ)
+                        </div>
+                    `,
+                    iconSize: [170, 32],
+                    iconAnchor: [85, 16]
+                });
+
+                L.marker(diuCenter, { icon: campusIcon })
+                    .addTo(leafletMapInstance)
+                    .bindPopup(`
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; padding: 6px;">
+                            <h4 style="color: #1B5E20; font-size: 14px; font-weight: 800; margin-bottom: 4px;">🏛️ Daffodil International University</h4>
+                            <p style="font-size: 12px; color: #475569; margin-bottom: 6px;">Daffodil Smart City, Ashulia, Dhaka</p>
+                            <span style="background: #DCFCE7; color: #166534; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 12px;">Primary Transport Hub</span>
+                        </div>
+                    `);
+            } catch(e) {
+                console.error('Error initializing Leaflet map:', e);
+            }
+        }
+
+        function recenterFleetMap() {
+            if (leafletMapInstance) {
+                leafletMapInstance.setView([23.8765, 90.3204], 12);
+            }
+        }
+
+        async function loadFleetMapData() {
+            if (!leafletMapInstance) return;
+
+            if (fleetMarkersLayer) {
+                leafletMapInstance.removeLayer(fleetMarkersLayer);
+            }
+            fleetMarkersLayer = L.layerGroup().addTo(leafletMapInstance);
+
+            const corridorFilter = document.getElementById('mapCorridorFilter')?.value || 'all';
+            const typeFilter = document.getElementById('mapTypeFilter')?.value || 'all';
+
+            try {
+                const [ridesRes, reqRes] = await Promise.all([
+                    fetch('/ride/api/admin/rides').then(r => r.json()).catch(() => []),
+                    fetch('/ride/api/passenger-requests').then(r => r.json()).catch(() => [])
+                ]);
+
+                let activeRides = Array.isArray(ridesRes) ? ridesRes.filter(r => r.status === 'published' || r.status === 'active' || r.status === 'in_progress') : [];
+                let activeReqs = Array.isArray(reqRes) ? reqRes.filter(r => r.status === 'open') : [];
+
+                if (corridorFilter !== 'all') {
+                    activeRides = activeRides.filter(r => (r.routeCorridor || '').toLowerCase().includes(corridorFilter) || (r.destinationName || '').toLowerCase().includes(corridorFilter));
+                    activeReqs = activeReqs.filter(r => (r.pickup || '').toLowerCase().includes(corridorFilter) || (r.dropoff || '').toLowerCase().includes(corridorFilter));
+                }
+
+                const actEl = document.getElementById('fleetActiveCount');
+                if (actEl) actEl.innerText = activeRides.length;
+                const reqEl = document.getElementById('fleetRequestsCount');
+                if (reqEl) reqEl.innerText = activeReqs.length;
+
+                // Plot Active Rides
+                if (typeFilter === 'all' || typeFilter === 'rides') {
+                    activeRides.forEach(r => {
+                        const oLat = parseFloat(r.originLat) || 23.8765;
+                        const oLng = parseFloat(r.originLng) || 90.3204;
+                        const dLat = parseFloat(r.destinationLat) || 23.8069;
+                        const dLng = parseFloat(r.destinationLng) || 90.3687;
+
+                        // Route Polyline
+                        L.polyline([[oLat, oLng], [dLat, dLng]], {
+                            color: '#E65100',
+                            weight: 3.5,
+                            opacity: 0.75,
+                            dashArray: '6, 8'
+                        }).addTo(fleetMarkersLayer);
+
+                        // Custom Bike Icon
+                        const bikeIcon = L.divIcon({
+                            className: 'custom-bike-icon',
+                            html: `
+                                <div style="background: #E65100; color: white; border-radius: 50%; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 4px 10px rgba(230,81,0,0.5); border: 2.5px solid white;">
+                                    🏍️
+                                </div>
+                            `,
+                            iconSize: [34, 34],
+                            iconAnchor: [17, 17]
+                        });
+
+                        const bikeMarker = L.marker([dLat, dLng], { icon: bikeIcon }).addTo(fleetMarkersLayer);
+
+                        const popupHtml = `
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; min-width: 230px; padding: 6px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                    <strong style="font-size: 13.5px; color: #0F172A;">🏍️ ${r.driverName}</strong>
+                                    <span style="background: #DCFCE7; color: #166534; font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 8px;">৳${r.farePerSeat}</span>
+                                </div>
+                                <div style="font-size: 12px; color: #475569; margin-bottom: 3px;"><strong>Dept:</strong> ${r.driverDept || 'DIU Student'} • ${r.driverRating ? r.driverRating.toFixed(1) + '★' : '4.9★'}</div>
+                                <div style="font-size: 12px; color: #475569; margin-bottom: 3px;"><strong>Bike:</strong> ${r.vehicleModel} (${r.vehiclePlate || 'Verified Plate'})</div>
+                                <div style="font-size: 12px; color: #0F172A; margin: 6px 0; padding: 6px; background: #F8FAFC; border-radius: 8px;">
+                                    📍 <strong>From:</strong> ${r.originName}<br>
+                                    🏁 <strong>To:</strong> ${r.destinationName}
+                                </div>
+                                <div style="font-size: 11.5px; color: #E65100; font-weight: 700; margin-bottom: 8px;">
+                                    ⏰ Leaves: ${r.departureTime ? r.departureTime.slice(11, 16) : 'Scheduled'} • Seats: ${r.availableSeats}/${r.totalSeats}
+                                </div>
+                                <div style="display: flex; gap: 6px;">
+                                    ${r.driverPhone ? `<a href="tel:${r.driverPhone}" class="btn btn-secondary" style="font-size: 11px; padding: 4px 8px; text-decoration: none;">📞 Call ${r.driverPhone}</a>` : ''}
+                                    <button class="btn btn-primary" style="font-size: 11px; padding: 4px 8px;" onclick="switchTab('rides')">Inspect Route</button>
+                                </div>
+                            </div>
+                        `;
+                        bikeMarker.bindPopup(popupHtml);
+                    });
+                }
+
+                // Plot Passenger Requests
+                if (typeFilter === 'all' || typeFilter === 'requests') {
+                    activeReqs.forEach(req => {
+                        const reqIcon = L.divIcon({
+                            className: 'custom-req-icon',
+                            html: `
+                                <div style="background: #0284C7; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; box-shadow: 0 4px 8px rgba(2,132,199,0.45); border: 2px solid white;">
+                                    🎒
+                                </div>
+                            `,
+                            iconSize: [28, 28],
+                            iconAnchor: [14, 14]
+                        });
+
+                        const reqLat = 23.8765 + (Math.random() - 0.5) * 0.03;
+                        const reqLng = 90.3204 + (Math.random() - 0.5) * 0.03;
+                        const reqMarker = L.marker([reqLat, reqLng], { icon: reqIcon }).addTo(fleetMarkersLayer);
+
+                        reqMarker.bindPopup(`
+                            <div style="font-family: 'Plus Jakarta Sans', sans-serif; padding: 6px;">
+                                <strong style="font-size: 13px; color: #0284C7;">🎒 Student Commuter Request</strong>
+                                <div style="font-size: 12px; margin: 4px 0;"><strong>Passenger:</strong> ${req.passengerName} (${req.passengerPhone || 'No Phone'})</div>
+                                <div style="font-size: 11.5px; color: #475569;">📍 Pickup: ${req.pickup} ➔ ${req.dropoff}</div>
+                                <div style="font-size: 11.5px; color: #166534; font-weight: bold; margin-top: 4px;">Proposed Fare: ৳${req.proposedFare || 50}</div>
+                            </div>
+                        `);
+                    });
+                }
+            } catch (err) {
+                console.error('Fleet map error:', err);
+            }
+        }
 
         async function renderDashboardTab(container) {
             container.innerHTML = `
@@ -1615,7 +1864,13 @@ ADMIN_HTML = """<!DOCTYPE html>
                             From this portal, university transport administrators and proctorial body can audit live campus rides, monitor student driver profiles, verify GPS trails, broadcast campus safety notices, and export archival records in CSV/PDF.
                         </div>
 
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+                            <div style="border: 1.5px solid #86EFAC; border-radius: 14px; padding: 16px; background: #F0FDF4;">
+                                <h4 style="font-size: 14px; font-weight: 800; color: #15803D; margin-bottom: 8px;">🗺️ Live Commute Fleet Radar</h4>
+                                <p style="font-size: 12.5px; color: #166534; line-height: 1.5;">
+                                    Interactive campus map displaying active biker routes, passenger pickups, and DIU Smart City transport corridors.
+                                </p>
+                                <button class="btn btn-primary" style="margin-top: 12px; width: 100%; background: #15803D;" onclick="switchTab('fleet_map')">Open Live Radar Map ➔</button>
+                            </div>
                             <div style="border: 1px solid var(--border); border-radius: 14px; padding: 16px; background: white;">
                                 <h4 style="font-size: 14px; font-weight: 800; color: var(--primary); margin-bottom: 8px;">🏍️ Active Corridor Motorbikes</h4>
                                 <p style="font-size: 12.5px; color: var(--text-muted); line-height: 1.5;">
@@ -1710,6 +1965,7 @@ ADMIN_HTML = """<!DOCTYPE html>
                     <div class="card-header">
                         <div class="card-title">🛣️ Motorbike Rides & Routes (${rides.length})</div>
                         <div class="toolbar">
+                            <button class="btn btn-primary" onclick="switchTab('fleet_map')">🗺️ Interactive Map View</button>
                             <input type="text" class="search-input" placeholder="Search rider, corridor, origin..." oninput="filterTableRows(this.value)">
                             <button class="btn btn-secondary" onclick="window.open('/ride/api/admin/export/csv?type=rides', '_blank')">📥 Export CSV</button>
                             <button class="btn btn-accent" onclick="window.open('/ride/api/admin/export/pdf', '_blank')">🖨️ Print PDF</button>
