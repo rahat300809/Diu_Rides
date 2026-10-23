@@ -32,6 +32,14 @@ class _DiuAiChatSheetState extends ConsumerState<DiuAiChatSheet> {
 
   final List<Map<String, String>> _quickPromptChips = [
     {
+      'label': '⬡ হেক্সাগন নিয়ারেস্ট বাইকার',
+      'query': 'গুগল হেক্সাগন সিস্টেম ব্যবহার করে আমার গন্তব্যের সবচেয়ে কাছের সক্রিয় বাইকার সাজেস্ট করুন।',
+    },
+    {
+      'label': '📍 নিকটবর্তী ড্রপিং জোন',
+      'query': 'ক্যাম্পাস ও ঢাকার প্রধান রুটের সবচেয়ে কাছের ড্রপিং জোন এবং হাঁটার দূরত্ব কত?',
+    },
+    {
       'label': '💡 অ্যাপ গাইডলাইন',
       'query': 'ডিআইইউ রাইড অ্যাপটি কীভাবে ব্যবহার করব? সংক্ষেপে সম্পূর্ণ গাইডলাইন দিন।',
     },
@@ -421,6 +429,9 @@ class _DiuAiChatSheetState extends ConsumerState<DiuAiChatSheet> {
     final fare = r['fare_per_seat'] ?? '50';
     final bike = r['vehicle_model'] ?? 'Motorbike';
     final seats = r['available_seats'] ?? 1;
+    final hexBadge = r['hex_badge']?.toString();
+    final droppingZone = r['nearest_dropping_zone']?.toString();
+    final walkMins = r['dropping_zone_walk_mins']?.toString() ?? '2';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -468,7 +479,36 @@ class _DiuAiChatSheetState extends ConsumerState<DiuAiChatSheet> {
             '$origin ➔ $dest',
             style: const TextStyle(fontSize: 12, color: Color(0xFF334155), fontWeight: FontWeight.w600),
           ),
-          const SizedBox(height: 4),
+          if (hexBadge != null || droppingZone != null) ...[
+            const SizedBox(height: 5),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                border: Border.all(color: const Color(0xFFBFDBFE), width: 1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Text('⬡', style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.w900, fontSize: 13)),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      '${hexBadge ?? "নিকটবর্তী ম্যাচ"}${droppingZone != null ? " • ড্রপিং: $droppingZone (~$walkMins মি. হাঁটা)" : ""}',
+                      style: const TextStyle(
+                        fontSize: 10.5,
+                        color: Color(0xFF1E40AF),
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 5),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

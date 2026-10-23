@@ -90,6 +90,8 @@ run('echo rahat | sudo -S docker ps', 'Checking running Docker containers')
 # 5. Test endpoints
 run('curl -s http://127.0.0.1:8001/ride/health', 'Testing /ride/health')
 run('curl -s http://127.0.0.1:8001/ride/api/admin/ai-settings', 'Testing /ride/api/admin/ai-settings')
+run('curl -s http://127.0.0.1:8001/ride/api/spatial/dropping-zones', 'Testing /ride/api/spatial/dropping-zones')
+run('curl -s "http://127.0.0.1:8001/ride/api/rides/suggest-nearest?lat=23.8069&lng=90.3687&target_name=Mirpur+10"', 'Testing /ride/api/rides/suggest-nearest')
 run('curl -s -I http://127.0.0.1:8001/ride/ | head -n 12', 'Testing /ride/ web header')
 
 ssh.close()

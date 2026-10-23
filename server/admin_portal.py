@@ -23,6 +23,13 @@ from active_rides_manager import (
     ACTIVE_RIDES_JSON_PATH,
     ACTIVE_RIDES_MD_PATH,
 )
+from hex_spatial_engine import (
+    DROPPING_ZONES,
+    find_nearest_dropping_zone,
+    rank_bikers_by_hex_spatial_proximity,
+    lat_lng_to_hex8,
+    haversine_distance_m,
+)
 
 admin_router = APIRouter()
 
@@ -578,6 +585,68 @@ async def public_ai_chat_endpoint(payload: Dict[str, Any]):
         return res
     finally:
         conn.close()
+
+@admin_router.get("/ride/api/rides/suggest-nearest")
+@admin_router.get("/api/rides/suggest-nearest")
+async def suggest_nearest_bikers_endpoint(
+    lat: float = 23.8775,
+    lng: float = 90.3201,
+    target_name: str = "",
+    is_destination: bool = True,
+):
+    """
+    Ranks live bikers using Google/Uber H3 Hexagonal Spatial Indexing.
+    Provides proximity match score, exact meters, and nearest dropping zone.
+    """
+    active_rides = get_active_rides_from_file()
+    nearest_drop_zone = find_nearest_dropping_zone(lat, lng)
+    ranked = rank_bikers_by_hex_spatial_proximity(
+        active_rides=active_rides,
+        target_lat=lat,
+        target_lng=lng,
+        target_name=target_name,
+        is_destination_search=is_destination,
+    )
+    return {
+        "status": "success",
+        "target": {
+            "name": target_name or nearest_drop_zone["zone_name"],
+            "lat": lat,
+            "lng": lng,
+            "h3_index": lat_lng_to_hex8(lat, lng),
+        },
+        "nearest_dropping_zone": nearest_drop_zone,
+        "total_active_rides": len(active_rides),
+        "total_matched": len(ranked),
+        "ranked_bikers": ranked,
+    }
+
+@admin_router.get("/ride/api/spatial/dropping-zones")
+@admin_router.get("/api/spatial/dropping-zones")
+async def list_dropping_zones_endpoint():
+    """
+    Lists all 12 official DIU Campus & Key Dhaka Commute Dropping Zones
+    with real-time counts of incoming active bikers.
+    """
+    active_rides = get_active_rides_from_file()
+    zones_with_stats = []
+    for zone in DROPPING_ZONES:
+        z_copy = dict(zone)
+        biker_count = 0
+        for r in active_rides:
+            d_lat = float(r.get("destination_lat") or r.get("destinationLat") or 23.8765)
+            d_lng = float(r.get("destination_lng") or r.get("destinationLng") or 90.3204)
+            dist = haversine_distance_m(zone["lat"], zone["lng"], d_lat, d_lng)
+            if dist <= 1500:
+                biker_count += 1
+        z_copy["active_incoming_bikers"] = biker_count
+        zones_with_stats.append(z_copy)
+
+    return {
+        "status": "success",
+        "total_zones": len(zones_with_stats),
+        "zones": zones_with_stats,
+    }
 
 @admin_router.post("/ride/api/admin/sync-active-rides")
 @admin_router.post("/api/admin/sync-active-rides")

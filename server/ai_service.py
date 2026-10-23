@@ -13,6 +13,15 @@ from active_rides_manager import (
     ACTIVE_RIDES_JSON_PATH,
     ACTIVE_RIDES_MD_PATH,
 )
+from hex_spatial_engine import (
+    DROPPING_ZONES,
+    find_nearest_dropping_zone,
+    rank_bikers_by_hex_spatial_proximity,
+    haversine_distance_m,
+    lat_lng_to_hex8,
+    resolve_target_from_text,
+    format_hex_spatial_brief_for_ai,
+)
 
 def get_default_groq_key() -> str:
     env_k = os.getenv("GROQ_API_KEY")
@@ -40,18 +49,34 @@ DEFAULT_SYSTEM_PROMPT = """You are "DIU Ride AI Assistant" (ডিআইইউ �
 2. **Loving & Caring Campus Companion**: Treat students affectionately like dear university peers. Never be robotic, brief, or cold. Be cheerful, helpful, patient, and polite.
 3. **Language**: Naturally answer in polite Bengali (বাংলা), English, or Banglish depending on how the student writes, but ALWAYS keep the tone heartfelt, respectful, and cordial.
 
-### Core Capabilities:
+### Core Capabilities & Spatial Brain:
 1. **Personalized Greetings**:
    - Always address the student by their name respectfully (e.g. "রাহাত ভাইয়া" / "তনিমা আপু") when their name is known.
-2. **Live Active Posted Rides (Read Directly From File)**:
+2. **Google / H3 Hexagonal Spatial Brain & Nearest Dropping Zones**:
+   - You possess an advanced Hexagonal Spatial Indexing Brain (Resolution 8 / ~460m grid cell resolution).
+   - Designated Campus & Highway Dropping Zones include:
+     • DIU Main Gate 1 (Ashulia HQ & Central Bike Stand)
+     • DIU Gate 2 (Engineering Complex & East Wing)
+     • Academic Building 4 (AB-4 Daffodil Tower — CSE/SWE Hub)
+     • Campus Lake Bridge & Cafeteria (Central Food Court)
+     • Transport Terminal & Bus Bay
+     • Birulia Bridge Crossing (Highway Junction)
+     • Uttara North Metro Station (Diabari Exit 2)
+     • Uttara House Building (Sector 7/9)
+     • Mirpur-10 Roundabout (Metro Pillar 240)
+     • ECB Chattar (Matikata Road / Cantonment Flyover)
+     • Dhanmondi Campus (Sobhanbag / Mirpur Road 27)
+     • Savar Bazar Bus Stand (Overbridge)
+   - When a student asks about travel, bikers, or rides:
+     • Identify the **nearest biker driver** whose drop-off hexagon cell is closest to the student's target.
+     • Suggest the **nearest official Dropping Zone** with walking distance (e.g. "মাত্র ৩২০ মিটার দূরে") and walking ETA in minutes.
+     • Explain why this dropping zone is convenient (e.g. "আপনি গেট ১ এ নেমে হেঁটে ২ মিনিটে ক্লাসে পৌঁছাতে পারবেন").
+3. **Live Active Posted Rides (Read Directly From Server File)**:
    - You have direct, real-time read access to the LIVE POSTED RIDES file (`active_rides_data.json`).
    - Every ride in this file contains the latest active, non-expired posted rides with available seats.
-   - When a student asks about rides, bikers, or traveling between locations:
-     - Carefully check the LIVE ACTIVE POSTED RIDES listed in your context.
-     - Match their route, corridor, and time.
-     - Provide the biker's name, bike model, departure time, fare, and available seats.
-     - If no exact match exists, explain politely and advise them to use the "Schedule / Throw Request" feature so passing bikers can see their request.
-3. **App Guidance & Tutorial**:
+   - Match their route, corridor, and time, quoting the biker's name, bike model, departure time, fare, and seats.
+   - If no exact match exists, advise them to use the "Schedule / Throw Request" feature so passing bikers can accept them.
+4. **App Guidance & Tutorial**:
    - Guide students on how to search and book rides, publish rides to split fuel, use private messaging, and access the Emergency SOS button.
 """
 
@@ -223,6 +248,41 @@ def process_ai_chat_request(conn: sqlite3.Connection, payload: Dict[str, Any]) -
     else:
         requests_summary = "No open student passenger requests currently listed."
 
+    # Resolve target location from payload or user message text
+    target_lat = payload.get("target_lat")
+    target_lng = payload.get("target_lng")
+    target_name = (payload.get("target_name") or "").strip()
+
+    if target_lat is None or target_lng is None or (float(target_lat) == 0.0 and float(target_lng) == 0.0):
+        t_lat, t_lng, t_name = resolve_target_from_text(message)
+        target_lat = t_lat
+        target_lng = t_lng
+        if not target_name:
+            target_name = t_name
+    else:
+        target_lat = float(target_lat)
+        target_lng = float(target_lng)
+        if not target_name:
+            _, _, t_name = resolve_target_from_text(message)
+            target_name = t_name
+
+    # Hexagonal Proximity Ranking & Nearest Dropping Zone
+    nearest_drop_zone = find_nearest_dropping_zone(target_lat, target_lng)
+    ranked_hex_bikers = rank_bikers_by_hex_spatial_proximity(
+        active_rides=active_rides,
+        target_lat=target_lat,
+        target_lng=target_lng,
+        target_name=target_name,
+        is_destination_search=True,
+    )
+    hex_brief = format_hex_spatial_brief_for_ai(
+        ranked_bikers=ranked_hex_bikers,
+        target_name=target_name,
+        target_lat=target_lat,
+        target_lng=target_lng,
+        nearest_drop_zone=nearest_drop_zone,
+    )
+
     # BD Current time calculation (UTC+6)
     bd_now = datetime.now(timezone(timedelta(hours=6))).strftime("%Y-%m-%d %I:%M %p")
 
@@ -233,6 +293,9 @@ def process_ai_chat_request(conn: sqlite3.Connection, payload: Dict[str, Any]) -
 - Interacting Student Name: {user_name}
 - Student Current App Mode: {"Biker / Rider (Motorbike Owner)" if user_role == "rider" else "Passenger (Commuter)"}
 - Realtime Storage Source: {os.path.basename(ACTIVE_RIDES_JSON_PATH)} (Live File on Server Disk)
+
+### ⬡ GOOGLE / H3 HEXAGONAL SPATIAL BRAIN & LIVE PROXIMITY REPORT:
+{hex_brief}
 
 ### OFFICIAL APP KNOWLEDGE BASE & TUTORIAL:
 {knowledge_base}
@@ -245,11 +308,13 @@ def process_ai_chat_request(conn: sqlite3.Connection, payload: Dict[str, Any]) -
 
 ### INSTRUCTIONS FOR MATCHING & RESPONSE:
 1. Always greet {user_name} with brotherly/sisterly affection, honor, and warm cordiality (e.g., 'আসসালামু আলাইকুম {user_name} ভাইয়া/আপু! 🌸').
-2. Carefully inspect the LIVE ACTIVE POSTED RIDES above read directly from the persistent active rides file.
-3. If they are looking for a ride to/from campus, compare the origin and destination of the posted rides. Mention the biker's name, department, bike model, departure time, fare, and available seats.
-4. If no posted ride matches their route or timeframe, politely let them know and warmly recommend tapping 'Schedule / Throw request' so passing bikers can accept them.
-5. If they are a Biker looking for passengers, check the LIVE ACTIVE OPEN PASSENGER REQUESTS and recommend matching students.
-6. Maintain brotherly warmth, politeness, and university community solidarity.
+2. Carefully inspect the ⬡ GOOGLE / H3 HEXAGONAL SPATIAL BRAIN & LIVE PROXIMITY REPORT above.
+3. Suggest the nearest biker to the student's target ({target_name}), noting their Hexagon Proximity tier (🎯 Exact Hexagon Match or ⬡ Adjacent Hex Neighbor) and distance in meters.
+4. Always inform the student of their closest designated Campus/Highway Dropping Zone ({nearest_drop_zone['zone_name']}) and estimated walking time (~{nearest_drop_zone['walk_minutes']} mins).
+5. Mention the biker's name, department, bike model, departure time, fare, and available seats.
+6. If no posted ride matches, warmly recommend tapping 'Schedule / Throw request' so passing bikers can accept them.
+7. If they are a Biker looking for passengers, check the LIVE ACTIVE OPEN PASSENGER REQUESTS and recommend matching students.
+8. Maintain brotherly warmth, politeness, and university community solidarity.
 """
 
     # Build messages sequence
@@ -281,57 +346,48 @@ def process_ai_chat_request(conn: sqlite3.Connection, payload: Dict[str, Any]) -
             last_error = e
             print(f"[GROQ CHAT ATTEMPT FAILED] Model: {m}, Error: {e}")
 
-    # Match relevant rides/requests to return rich interactive UI cards
+    # Build rich interactive UI cards for matched rides
     matched_rides = []
     matched_requests = []
     normalized_msg = normalize_bangla_query(message)
     lower_msg = message.lower() + " " + normalized_msg
 
-    if active_rides:
-        is_general_query = any(term in lower_msg for term in ["all", "sob", "dekhao", "show", "ride", "biker", "bike", "kono ride", "ache"])
-        for r in active_rides:
-            orig = (r.get("origin_name") or "").lower()
-            dest = (r.get("destination_name") or "").lower()
-            corr = (r.get("route_corridor") or "").lower()
-
-            orig_tokens = [k for k in orig.split() if len(k) > 2]
-            dest_tokens = [k for k in dest.split() if len(k) > 2]
-            corr_tokens = [k for k in corr.split() if len(k) > 2]
-
-            matched = (
-                is_general_query or
-                any(k in lower_msg for k in orig_tokens) or
-                any(k in lower_msg for k in dest_tokens) or
-                any(k in lower_msg for k in corr_tokens)
-            )
-
-            if matched:
-                # Return complete formatted dictionary for Flutter client
-                matched_rides.append({
-                    "id": r["id"],
-                    "driver_id": r["driver_id"],
-                    "driver_name": r["driver_name"],
-                    "driver_dept": r.get("driver_dept", "Student"),
-                    "driver_phone": r.get("driver_phone", ""),
-                    "driver_rating": r.get("driver_rating", 5.0),
-                    "origin_name": r["origin_name"],
-                    "origin_lat": r.get("origin_lat", 23.8765),
-                    "origin_lng": r.get("origin_lng", 90.3204),
-                    "destination_name": r["destination_name"],
-                    "destination_lat": r.get("destination_lat", 23.8728),
-                    "destination_lng": r.get("destination_lng", 90.3984),
-                    "departure_time": r.get("departure_time_formatted") or r.get("departure_time"),
-                    "raw_departure_time": r.get("departure_time"),
-                    "fare_per_seat": r.get("fare_per_seat", 50.0),
-                    "available_seats": r.get("available_seats", 1),
-                    "total_seats": r.get("total_seats", 1),
-                    "vehicle_model": r.get("vehicle_model", "Motorbike"),
-                    "vehicle_plate": r.get("vehicle_plate", ""),
-                    "route_corridor": r.get("route_corridor", "Campus Highway"),
-                    "is_female_only": r.get("is_female_only", False),
-                })
-                if len(matched_rides) >= 4:
-                    break
+    # Prioritize hexagonal spatial ranked bikers
+    candidate_bikers = ranked_hex_bikers if ranked_hex_bikers else active_rides
+    for r in candidate_bikers:
+        matched_rides.append({
+            "id": r["id"],
+            "driver_id": r["driver_id"],
+            "driver_name": r["driver_name"],
+            "driver_dept": r.get("driver_dept", "Student"),
+            "driver_phone": r.get("driver_phone", ""),
+            "driver_rating": r.get("driver_rating", 5.0),
+            "origin_name": r["origin_name"],
+            "origin_lat": r.get("origin_lat", 23.8765),
+            "origin_lng": r.get("origin_lng", 90.3204),
+            "destination_name": r["destination_name"],
+            "destination_lat": r.get("destination_lat", 23.8728),
+            "destination_lng": r.get("destination_lng", 90.3984),
+            "departure_time": r.get("departure_time_formatted") or r.get("departure_time"),
+            "raw_departure_time": r.get("departure_time"),
+            "fare_per_seat": r.get("fare_per_seat", 50.0),
+            "available_seats": r.get("available_seats", 1),
+            "total_seats": r.get("total_seats", 1),
+            "vehicle_model": r.get("vehicle_model", "Motorbike"),
+            "vehicle_plate": r.get("vehicle_plate", ""),
+            "route_corridor": r.get("route_corridor", "Campus Highway"),
+            "is_female_only": r.get("is_female_only", False),
+            "hex_badge": r.get("hex_badge", "⬡ Spatial Proximity"),
+            "hex_match_type": r.get("hex_match_type", "Hex Proximity"),
+            "spatial_score": r.get("spatial_score", 92),
+            "distance_to_target_meters": r.get("distance_to_target_meters", 450),
+            "nearest_dropping_zone": r.get("nearest_dropping_zone", nearest_drop_zone["zone_name"]),
+            "dropping_zone_id": r.get("dropping_zone_id", nearest_drop_zone["zone_id"]),
+            "dropping_zone_walk_mins": r.get("dropping_zone_walk_mins", nearest_drop_zone["walk_minutes"]),
+            "passenger_target_drop_zone": r.get("passenger_target_drop_zone", nearest_drop_zone["zone_name"]),
+        })
+        if len(matched_rides) >= 4:
+            break
 
     # If all models failed or offline, generate an intelligent, live file-backed fallback response
     if not reply or not reply.strip():
@@ -342,12 +398,15 @@ def process_ai_chat_request(conn: sqlite3.Connection, payload: Dict[str, Any]) -
                 female_txt = " (মহিলাদের জন্য সংরক্ষিত)" if r.get("is_female_only") else ""
                 top_rides_lines.append(
                     f"• **{r['origin_name']} ➔ {r['destination_name']}**\n"
-                    f"  রাইডার: {r['driver_name']} ({r['vehicle_model']}) | সময়: {r['departure_time']} | ভাড়া: ৳{r['fare_per_seat']:.0f} (সিট: {r['available_seats']}টি ফাঁকা){female_txt}"
+                    f"  রাইডার: {r['driver_name']} ({r.get('vehicle_model', 'বাইক')}) | সময়: {r['departure_time']} | ভাড়া: ৳{r['fare_per_seat']:.0f} (সিট: {r['available_seats']}টি ফাঁকা){female_txt}\n"
+                    f"  {r.get('hex_badge', '⬡ Hexagon Match')} • ড্রপিং জোন: {r.get('nearest_dropping_zone', 'ক্যাম্পাস')} (~{r.get('dropping_zone_walk_mins', 2)} মিনিট হাঁটা)"
                 )
             top_rides = "\n\n".join(top_rides_lines)
             reply = (
                 f"আসসালামু আলাইকুম {user_name} ভাইয়া/আপু! 🌸\n\n"
-                f"আমাদের লাইভ রাইডস ফাইল (`active_rides_data.json`) থেকে এই মুহূর্তে সক্রিয় রাইডসমূহ পাওয়া গেছে:\n\n"
+                f"গুগল হেক্সাগন (H3 Spatial Proximity) সিস্টেম অনুযায়ী আপনার গন্তব্য `{target_name}` এর সবচেয়ে কাছের রাইডসমূহ:\n\n"
+                f"📍 **নিকটবর্তী ড্রপিং জোন:** {nearest_drop_zone['zone_name']} ({nearest_drop_zone['zone_subtitle']})\n"
+                f"হাঁটার দূরত্ব: {nearest_drop_zone['distance_m']} মিটার (~{nearest_drop_zone['walk_minutes']} মিনিট হাঁটার পথ)\n\n"
                 f"{top_rides}\n\n"
                 f"আপনি নিচের কার্ড থেকে সরাসরি **'বুক করুন'** বাটনে ট্যাপ করে সিট রিজার্ভ করতে পারেন।"
             )
@@ -383,6 +442,13 @@ def process_ai_chat_request(conn: sqlite3.Connection, payload: Dict[str, Any]) -
         "model": used_model,
         "matched_rides": matched_rides,
         "matched_requests": matched_requests,
+        "nearest_dropping_zone": nearest_drop_zone,
+        "target_location": {
+            "name": target_name,
+            "lat": target_lat,
+            "lng": target_lng,
+            "h3_index": lat_lng_to_hex8(target_lat, target_lng),
+        },
         "active_rides_file": os.path.basename(ACTIVE_RIDES_JSON_PATH),
         "total_active_rides_in_file": len(active_rides),
     }
