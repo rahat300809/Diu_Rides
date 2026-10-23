@@ -81,6 +81,7 @@ if 'docker' not in docker_check.lower():
 
 print("🐳 Deploying project with Docker Compose...")
 run('echo rahat | sudo -S systemctl stop diu-ride.service 2>/dev/null || true', 'Stopping legacy systemd service')
+run('echo rahat | sudo -S fuser -k 8001/tcp 8080/tcp 2>/dev/null || true', 'Freeing up ports 8001 and 8080')
 run('cd /home/rahat/diu_ride && echo rahat | sudo -S docker compose down 2>/dev/null || true', 'Stopping old containers')
 run('cd /home/rahat/diu_ride && echo rahat | sudo -S docker compose up -d --build', 'Building and launching Docker containers')
 time.sleep(5)
