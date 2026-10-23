@@ -793,7 +793,8 @@ class LocationSearchService {
     return 'Pin (${point.latitude.toStringAsFixed(3)}, ${point.longitude.toStringAsFixed(3)})';
   }
 
-  /// Decodes Google encoded polyline string into List of LatLng points
+  /// Decodes Google encoded polyline string into List of LatLng points.
+  /// Web-safe: Uses arithmetic shift inversion without `~` to prevent Dart2js unsigned integer overflow.
   static List<LatLng> decodePolyline(String encoded) {
     final List<LatLng> poly = [];
     int index = 0, len = encoded.length;
@@ -806,7 +807,8 @@ class LocationSearchService {
         result |= (b & 0x1f) << shift;
         shift += 5;
       } while (b >= 0x20);
-      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      // Web-safe signed delta calculation (replaces `~(result >> 1)` which breaks in Dart2js)
+      final int dlat = ((result & 1) != 0 ? -((result >> 1) + 1) : (result >> 1));
       lat += dlat;
 
       shift = 0;
@@ -816,10 +818,16 @@ class LocationSearchService {
         result |= (b & 0x1f) << shift;
         shift += 5;
       } while (b >= 0x20);
-      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      // Web-safe signed delta calculation
+      final int dlng = ((result & 1) != 0 ? -((result >> 1) + 1) : (result >> 1));
       lng += dlng;
 
-      poly.add(LatLng(lat / 1E5, lng / 1E5));
+      final double finalLat = lat / 1E5;
+      final double finalLng = lng / 1E5;
+      // Sanity clamp to valid Earth coordinates
+      if (finalLat >= -90.0 && finalLat <= 90.0 && finalLng >= -180.0 && finalLng <= 180.0) {
+        poly.add(LatLng(finalLat, finalLng));
+      }
     }
     return poly;
   }

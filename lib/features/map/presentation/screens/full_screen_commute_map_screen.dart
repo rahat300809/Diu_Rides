@@ -118,11 +118,22 @@ class _FullScreenCommuteMapScreenState
 
     if (_routePolylinePoints.isNotEmpty) {
       for (final p in _routePolylinePoints) {
+        if (p.latitude < 20.0 || p.latitude > 27.0 || p.longitude < 87.0 || p.longitude > 93.0) continue;
         if (p.latitude < southWestLat) southWestLat = p.latitude;
         if (p.longitude < southWestLng) southWestLng = p.longitude;
         if (p.latitude > northEastLat) northEastLat = p.latitude;
         if (p.longitude > northEastLng) northEastLng = p.longitude;
       }
+    }
+
+    // Ensure bounding box has non-zero padding so Google Map doesn't zoom out to entire planet
+    if ((northEastLat - southWestLat).abs() < 0.008) {
+      northEastLat += 0.004;
+      southWestLat -= 0.004;
+    }
+    if ((northEastLng - southWestLng).abs() < 0.008) {
+      northEastLng += 0.004;
+      southWestLng -= 0.004;
     }
 
     final bounds = LatLngBounds(
