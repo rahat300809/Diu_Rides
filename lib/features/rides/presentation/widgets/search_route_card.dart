@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
+import 'package:diu_ride/features/map/presentation/widgets/location_autocomplete_input.dart';
 
 class SearchRouteCard extends StatefulWidget {
   final String pickup;
@@ -126,117 +127,33 @@ class _SearchRouteCardState extends State<SearchRouteCard> with SingleTickerProv
                   ),
                   const SizedBox(width: 12),
 
-                  // Pickup & Dropoff Inputs
+                  // Pickup & Dropoff Inputs with Google API Autocomplete & Map Picker
                   Expanded(
                     child: Column(
                       children: [
-                        // Pickup input
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'From (Pickup)',
-                                      style: AppTypography.labelSm.copyWith(
-                                        color: AppColors.onSurfaceVariant,
-                                        fontSize: 10.5,
-                                      ),
-                                    ),
-                                    TextField(
-                                      controller: _pickupController,
-                                      style: AppTypography.bodyMdMedium,
-                                      decoration: const InputDecoration(
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.zero,
-                                        border: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                      ),
-                                      onChanged: widget.onPickupChanged,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              InkWell(
-                                onTap: widget.onGpsTap,
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  width: 32,
-                                  height: 32,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.surfaceContainer,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.my_location,
-                                    color: AppColors.primary,
-                                    size: 16,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                        LocationAutocompleteInput(
+                          controller: _pickupController,
+                          hintText: 'Choose campus pickup point',
+                          labelText: 'From (Pickup)',
+                          prefixIcon: Icons.trip_origin,
+                          prefixColor: AppColors.primary,
+                          onLocationSelected: (result) {
+                            _pickupController.text = result.title;
+                            widget.onPickupChanged(result.title);
+                          },
+                          onGpsTap: widget.onGpsTap,
                         ),
                         const SizedBox(height: 8),
-
-                        // Dropoff input
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'To (Destination)',
-                                      style: AppTypography.labelSm.copyWith(
-                                        color: AppColors.onSurfaceVariant,
-                                        fontSize: 10.5,
-                                      ),
-                                    ),
-                                    TextField(
-                                      controller: _dropoffController,
-                                      style: AppTypography.bodyMdMedium,
-                                      decoration: const InputDecoration(
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.zero,
-                                        border: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                      ),
-                                      onChanged: widget.onDropoffChanged,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                width: 32,
-                                height: 32,
-                                decoration: const BoxDecoration(
-                                  color: AppColors.surfaceContainer,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.pin_drop,
-                                  color: AppColors.secondary,
-                                  size: 16,
-                                ),
-                              ),
-                            ],
-                          ),
+                        LocationAutocompleteInput(
+                          controller: _dropoffController,
+                          hintText: 'e.g. Motijheel, Mirpur 10, Uttara...',
+                          labelText: 'To (Destination)',
+                          prefixIcon: Icons.location_on,
+                          prefixColor: AppColors.secondary,
+                          onLocationSelected: (result) {
+                            _dropoffController.text = result.title;
+                            widget.onDropoffChanged(result.title);
+                          },
                         ),
                       ],
                     ),

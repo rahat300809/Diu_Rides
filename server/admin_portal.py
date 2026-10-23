@@ -648,6 +648,73 @@ async def list_dropping_zones_endpoint():
         "zones": zones_with_stats,
     }
 
+GOOGLE_API_KEY = "AIzaSyD-hl4Vshm6lqgUopu4rHbwmUbbPNA7kfA"
+
+@admin_router.get("/ride/api/places/autocomplete")
+@admin_router.get("/api/places/autocomplete")
+async def proxy_places_autocomplete_endpoint(q: str = ""):
+    """
+    Proxies Google Places (New) autocomplete API for Bangladesh destinations,
+    e.g. typing 'moti' returns Motijheel, Dhaka.
+    """
+    import urllib.request
+    clean = (q or "").strip()
+    if not clean:
+        return {"status": "success", "suggestions": []}
+
+    try:
+        url = "https://places.googleapis.com/v1/places:autocomplete"
+        headers = {
+            "X-Goog-Api-Key": GOOGLE_API_KEY,
+            "Content-Type": "application/json",
+            "User-Agent": "DIU-Ride-Server/1.0",
+        }
+        data = json.dumps({
+            "input": clean,
+            "includedRegionCodes": ["bd"],
+        }).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=6.0) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            return {"status": "success", "data": body}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "suggestions": []}
+
+@admin_router.get("/ride/api/places/routes")
+@admin_router.get("/api/places/routes")
+async def proxy_places_routes_endpoint(origin_lat: float, origin_lng: float, dest_lat: float, dest_lng: float):
+    """
+    Proxies Google Routes computeRoutes API / OSRM for turn-by-turn road paths.
+    """
+    import urllib.request
+    try:
+        url = "https://routes.googleapis.com/directions/v2:computeRoutes"
+        headers = {
+            "X-Goog-Api-Key": GOOGLE_API_KEY,
+            "Content-Type": "application/json",
+            "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.description",
+            "User-Agent": "DIU-Ride-Server/1.0",
+        }
+        data = json.dumps({
+            "origin": {"location": {"latLng": {"latitude": origin_lat, "longitude": origin_lng}}},
+            "destination": {"location": {"latLng": {"latitude": dest_lat, "longitude": dest_lng}}},
+            "travelMode": "DRIVE"
+        }).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+        with urllib.request.urlopen(req, timeout=7.0) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            return {"status": "success", "data": body}
+    except Exception:
+        # Fallback to OSRM
+        try:
+            osrm_url = f"https://router.project-osrm.org/route/v1/driving/{origin_lng},{origin_lat};{dest_lng},{dest_lat}?overview=full&geometries=geojson"
+            req = urllib.request.Request(osrm_url, headers={"User-Agent": "DIU-Ride-Server/1.0"})
+            with urllib.request.urlopen(req, timeout=6.0) as resp:
+                body = json.loads(resp.read().decode("utf-8"))
+                return {"status": "success", "source": "osrm", "data": body}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
 @admin_router.post("/ride/api/admin/sync-active-rides")
 @admin_router.post("/api/admin/sync-active-rides")
 async def admin_sync_active_rides_endpoint():

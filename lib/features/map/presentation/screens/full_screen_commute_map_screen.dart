@@ -48,6 +48,9 @@ class _FullScreenCommuteMapScreenState
   int _routeEtaMinutes = 0;
   String? _nearestDroppingZone;
   int _walkMinutesToZone = 2;
+  List<LatLng> _routePolylinePoints = [];
+  String _routeSummary = '';
+  bool _isCalculatingRoute = false;
 
   // Search Results & Suggestions
   List<LocationSearchResult> _searchResults = [];
@@ -86,7 +89,6 @@ class _FullScreenCommuteMapScreenState
 
         if (_selectedDestination != null) {
           _calculateRouteStats(_selectedDestination!, _destinationName);
-          _fitRouteBounds();
         } else {
           _animateCameraTo(_currentLocation, zoom: 15.0);
         }
@@ -109,10 +111,19 @@ class _FullScreenCommuteMapScreenState
   void _fitRouteBounds() {
     if (_selectedDestination == null || _mapController == null) return;
 
-    final southWestLat = math.min(_currentLocation.latitude, _selectedDestination!.latitude);
-    final southWestLng = math.min(_currentLocation.longitude, _selectedDestination!.longitude);
-    final northEastLat = math.max(_currentLocation.latitude, _selectedDestination!.latitude);
-    final northEastLng = math.max(_currentLocation.longitude, _selectedDestination!.longitude);
+    double southWestLat = math.min(_currentLocation.latitude, _selectedDestination!.latitude);
+    double southWestLng = math.min(_currentLocation.longitude, _selectedDestination!.longitude);
+    double northEastLat = math.max(_currentLocation.latitude, _selectedDestination!.latitude);
+    double northEastLng = math.max(_currentLocation.longitude, _selectedDestination!.longitude);
+
+    if (_routePolylinePoints.isNotEmpty) {
+      for (final p in _routePolylinePoints) {
+        if (p.latitude < southWestLat) southWestLat = p.latitude;
+        if (p.longitude < southWestLng) southWestLng = p.longitude;
+        if (p.latitude > northEastLat) northEastLat = p.latitude;
+        if (p.longitude > northEastLng) northEastLng = p.longitude;
+      }
+    }
 
     final bounds = LatLngBounds(
       southwest: LatLng(southWestLat, southWestLng),
@@ -122,15 +133,15 @@ class _FullScreenCommuteMapScreenState
     _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 70));
   }
 
-  void _calculateRouteStats(LatLng point, String name) {
-    final distMeters = Geolocator.distanceBetween(
-      _currentLocation.latitude,
-      _currentLocation.longitude,
-      point.latitude,
-      point.longitude,
-    );
-    final distKm = distMeters / 1000.0;
-    final etaMins = (distKm / 32.0 * 60).round() + 4; // ~32 km/h bike pace + buffer
+  Future<void> _calculateRouteStats(LatLng point, String name) async {
+    setState(() {
+      _selectedDestination = point;
+      _destinationName = name;
+      _isCalculatingRoute = true;
+      _selectedRide = null;
+    });
+
+    final route = await LocationSearchService.getRoute(_currentLocation, point);
 
     // Identify nearest dropping zone
     String bestZone = 'DIU Main Gate 1';
@@ -149,15 +160,18 @@ class _FullScreenCommuteMapScreenState
     }
     final walkMins = math.max(1, (minZoneDist / 80.0).round());
 
-    setState(() {
-      _selectedDestination = point;
-      _destinationName = name;
-      _routeDistanceKm = double.parse(distKm.toStringAsFixed(1));
-      _routeEtaMinutes = etaMins;
-      _nearestDroppingZone = bestZone;
-      _walkMinutesToZone = walkMins;
-      _selectedRide = null;
-    });
+    if (mounted && _selectedDestination == point) {
+      setState(() {
+        _routeDistanceKm = double.parse(route.distanceKm.toStringAsFixed(1));
+        _routeEtaMinutes = route.durationMinutes;
+        _routePolylinePoints = route.polylinePoints;
+        _routeSummary = route.summary;
+        _nearestDroppingZone = bestZone;
+        _walkMinutesToZone = walkMins;
+        _isCalculatingRoute = false;
+      });
+      _fitRouteBounds();
+    }
   }
 
   void _onLocationSelected(LocationSearchResult result) {
@@ -166,7 +180,6 @@ class _FullScreenCommuteMapScreenState
       _showSearchResults = false;
     });
     _calculateRouteStats(result.latLng, result.title);
-    _fitRouteBounds();
   }
 
   void _onMapTapped(LatLng point) async {
@@ -177,7 +190,6 @@ class _FullScreenCommuteMapScreenState
     final name = await LocationSearchService.reverseGeocode(point);
     _searchController.text = name;
     _calculateRouteStats(point, name);
-    _fitRouteBounds();
   }
 
   void _handleSearchChanged(String text) async {
@@ -211,6 +223,8 @@ class _FullScreenCommuteMapScreenState
       _routeEtaMinutes = 0;
       _nearestDroppingZone = null;
       _selectedRide = null;
+      _routePolylinePoints = [];
+      _routeSummary = '';
       _searchController.clear();
       _showSearchResults = false;
     });
@@ -262,7 +276,6 @@ class _FullScreenCommuteMapScreenState
           onTap: () {
             _searchController.text = zone.title;
             _calculateRouteStats(zone.latLng, zone.title);
-            _fitRouteBounds();
           },
         ),
       );
@@ -293,17 +306,32 @@ class _FullScreenCommuteMapScreenState
 
   Set<Polyline> _buildPolylines() {
     final polylines = <Polyline>{};
-    if (_selectedDestination != null) {
+    if (_selectedDestination != null && _routePolylinePoints.isNotEmpty) {
+      // Google Maps double casing for clean road appearance
+      polylines.add(
+        Polyline(
+          polylineId: const PolylineId('active_commute_casing'),
+          points: _routePolylinePoints,
+          color: const Color(0xFF1565C0),
+          width: 7,
+        ),
+      );
       polylines.add(
         Polyline(
           polylineId: const PolylineId('active_commute_route'),
+          points: _routePolylinePoints,
+          color: const Color(0xFF42A5F5),
+          width: 5,
+        ),
+      );
+    } else if (_selectedDestination != null) {
+      polylines.add(
+        Polyline(
+          polylineId: const PolylineId('active_commute_direct'),
           points: [_currentLocation, _selectedDestination!],
           color: const Color(0xFFE65100),
-          width: 5,
-          patterns: [
-            PatternItem.dash(20),
-            PatternItem.gap(10),
-          ],
+          width: 4,
+          patterns: [PatternItem.dash(15), PatternItem.gap(8)],
         ),
       );
     }
@@ -653,9 +681,20 @@ class _FullScreenCommuteMapScreenState
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '$_routeDistanceKm km route • ~$_routeEtaMinutes min bike ride',
+                      _isCalculatingRoute
+                          ? 'Calculating turn-by-turn road route...'
+                          : '$_routeDistanceKm km road route • ~$_routeEtaMinutes min bike ride',
                       style: const TextStyle(fontSize: 12, color: Color(0xFF0284C7), fontWeight: FontWeight.w700),
                     ),
+                    if (_routeSummary.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '🛣️ Path: $_routeSummary',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),

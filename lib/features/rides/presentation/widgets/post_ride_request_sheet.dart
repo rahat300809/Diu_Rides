@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
 import 'package:diu_ride/features/auth/presentation/providers/auth_provider.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
+import 'package:diu_ride/features/map/presentation/widgets/location_autocomplete_input.dart';
 
 class PostRideRequestSheet extends ConsumerStatefulWidget {
   const PostRideRequestSheet({super.key});
@@ -226,56 +227,32 @@ class _PostRideRequestSheetState extends ConsumerState<PostRideRequestSheet> {
             ),
             const SizedBox(height: 18),
 
-            // Pickup Input
-            Text(
-              'PICKUP LOCATION',
-              style: AppTypography.labelSm.copyWith(
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF8E8E93),
-                fontSize: 11,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF4F5F7),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: TextField(
-                controller: _pickupController,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.trip_origin, size: 18, color: Color(0xFF2E7D32)),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
-              ),
+            // Pickup Input with Google Autocomplete & Map Picker
+            LocationAutocompleteInput(
+              controller: _pickupController,
+              labelText: 'PICKUP LOCATION',
+              hintText: 'e.g. DIU Main Gate 1, AB-4, Daffodil Tower...',
+              prefixIcon: Icons.trip_origin,
+              prefixColor: const Color(0xFF2E7D32),
+              onLocationSelected: (loc) {
+                _pickupController.text = loc.title;
+              },
+              onGpsTap: () {
+                _pickupController.text = 'DIU Smart City, Ashulia';
+              },
             ),
             const SizedBox(height: 14),
 
-            // Dropoff Input
-            Text(
-              'WHERE DO YOU WANT TO GO?',
-              style: AppTypography.labelSm.copyWith(
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF8E8E93),
-                fontSize: 11,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F7),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: TextField(
-                controller: _dropoffController,
-                decoration: const InputDecoration(
-                  hintText: 'e.g. Uttara Sector 11, Mirpur 10...',
-                  prefixIcon: Icon(Icons.location_on, size: 20, color: Color(0xFF34C759)),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
-              ),
+            // Dropoff Input with Google Places Autocomplete & Map Picker
+            LocationAutocompleteInput(
+              controller: _dropoffController,
+              labelText: 'WHERE DO YOU WANT TO GO?',
+              hintText: 'e.g. Motijheel, Uttara, Mirpur 10, Dhanmondi...',
+              prefixIcon: Icons.location_on,
+              prefixColor: const Color(0xFFE65100),
+              onLocationSelected: (loc) {
+                _dropoffController.text = loc.title;
+              },
             ),
             const SizedBox(height: 8),
 

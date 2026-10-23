@@ -11,6 +11,9 @@ import 'package:diu_ride/features/rides/presentation/providers/rides_provider.da
 import 'package:diu_ride/features/rides/presentation/widgets/ride_result_card.dart';
 import 'package:diu_ride/features/rides/presentation/widgets/search_filter_chips.dart';
 import 'package:diu_ride/features/rides/presentation/widgets/search_route_card.dart';
+import 'package:diu_ride/core/services/location_search_service.dart';
+import 'package:diu_ride/features/map/presentation/widgets/location_autocomplete_input.dart';
+import 'package:diu_ride/features/map/presentation/screens/full_screen_commute_map_screen.dart';
 
 class SearchRidesScreen extends ConsumerStatefulWidget {
   const SearchRidesScreen({super.key});
@@ -25,6 +28,8 @@ class _SearchRidesScreenState extends ConsumerState<SearchRidesScreen> {
   bool _isMapView = false;
   GoogleMapController? _mapController;
   RideModel? _selectedMapRide;
+  RouteSuggestion? _selectedRouteSuggestion;
+  Set<Polyline> _mapPolylines = {};
 
   final List<String> _quickTags = [
     'All',
@@ -182,43 +187,21 @@ class _SearchRidesScreenState extends ConsumerState<SearchRidesScreen> {
               ),
             ),
 
-            // Mode 1: All Rides - Live Search Input
+            // Mode 1: All Rides - Live Search Input with Google Places Autocomplete & Map Picker
             if (filterState.isAllRidesMode) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.outlineVariant.withOpacity(0.6)),
-                    boxShadow: const [
-                      BoxShadow(color: AppColors.cardShadow, blurRadius: 6, offset: Offset(0, 2)),
-                    ],
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: (val) {
-                      filterNotifier.setGeneralSearch(val);
-                      if (val.isEmpty) setState(() => _selectedQuickTag = 'All');
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Search destination, pickup, driver, vehicle...',
-                      hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline),
-                      prefixIcon: const Icon(Icons.search, color: AppColors.primary),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () {
-                                _searchController.clear();
-                                filterNotifier.setGeneralSearch('');
-                                setState(() => _selectedQuickTag = 'All');
-                              },
-                            )
-                          : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    ),
-                  ),
+                child: LocationAutocompleteInput(
+                  controller: _searchController,
+                  hintText: 'Search destination (e.g. Motijheel, Mirpur 10)...',
+                  prefixIcon: Icons.search,
+                  prefixColor: AppColors.primary,
+                  showMapPicker: true,
+                  onLocationSelected: (loc) {
+                    _searchController.text = loc.title;
+                    filterNotifier.setGeneralSearch(loc.title);
+                    setState(() => _selectedQuickTag = loc.title);
+                  },
                 ),
               ),
 
@@ -506,11 +489,36 @@ class _SearchRidesScreenState extends ConsumerState<SearchRidesScreen> {
             title: '🏍️ ${ride.driverName} (৳${ride.farePerSeat.toInt()})',
             snippet: '${ride.originName} ➔ ${ride.destinationName}',
           ),
-          onTap: () {
-            setState(() => _selectedMapRide = ride);
+          onTap: () async {
+            setState(() {
+              _selectedMapRide = ride;
+              _selectedRouteSuggestion = null;
+            });
             _mapController?.animateCamera(
-              CameraUpdate.newLatLngZoom(LatLng(ride.destinationLat, ride.destinationLng), 13.5),
+              CameraUpdate.newLatLngZoom(LatLng(ride.destinationLat, ride.destinationLng), 13.0),
             );
+            final origin = LatLng(ride.originLat, ride.originLng);
+            final dest = LatLng(ride.destinationLat, ride.destinationLng);
+            final route = await LocationSearchService.getRoute(origin, dest);
+            if (mounted && _selectedMapRide?.id == ride.id) {
+              setState(() {
+                _selectedRouteSuggestion = route;
+                _mapPolylines = {
+                  Polyline(
+                    polylineId: const PolylineId('selected_ride_casing'),
+                    points: route.polylinePoints,
+                    color: const Color(0xFF1565C0),
+                    width: 6,
+                  ),
+                  Polyline(
+                    polylineId: const PolylineId('selected_ride_route'),
+                    points: route.polylinePoints,
+                    color: const Color(0xFF42A5F5),
+                    width: 4,
+                  ),
+                };
+              });
+            }
           },
         ),
       );
@@ -525,16 +533,21 @@ class _SearchRidesScreenState extends ConsumerState<SearchRidesScreen> {
           ),
           onMapCreated: (ctrl) => _mapController = ctrl,
           markers: markers,
+          polylines: _mapPolylines,
           myLocationEnabled: true,
           zoomControlsEnabled: false,
           mapToolbarEnabled: false,
           onTap: (_) {
             if (_selectedMapRide != null) {
-              setState(() => _selectedMapRide = null);
+              setState(() {
+                _selectedMapRide = null;
+                _selectedRouteSuggestion = null;
+                _mapPolylines = {};
+              });
             }
           },
         ),
-        // Overlay banner
+        // Overlay banner with Full Screen Map access
         Positioned(
           top: 10,
           left: 16,
@@ -542,20 +555,54 @@ class _SearchRidesScreenState extends ConsumerState<SearchRidesScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.95),
+              color: Colors.white.withOpacity(0.96),
               borderRadius: BorderRadius.circular(14),
               boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
             ),
             child: Row(
               children: [
-                const Icon(Icons.touch_app, size: 16, color: Color(0xFFE65100)),
+                const Icon(Icons.two_wheeler, size: 18, color: Color(0xFFE65100)),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Tap any pin on the map to inspect peer destination & book seats',
+                    _selectedRouteSuggestion != null
+                        ? 'Road Path: ${_selectedRouteSuggestion!.distanceKm.toStringAsFixed(1)} km • ~${_selectedRouteSuggestion!.durationMinutes} mins'
+                        : 'Tap any biker pin to see Google road route & reserve',
                     style: AppTypography.labelSm.copyWith(
                       color: const Color(0xFF1F2937),
                       fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => FullScreenCommuteMapScreen(
+                          initialDestination: _selectedMapRide != null
+                              ? LatLng(_selectedMapRide!.destinationLat, _selectedMapRide!.destinationLng)
+                              : null,
+                          initialDestinationName: _selectedMapRide?.destinationName,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE65100).withOpacity(0.4)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Full Map', style: TextStyle(color: Color(0xFFE65100), fontSize: 11, fontWeight: FontWeight.bold)),
+                        SizedBox(width: 2),
+                        Icon(Icons.fullscreen, size: 14, color: Color(0xFFE65100)),
+                      ],
                     ),
                   ),
                 ),

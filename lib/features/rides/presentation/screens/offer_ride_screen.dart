@@ -16,6 +16,9 @@ import 'package:diu_ride/features/rides/data/models/passenger_request_model.dart
 import 'package:diu_ride/core/utils/date_time_utils.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:diu_ride/features/profile/presentation/widgets/motorcycle_config_dialog.dart';
+import 'package:diu_ride/core/services/location_search_service.dart';
+import 'package:diu_ride/features/map/presentation/widgets/location_autocomplete_input.dart';
+import 'package:diu_ride/features/map/presentation/screens/full_screen_commute_map_screen.dart';
 
 class OfferRideScreen extends ConsumerStatefulWidget {
   final VoidCallback onRidePublished;
@@ -45,6 +48,9 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
   LatLng _originLatLng = const LatLng(CampusLocations.diuCenterLat, CampusLocations.diuCenterLng);
   LatLng _destinationLatLng = const LatLng(23.8710, 90.3800);
   bool _isMapInteractive = false;
+  RouteSuggestion? _routeSuggestion;
+  Set<Polyline> _previewPolylines = {};
+  bool _isLoadingRoute = false;
 
   bool _isWaypointOpen = false;
   int _selectedDateIndex = 0; // 0: Today, 1: Tomorrow, 2: Custom
@@ -74,6 +80,35 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
     _manualDateController.text = '${DateTime.now().day.toString().padLeft(2, '0')}/${DateTime.now().month.toString().padLeft(2, '0')}/${DateTime.now().year}';
     _manualTimeController.text = '04:30 PM';
     _loadSavedMotoConfig();
+    _updateRealRoadRoute();
+  }
+
+  Future<void> _updateRealRoadRoute() async {
+    setState(() => _isLoadingRoute = true);
+    final route = await LocationSearchService.getRoute(_originLatLng, _destinationLatLng);
+    if (mounted) {
+      setState(() {
+        _routeSuggestion = route;
+        _isLoadingRoute = false;
+        _previewPolylines = {
+          Polyline(
+            polylineId: const PolylineId('offer_preview_route_casing'),
+            points: route.polylinePoints,
+            color: const Color(0xFFB23B00),
+            width: 6,
+          ),
+          Polyline(
+            polylineId: const PolylineId('offer_preview_route'),
+            points: route.polylinePoints,
+            color: const Color(0xFFE65100),
+            width: 4,
+          ),
+        };
+      });
+      _offerMapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(_destinationLatLng, 12.5),
+      );
+    }
   }
 
   Future<void> _loadSavedMotoConfig() async {
@@ -413,15 +448,24 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Origin
-                    Text('Origin / DIU Spot', style: AppTypography.labelSm),
-                    const SizedBox(height: 6),
-                    TextField(
+                    // Origin with Google Places Autocomplete & Map Picker
+                    LocationAutocompleteInput(
                       controller: _originController,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.trip_origin, color: AppColors.primary),
-                        hintText: 'Choose campus pickup point',
-                      ),
+                      hintText: 'Choose campus pickup point',
+                      labelText: 'Origin / DIU Spot',
+                      prefixIcon: Icons.trip_origin,
+                      prefixColor: AppColors.primary,
+                      mapInitialPosition: _originLatLng,
+                      onLocationSelected: (loc) {
+                        _originController.text = loc.title;
+                        _originLatLng = loc.latLng;
+                        _updateRealRoadRoute();
+                      },
+                      onGpsTap: () {
+                        _originController.text = 'DIU Smart City, Ashulia';
+                        _originLatLng = const LatLng(CampusLocations.diuCenterLat, CampusLocations.diuCenterLng);
+                        _updateRealRoadRoute();
+                      },
                     ),
                     const SizedBox(height: 8),
 
@@ -473,15 +517,19 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                     ],
                     const SizedBox(height: 14),
 
-                    // Destination
-                    Text('Destination in Dhaka', style: AppTypography.labelSm),
-                    const SizedBox(height: 6),
-                    TextField(
+                    // Destination with Google Places Autocomplete & Map Picker
+                    LocationAutocompleteInput(
                       controller: _destinationController,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.location_on, color: AppColors.secondary),
-                        hintText: 'Search Dhaka drop-off...',
-                      ),
+                      hintText: 'Search Dhaka drop-off (e.g. Motijheel, Mirpur 10)...',
+                      labelText: 'Destination in Dhaka',
+                      prefixIcon: Icons.location_on,
+                      prefixColor: AppColors.secondary,
+                      mapInitialPosition: _destinationLatLng,
+                      onLocationSelected: (loc) {
+                        _destinationController.text = loc.title;
+                        _destinationLatLng = loc.latLng;
+                        _updateRealRoadRoute();
+                      },
                     ),
                     const SizedBox(height: 8),
 
@@ -617,20 +665,27 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                                   infoWindow: InfoWindow(title: 'Drop-off: ${_destinationController.text}'),
                                 ),
                               },
-                              polylines: {
-                                Polyline(
-                                  polylineId: const PolylineId('offer_preview_route'),
-                                  points: [_originLatLng, _destinationLatLng],
-                                  color: const Color(0xFFE65100),
-                                  width: 4,
-                                ),
-                              },
-                              onTap: (latLng) {
+                              polylines: _previewPolylines.isNotEmpty
+                                  ? _previewPolylines
+                                  : {
+                                      Polyline(
+                                        polylineId: const PolylineId('offer_preview_route'),
+                                        points: [_originLatLng, _destinationLatLng],
+                                        color: const Color(0xFFE65100),
+                                        width: 4,
+                                      ),
+                                    },
+                              onTap: (latLng) async {
                                 setState(() {
                                   _destinationLatLng = latLng;
-                                  _destinationController.text =
-                                      'Map Pin (${latLng.latitude.toStringAsFixed(3)}, ${latLng.longitude.toStringAsFixed(3)})';
                                 });
+                                final name = await LocationSearchService.reverseGeocode(latLng);
+                                if (mounted) {
+                                  setState(() {
+                                    _destinationController.text = name;
+                                  });
+                                  _updateRealRoadRoute();
+                                }
                               },
                             ),
                             // Top Right: Floating Pan / Scroll Toggle Button
@@ -675,19 +730,66 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                                 ),
                               ),
                             ),
+                            // Floating Google Maps Style Route Info Banner
                             Positioned(
                               bottom: 8,
                               left: 8,
+                              right: 8,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.92),
+                                  color: Colors.black87,
                                   borderRadius: BorderRadius.circular(12),
-                                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                                  boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
                                 ),
-                                child: Text(
-                                  'Tap map to set drop-off pin',
-                                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.grey[800]),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.two_wheeler, color: Color(0xFFFFA726), size: 16),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _isLoadingRoute
+                                              ? 'Calculating road route...'
+                                              : (_routeSuggestion != null
+                                                  ? '${_routeSuggestion!.distanceKm.toStringAsFixed(1)} km • ~${_routeSuggestion!.durationMinutes} mins'
+                                                  : 'Tap map to set pin'),
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    InkWell(
+                                      onTap: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => FullScreenCommuteMapScreen(
+                                              initialDestination: _destinationLatLng,
+                                              initialDestinationName: _destinationController.text,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      child: const Row(
+                                        children: [
+                                          Text(
+                                            'Full Map',
+                                            style: TextStyle(
+                                              color: Color(0xFFFFA726),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          SizedBox(width: 2),
+                                          Icon(Icons.fullscreen, color: Color(0xFFFFA726), size: 15),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
