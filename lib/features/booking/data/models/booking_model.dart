@@ -14,6 +14,14 @@ class BookingModel {
   final double totalFare;
   final BookingStatus status;
   final DateTime requestedAt;
+  final String? driverId;
+  final String? driverName;
+  final String? driverPhone;
+  final String? vehicleModel;
+  final DateTime? departureTime;
+  final String? originName;
+  final String? destinationName;
+  final String? rideStatus;
 
   const BookingModel({
     required this.id,
@@ -29,9 +37,22 @@ class BookingModel {
     required this.totalFare,
     this.status = BookingStatus.requested,
     required this.requestedAt,
+    this.driverId,
+    this.driverName,
+    this.driverPhone,
+    this.vehicleModel,
+    this.departureTime,
+    this.originName,
+    this.destinationName,
+    this.rideStatus,
   });
 
   factory BookingModel.fromJson(Map<String, dynamic> json) {
+    DateTime? depTime;
+    if (json['departureTime'] != null) {
+      depTime = DateTime.tryParse(json['departureTime'].toString());
+    }
+
     return BookingModel(
       id: json['id'] as String,
       rideId: json['rideId'] as String,
@@ -49,6 +70,14 @@ class BookingModel {
         orElse: () => BookingStatus.requested,
       ),
       requestedAt: DateTime.parse(json['requestedAt'] as String),
+      driverId: json['driverId'] as String?,
+      driverName: json['driverName'] as String?,
+      driverPhone: json['driverPhone'] as String?,
+      vehicleModel: json['vehicleModel'] as String?,
+      departureTime: depTime,
+      originName: json['originName'] as String?,
+      destinationName: json['destinationName'] as String?,
+      rideStatus: json['rideStatus'] as String?,
     );
   }
 
@@ -67,10 +96,28 @@ class BookingModel {
       'totalFare': totalFare,
       'status': status.name,
       'requestedAt': requestedAt.toIso8601String(),
+      if (driverId != null) 'driverId': driverId,
+      if (driverName != null) 'driverName': driverName,
+      if (driverPhone != null) 'driverPhone': driverPhone,
+      if (vehicleModel != null) 'vehicleModel': vehicleModel,
+      if (departureTime != null) 'departureTime': departureTime!.toIso8601String(),
+      if (originName != null) 'originName': originName,
+      if (destinationName != null) 'destinationName': destinationName,
+      if (rideStatus != null) 'rideStatus': rideStatus,
     };
   }
 
-  BookingModel copyWith({BookingStatus? status}) {
+  BookingModel copyWith({
+    BookingStatus? status,
+    String? driverId,
+    String? driverName,
+    String? driverPhone,
+    String? vehicleModel,
+    DateTime? departureTime,
+    String? originName,
+    String? destinationName,
+    String? rideStatus,
+  }) {
     return BookingModel(
       id: id,
       rideId: rideId,
@@ -85,6 +132,14 @@ class BookingModel {
       totalFare: totalFare,
       status: status ?? this.status,
       requestedAt: requestedAt,
+      driverId: driverId ?? this.driverId,
+      driverName: driverName ?? this.driverName,
+      driverPhone: driverPhone ?? this.driverPhone,
+      vehicleModel: vehicleModel ?? this.vehicleModel,
+      departureTime: departureTime ?? this.departureTime,
+      originName: originName ?? this.originName,
+      destinationName: destinationName ?? this.destinationName,
+      rideStatus: rideStatus ?? this.rideStatus,
     );
   }
 }

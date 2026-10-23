@@ -30,7 +30,7 @@ class AppConfig {
       environment: environment,
       apiBaseUrl: apiBaseUrl ?? defaultApiUrl,
       wsBaseUrl: wsBaseUrl ?? defaultWsUrl,
-      googleMapsApiKey: googleMapsApiKey ?? 'AIzaSyDIU_CAMPUS_MAPS_KEY',
+      googleMapsApiKey: googleMapsApiKey ?? 'AIzaSyD-hl4Vshm6lqgUopu4rHbwmUbbPNA7kfA',
       useMockData: useMockData,
     );
   }
@@ -39,7 +39,7 @@ class AppConfig {
     if (kIsWeb) {
       final origin = Uri.base.origin;
       if (origin.startsWith('http://localhost') || origin.startsWith('http://127.0.0.1')) {
-        return 'https://servertest.eu.cc/ride/api';
+        return 'http://127.0.0.1:8080/ride/api';
       }
       return '$origin/ride/api';
     }
@@ -48,14 +48,14 @@ class AppConfig {
   }
 
   static String get fallbackApiUrl {
-    return 'http://192.168.0.114:8080/ride/api';
+    return 'https://servertest.eu.cc/ride/api';
   }
 
   static String get defaultWsUrl {
     if (kIsWeb) {
       final host = Uri.base.host;
       if (host == 'localhost' || host == '127.0.0.1') {
-        return 'wss://servertest.eu.cc/ride/ws';
+        return 'ws://127.0.0.1:8080/ride/ws';
       }
       final portStr = Uri.base.hasPort ? ':${Uri.base.port}' : '';
       final isSecure = Uri.base.scheme == 'https';
@@ -66,6 +66,6 @@ class AppConfig {
   }
 
   static String get fallbackWsUrl {
-    return 'ws://192.168.0.114:8080/ride/ws';
+    return 'wss://servertest.eu.cc/ride/ws';
   }
 }

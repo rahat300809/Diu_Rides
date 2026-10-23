@@ -10,6 +10,7 @@ import 'package:diu_ride/features/rides/data/models/ride_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 import 'package:diu_ride/features/rides/presentation/widgets/post_expiry_extension_dialog.dart';
 import 'package:diu_ride/core/providers/app_mode_provider.dart';
+import 'package:diu_ride/features/tracking/presentation/screens/ride_details_tracking_screen.dart';
 
 class MyRidesActivityView extends ConsumerStatefulWidget {
   final VoidCallback onOfferRide;
@@ -776,7 +777,11 @@ class _MyRidesActivityViewState extends ConsumerState<MyRidesActivityView> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: booking.status == BookingStatus.accepted
+              ? const Color(0xFF10B981).withOpacity(0.4)
+              : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -790,30 +795,56 @@ class _MyRidesActivityViewState extends ConsumerState<MyRidesActivityView> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Top Bar
+            // Top Bar: Status + Fare
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: statusBg,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    statusLabel,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
-                      color: statusFg,
-                      letterSpacing: 0.3,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: statusBg,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (booking.status == BookingStatus.completed)
+                            const Padding(
+                              padding: EdgeInsets.only(right: 4),
+                              child: Icon(Icons.check_circle, size: 12, color: Color(0xFF475569)),
+                            ),
+                          Text(
+                            booking.status == BookingStatus.completed ? 'COMPLETED (CLOSED)' : statusLabel,
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: statusFg,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${booking.seatsBooked} seat',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF475569)),
+                      ),
+                    ),
+                  ],
                 ),
                 Text(
                   CurrencyFormatter.formatBdt(booking.totalFare),
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF0F172A),
                   ),
@@ -823,7 +854,38 @@ class _MyRidesActivityViewState extends ConsumerState<MyRidesActivityView> {
 
             const SizedBox(height: 12),
 
-            // Route
+            // Driver & Vehicle Pill (if available)
+            if (booking.driverName != null && booking.driverName!.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.two_wheeler, size: 16, color: Color(0xFFE65100)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '${booking.driverName} • ${booking.vehicleModel ?? 'Motorbike'}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (booking.departureTime != null)
+                      Text(
+                        DateTimeUtils.formatTime(booking.departureTime!),
+                        style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+
+            // Route: Pickup -> Dropoff
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -888,6 +950,7 @@ class _MyRidesActivityViewState extends ConsumerState<MyRidesActivityView> {
                       if (confirm == true) {
                         await ref.read(bookingNotifierProvider.notifier).cancelBooking(booking.id);
                         ref.invalidate(myBookingsProvider);
+                        ref.invalidate(allAvailableRidesProvider);
                       }
                     },
                     style: OutlinedButton.styleFrom(
@@ -902,6 +965,30 @@ class _MyRidesActivityViewState extends ConsumerState<MyRidesActivityView> {
                   const SizedBox(width: 8),
                 ],
 
+                // Track Live / Map button (when confirmed)
+                if (booking.status == BookingStatus.accepted) ...[
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => RideDetailsTrackingScreen(
+                            rideId: booking.rideId,
+                          ),
+                        ),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF10B981),
+                      side: const BorderSide(color: Color(0xFF10B981)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.map_outlined, size: 14),
+                    label: const Text('Track Map', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+
                 // Chat with driver button
                 ElevatedButton.icon(
                   onPressed: () {
@@ -909,9 +996,9 @@ class _MyRidesActivityViewState extends ConsumerState<MyRidesActivityView> {
                       MaterialPageRoute(
                         builder: (_) => ChatScreen(
                           rideId: booking.rideId,
-                          driverName: 'Driver',
-                          peerName: 'Driver',
-                          vehicleModel: 'Bike',
+                          driverName: booking.driverName ?? 'Driver',
+                          peerName: booking.driverName ?? 'Driver',
+                          vehicleModel: booking.vehicleModel ?? 'Bike',
                           peerRole: 'Driver',
                         ),
                       ),

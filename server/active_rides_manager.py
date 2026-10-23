@@ -42,10 +42,10 @@ def format_human_departure_time(dep_str: str) -> str:
         return str(dep_str)
     return dt.strftime("%I:%M %p")
 
-def is_ride_expired(dep_str: str, grace_minutes: int = 10) -> bool:
+def is_ride_expired(dep_str: str, grace_minutes: int = 0) -> bool:
     """
-    Checks if departure time is in the past by more than grace_minutes.
-    Local Bangladesh time is used.
+    Checks if departure time is in the past.
+    Local Bangladesh time (UTC+6) is used.
     """
     dep_dt = parse_departure_time(dep_str)
     if not dep_dt:
@@ -55,7 +55,7 @@ def is_ride_expired(dep_str: str, grace_minutes: int = 10) -> bool:
     if dep_dt.tzinfo is not None:
         dep_dt = dep_dt.replace(tzinfo=None)
 
-    now_naive = datetime.now()
+    now_naive = get_bd_now().replace(tzinfo=None)
     diff_minutes = (now_naive - dep_dt).total_seconds() / 60.0
     return diff_minutes >= grace_minutes
 

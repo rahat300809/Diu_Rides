@@ -48,16 +48,21 @@ class SharedSyncRidesRepository implements RidesRepository {
 
   @override
   Future<List<RideModel>> getAllAvailableRides() async {
+    final now = DateTime.now();
     try {
       final response = await _dio.get('$_apiBase/rides');
       if (response.statusCode == 200 && response.data is List) {
         final list = (response.data as List)
             .map((item) => RideModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .where((r) =>
+                r.status == RideStatus.published &&
+                r.availableSeats > 0 &&
+                r.departureTime.isAfter(now))
             .toList();
         
         // Cache to preferences
         try {
-          final encoded = jsonEncode((response.data as List));
+          final encoded = jsonEncode(list.map((r) => r.toJson()).toList());
           await preferences.saveSharedRides(encoded);
         } catch (_) {}
 
@@ -74,11 +79,21 @@ class SharedSyncRidesRepository implements RidesRepository {
         final decoded = jsonDecode(cached) as List<dynamic>;
         return decoded
             .map((item) => RideModel.fromJson(Map<String, dynamic>.from(item as Map)))
+            .where((r) =>
+                r.status == RideStatus.published &&
+                r.availableSeats > 0 &&
+                r.departureTime.isAfter(now))
             .toList();
       } catch (_) {}
     }
 
-    return _localFallback.getAllAvailableRides();
+    final fallback = await _localFallback.getAllAvailableRides();
+    return fallback
+        .where((r) =>
+            r.status == RideStatus.published &&
+            r.availableSeats > 0 &&
+            r.departureTime.isAfter(now))
+        .toList();
   }
 
   @override
@@ -367,6 +382,37 @@ class SharedSyncRidesRepository implements RidesRepository {
         await _dio.patch('$_apiBase/rides', data: {'id': rideId, 'status': 'completed'});
       } catch (_) {}
     }
+
+    // 1. Purge from cached shared rides
+    try {
+      final cached = preferences.getSharedRides();
+      if (cached != null && cached.isNotEmpty) {
+        final decoded = jsonDecode(cached) as List<dynamic>;
+        final filtered = decoded.where((item) {
+          if (item is Map) {
+            final id = item['id']?.toString() ?? '';
+            return id != rideId && !id.contains(rideId);
+          }
+          return true;
+        }).toList();
+        await preferences.saveSharedRides(jsonEncode(filtered));
+      }
+    } catch (_) {}
+
+    // 2. Mark any matching booking in cached bookings as completed
+    try {
+      final cachedB = preferences.getSharedBookings();
+      if (cachedB != null && cachedB.isNotEmpty) {
+        final decodedB = jsonDecode(cachedB) as List<dynamic>;
+        for (final item in decodedB) {
+          if (item is Map && (item['rideId'] == rideId || item['rideId']?.toString().contains(rideId) == true)) {
+            item['status'] = 'completed';
+          }
+        }
+        await preferences.saveSharedBookings(jsonEncode(decodedB));
+      }
+    } catch (_) {}
+
     await _localFallback.completeRide(rideId, endLat: endLat, endLng: endLng);
     return true;
   }

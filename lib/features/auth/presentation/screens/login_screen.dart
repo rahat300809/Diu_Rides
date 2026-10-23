@@ -515,8 +515,71 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                     ],
                   ),
           ),
+          // Quick Demo Credentials Pill
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerHigh.withOpacity(0.6),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.outlineVariant.withOpacity(0.5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.flash_on, size: 14, color: Color(0xFFF59E0B)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Quick Demo Login:',
+                      style: AppTypography.labelSm.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          _loginIdentifierController.text = '201-15-14285';
+                          _loginPasswordController.text = 'password123';
+                          _submitSignIn();
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          side: const BorderSide(color: AppColors.primary),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Demo Student', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          _loginIdentifierController.text = '202-15-54321';
+                          _loginPasswordController.text = 'password123';
+                          _submitSignIn();
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          side: const BorderSide(color: Color(0xFF10B981)),
+                          foregroundColor: const Color(0xFF10B981),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        child: const Text('Demo Driver', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
-
         ],
       ),
     );

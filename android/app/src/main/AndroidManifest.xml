@@ -16,7 +16,7 @@
         android:usesCleartextTraffic="true">
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyDIU_MOCK_GOOGLE_MAPS_KEY_FOR_CAMPUS"/>
+            android:value="AIzaSyD-hl4Vshm6lqgUopu4rHbwmUbbPNA7kfA"/>
 
         <activity
             android:name=".MainActivity"

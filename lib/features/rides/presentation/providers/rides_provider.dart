@@ -205,9 +205,19 @@ final allSystemRidesProvider = FutureProvider<List<RideModel>>((ref) async {
 final allAvailableRidesProvider = FutureProvider<List<RideModel>>((ref) async {
   final all = await ref.watch(allSystemRidesProvider.future);
   final currentUser = ref.watch(authNotifierProvider).user;
-  if (currentUser == null) return all;
-  // Rider shouldn't see their own posted rides in the available rides feed!
-  return all.where((r) => !isCurrentUserRide(r, currentUser)).toList();
+  final now = DateTime.now();
+
+  return all.where((r) {
+    // Must be published and open
+    if (r.status != RideStatus.published) return false;
+    // Must have available seats remaining
+    if (r.availableSeats <= 0) return false;
+    // Must not be expired past departure time
+    if (!r.departureTime.isAfter(now)) return false;
+    // Rider shouldn't see their own posted rides in the available rides feed
+    if (currentUser != null && isCurrentUserRide(r, currentUser)) return false;
+    return true;
+  }).toList();
 });
 
 final myPostedRidesProvider = FutureProvider<List<RideModel>>((ref) async {

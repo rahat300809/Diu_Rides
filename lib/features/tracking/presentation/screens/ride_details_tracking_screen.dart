@@ -105,6 +105,15 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
             });
           } catch (_) {}
         }
+      } else if (msg['event'] == 'ride_session_status_changed' || msg['event'] == 'ride_completed') {
+        final data = msg['data'] is Map ? msg['data'] as Map<String, dynamic> : <String, dynamic>{};
+        final rId = data['rideId'] ?? data['id'];
+        final status = data['status']?.toString();
+        if ((rId == widget.rideId || rId?.toString().contains(widget.rideId) == true) && status == 'completed' && mounted) {
+          ref.invalidate(allAvailableRidesProvider);
+          ref.invalidate(myBookingsProvider);
+          _showToast('🏁 Trip completed and closed by rider!');
+        }
       }
     });
   }
@@ -223,9 +232,48 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
       );
     } catch (_) {}
 
+    ref.invalidate(allAvailableRidesProvider);
+    ref.invalidate(allSystemRidesProvider);
+    ref.invalidate(myPostedRidesProvider);
+    ref.invalidate(myBookingsProvider);
+    ref.invalidate(searchRidesResultsProvider);
+
     if (mounted) {
-      _showToast('Ride Completed! End GPS & full route link saved.');
-      ref.invalidate(searchRidesResultsProvider);
+      _showToast('Ride Completed & Closed!');
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle, color: Color(0xFF10B981), size: 26),
+              SizedBox(width: 8),
+              Text('Trip Completed!'),
+            ],
+          ),
+          content: Text(
+            'Ride from ${ride.originName} to ${ride.destinationName} has been successfully completed and closed.',
+            style: const TextStyle(fontSize: 13.5),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+              },
+              child: const Text('Close Screen', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
     }
   }
 

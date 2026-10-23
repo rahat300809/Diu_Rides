@@ -86,19 +86,24 @@ class _MainNavigationScreenState extends ConsumerState<MainNavigationScreen> {
         final event = msg['event'] ?? msg['type'];
         final data = msg['data'] is Map ? Map<String, dynamic>.from(msg['data'] as Map) : msg;
 
-        // 1. Live rides updates (New ride published, booked, started, or completed)
+        // 1. Live rides updates (New ride published, booked, started, completed, or deleted)
         if (event == 'ride_created' ||
             event == 'new_ride' ||
             event == 'ride_updated' ||
             event == 'ride_started' ||
             event == 'ride_completed' ||
             event == 'ride_cancelled' ||
+            event == 'ride_deleted' ||
+            event == 'post_deleted' ||
             event == 'booking_created' ||
             event == 'booking_status_updated') {
           debugPrint('[Live WS] Received $event - refreshing live rides cache');
           ref.invalidate(allAvailableRidesProvider);
+          ref.invalidate(allSystemRidesProvider);
           ref.invalidate(departingSoonRidesProvider);
+          ref.invalidate(myPostedRidesProvider);
           ref.invalidate(myBookingsProvider);
+          ref.invalidate(searchRidesResultsProvider);
         }
 
         // 1b. Live ride booking request alert for rider

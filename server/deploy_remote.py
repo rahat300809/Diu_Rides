@@ -5,11 +5,30 @@ import os
 
 sys.stdout.reconfigure(encoding='utf-8')
 
+HOST = os.environ.get('DEPLOY_HOST', '192.168.0.114')
+USER = os.environ.get('DEPLOY_USER', 'rahat')
+PASSWORD = os.environ.get('DEPLOY_PASS', 'rahat')
+
+print(f"Connecting to {USER}@{HOST}...")
+
 ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-print("Connecting to rahat@192.168.0.114...")
-ssh.connect('192.168.0.114', username='rahat', password='rahat', timeout=10)
-print("Connected successfully!\n")
+
+connected = False
+for attempt in range(1, 4):
+    try:
+        ssh.connect(HOST, username=USER, password=PASSWORD, timeout=12, banner_timeout=30)
+        connected = True
+        print("Connected successfully!\n")
+        break
+    except Exception as e:
+        print(f"Connection attempt {attempt} failed: {e}")
+        if attempt < 3:
+            time.sleep(2)
+
+if not connected:
+    print(f"\n❌ Could not connect to {USER}@{HOST}. Ensure host is powered on and SSH service is running.")
+    sys.exit(1)
 
 def run(cmd, desc=''):
     print(f"==================================================")
@@ -53,49 +72,26 @@ if os.path.exists(bak) and os.path.exists(cur):
 """
 run(f"python3 -c \"{merge_script}\"", '4. Merging runtime completed trips')
 
-# 4. Pip install requirements
-run('/home/rahat/diu_ride_env/bin/pip install -r /home/rahat/diu_ride/server/requirements.txt', '5. Installing Python dependencies')
+# 4. Check Docker deployment
+docker_check = run('which docker && (docker compose version || which docker-compose)', '5. Checking Docker presence')
 
-# 5. Upload latest APK via SFTP
-local_apk = os.path.join(os.path.dirname(__file__), 'web_build', 'diu_ride.apk')
-if not os.path.exists(local_apk):
-    local_apk = os.path.join(os.path.dirname(__file__), '..', 'build', 'app', 'outputs', 'flutter-apk', 'app-release.apk')
+if 'docker' in docker_check:
+    print("🐳 Deploying via Docker Compose...")
+    run('echo rahat | sudo -S systemctl stop diu-ride.service 2>/dev/null || true', 'Stopping legacy systemd service')
+    run('cd /home/rahat/diu_ride && echo rahat | sudo -S docker compose up -d --build || echo rahat | sudo -S docker-compose up -d --build', 'Building and launching Docker containers')
+    time.sleep(5)
+    run('echo rahat | sudo -S docker ps --filter "name=diu_ride_app"', 'Checking running Docker containers')
+else:
+    print("Using standard systemd deployment...")
+    run('/home/rahat/diu_ride_env/bin/pip install -r /home/rahat/diu_ride/server/requirements.txt', 'Installing Python dependencies')
+    run('echo rahat | sudo -S systemctl restart diu-ride.service', 'Restarting diu-ride.service')
+    time.sleep(3)
+    run('systemctl status diu-ride.service --no-pager', 'Checking diu-ride.service status')
 
-if os.path.exists(local_apk):
-    apk_mb = os.path.getsize(local_apk) / (1024 * 1024)
-    print("==================================================")
-    print(f"🚀 6. Uploading latest APK ({apk_mb:.1f} MB) via SFTP")
-    print("==================================================")
-    sftp = ssh.open_sftp()
-    remote_apk = '/home/rahat/diu_ride/server/web_build/diu_ride.apk'
-    sftp.put(local_apk, remote_apk)
-    
-    # Upload ai_config.json
-    local_ai_cfg = os.path.join(os.path.dirname(__file__), 'ai_config.json')
-    if os.path.exists(local_ai_cfg):
-        remote_ai_cfg = '/home/rahat/diu_ride/server/ai_config.json'
-        sftp.put(local_ai_cfg, remote_ai_cfg)
-        print(f"✓ AI Config successfully uploaded to {remote_ai_cfg}!")
-        
-    sftp.close()
-    print(f"✓ APK successfully uploaded to {remote_apk}!\n")
-
-# 6. Restart service
-run('echo rahat | sudo -S systemctl restart diu-ride.service', '7. Restarting diu-ride.service')
-
-time.sleep(3)
-
-# 7. Check status
-run('systemctl status diu-ride.service --no-pager', '8. Checking diu-ride.service status')
-
-# 8. Test endpoints
-run('curl -s http://127.0.0.1:8001/ride/health', '9. Testing /ride/health')
-run('curl -s http://127.0.0.1:8001/ride/api/admin/ai-settings', '10. Testing /ride/api/admin/ai-settings')
-run('curl -s -X POST http://127.0.0.1:8001/ride/api/ai/chat -H "Content-Type: application/json" -d \'{"user_name":"Rahat","message":"Assalamu Alaikum"}\'', '11. Testing /ride/api/ai/chat endpoint')
-run('curl -s -I http://127.0.0.1:8001/ride/ | head -n 12', '12. Testing /ride/ web header')
-run('curl -s -I http://127.0.0.1:8001/ride/download-apk | head -n 12', '13. Testing /ride/download-apk header')
-run('curl -s -I http://127.0.0.1:8001/download-apk | head -n 12', '14. Testing /download-apk header')
-run('curl -s http://127.0.0.1:8001/ride/api/ai/live-rides | head -c 180', '15. Testing /ride/api/ai/live-rides')
+# 5. Test endpoints
+run('curl -s http://127.0.0.1:8001/ride/health', 'Testing /ride/health')
+run('curl -s http://127.0.0.1:8001/ride/api/admin/ai-settings', 'Testing /ride/api/admin/ai-settings')
+run('curl -s -I http://127.0.0.1:8001/ride/ | head -n 12', 'Testing /ride/ web header')
 
 ssh.close()
-print("🎉 Deployment process finished!")
+print("🎉 Remote deployment successfully finished!")
