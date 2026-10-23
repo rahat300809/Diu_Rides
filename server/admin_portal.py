@@ -715,6 +715,36 @@ async def proxy_places_routes_endpoint(origin_lat: float, origin_lng: float, des
         except Exception as e:
             return {"status": "error", "message": str(e)}
 
+@admin_router.get("/ride/api/places/details")
+@admin_router.get("/api/places/details")
+async def proxy_places_details_endpoint(place_id: str):
+    """
+    Proxies Google Places (New) Place Details API to fetch exact LatLng for a place ID.
+    """
+    import urllib.request
+    clean_id = (place_id or "").strip().replace("places/", "")
+    if not clean_id:
+        return {"status": "error", "message": "Missing place_id"}
+    try:
+        url = f"https://places.googleapis.com/v1/places/{clean_id}?fields=id,displayName,location,formattedAddress"
+        headers = {
+            "X-Goog-Api-Key": GOOGLE_API_KEY,
+            "User-Agent": "DIU-Ride-Server/1.0",
+        }
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=6.0) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+            loc = body.get("location", {})
+            return {
+                "status": "success",
+                "lat": loc.get("latitude"),
+                "lng": loc.get("longitude"),
+                "address": body.get("formattedAddress"),
+                "data": body
+            }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 @admin_router.post("/ride/api/admin/sync-active-rides")
 @admin_router.post("/api/admin/sync-active-rides")
 async def admin_sync_active_rides_endpoint():

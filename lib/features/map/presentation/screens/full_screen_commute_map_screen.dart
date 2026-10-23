@@ -174,12 +174,18 @@ class _FullScreenCommuteMapScreenState
     }
   }
 
-  void _onLocationSelected(LocationSearchResult result) {
+  void _onLocationSelected(LocationSearchResult result) async {
     _searchController.text = result.title;
     setState(() {
       _showSearchResults = false;
     });
-    _calculateRouteStats(result.latLng, result.title);
+
+    LatLng target = result.latLng;
+    if (result.placeId != null) {
+      final point = await LocationSearchService.getPlaceCoordinates(result.placeId!);
+      if (point != null) target = point;
+    }
+    _calculateRouteStats(target, result.title);
   }
 
   void _onMapTapped(LatLng point) async {

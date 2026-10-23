@@ -39,12 +39,11 @@ class LocationAutocompleteInput extends StatefulWidget {
 
 class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
   final FocusNode _focusNode = FocusNode();
-  final LayerLink _layerLink = LayerLink();
-  OverlayEntry? _overlayEntry;
   Timer? _debounceTimer;
 
   List<LocationSearchResult> _suggestions = [];
   bool _isLoading = false;
+  bool _showSuggestions = false;
 
   @override
   void initState() {
@@ -58,17 +57,25 @@ class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
         _searchPlaces(widget.controller.text);
       }
     } else {
-      _removeOverlay();
+      // 250ms delay allows InkWell.onTap on suggestions to register before closing
+      Future.delayed(const Duration(milliseconds: 250), () {
+        if (mounted && !_focusNode.hasFocus) {
+          setState(() => _showSuggestions = false);
+        }
+      });
     }
   }
 
   void _onTextChanged(String query) {
     _debounceTimer?.cancel();
     if (query.trim().isEmpty) {
-      _removeOverlay();
+      setState(() {
+        _suggestions = [];
+        _showSuggestions = false;
+      });
       return;
     }
-    _debounceTimer = Timer(const Duration(milliseconds: 220), () {
+    _debounceTimer = Timer(const Duration(milliseconds: 160), () {
       _searchPlaces(query);
     });
   }
@@ -80,33 +87,20 @@ class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
     setState(() {
       _suggestions = results;
       _isLoading = false;
+      _showSuggestions = results.isNotEmpty && _focusNode.hasFocus;
     });
-
-    if (_suggestions.isNotEmpty && _focusNode.hasFocus) {
-      _showOverlay();
-    } else {
-      _removeOverlay();
-    }
-  }
-
-  void _showOverlay() {
-    _removeOverlay();
-    _overlayEntry = _createOverlayEntry();
-    Overlay.of(context).insert(_overlayEntry!);
-  }
-
-  void _removeOverlay() {
-    _overlayEntry?.remove();
-    _overlayEntry = null;
   }
 
   void _selectSuggestion(LocationSearchResult item) async {
     widget.controller.text = item.title;
-    _removeOverlay();
+    setState(() {
+      _showSuggestions = false;
+      _suggestions = [];
+    });
     _focusNode.unfocus();
 
-    // If place has no exact coordinates yet, fetch via Place Details
-    if (item.placeId != null && item.lat == 0.0 && item.lng == 0.0) {
+    // Fetch exact coordinates via Place Details if placeId is present
+    if (item.placeId != null) {
       final point = await LocationSearchService.getPlaceCoordinates(item.placeId!);
       if (point != null) {
         final updated = LocationSearchResult(
@@ -126,7 +120,7 @@ class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
   }
 
   void _openMapPicker() {
-    _removeOverlay();
+    setState(() => _showSuggestions = false);
     _focusNode.unfocus();
     MapLocationPickerSheet.show(
       context: context,
@@ -139,58 +133,159 @@ class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
     );
   }
 
-  OverlayEntry _createOverlayEntry() {
-    final renderBox = context.findRenderObject() as RenderBox?;
-    final size = renderBox?.size ?? Size.zero;
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _focusNode.removeListener(_onFocusChanged);
+    _focusNode.dispose();
+    super.dispose();
+  }
 
-    return OverlayEntry(
-      builder: (context) => Positioned(
-        width: size.width,
-        child: CompositedTransformFollower(
-          link: _layerLink,
-          showWhenUnlinked: false,
-          offset: Offset(0, size.height + 6),
-          child: Material(
-            elevation: 10,
-            borderRadius: BorderRadius.circular(16),
-            color: Colors.white,
-            shadowColor: Colors.black26,
-            child: Container(
-              constraints: const BoxConstraints(maxHeight: 250),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Main Input Field
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9FAFB),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: _focusNode.hasFocus ? widget.prefixColor : const Color(0xFFE5E7EB),
+              width: _focusNode.hasFocus ? 1.5 : 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: Icon(widget.prefixIcon, color: widget.prefixColor, size: 20),
               ),
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                shrinkWrap: true,
-                itemCount: _suggestions.length,
-                separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF3F4F6)),
-                itemBuilder: (context, index) {
-                  final item = _suggestions[index];
-                  IconData icon;
-                  Color iconColor;
-                  switch (item.category) {
-                    case 'campus':
-                      icon = Icons.school;
-                      iconColor = AppColors.primary;
-                      break;
-                    case 'metro':
-                      icon = Icons.train;
-                      iconColor = const Color(0xFF2E7D32);
-                      break;
-                    case 'hub':
-                      icon = Icons.hub;
-                      iconColor = const Color(0xFF1565C0);
-                      break;
-                    default:
-                      icon = Icons.place;
-                      iconColor = const Color(0xFFE65100);
-                  }
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.labelText != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        widget.labelText!,
+                        style: AppTypography.labelSm.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                    TextField(
+                      controller: widget.controller,
+                      focusNode: _focusNode,
+                      onChanged: _onTextChanged,
+                      style: AppTypography.bodyMdMedium.copyWith(fontSize: 13.5),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        hintText: widget.hintText,
+                        hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline, fontSize: 13),
+                        contentPadding: EdgeInsets.symmetric(
+                          vertical: widget.labelText != null ? 6 : 12,
+                        ),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              if (widget.controller.text.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.clear, size: 16, color: AppColors.outline),
+                  tooltip: 'Clear',
+                  onPressed: () {
+                    widget.controller.clear();
+                    setState(() {
+                      _suggestions = [];
+                      _showSuggestions = false;
+                    });
+                  },
+                ),
+              if (widget.onGpsTap != null)
+                IconButton(
+                  icon: const Icon(Icons.my_location, size: 18, color: AppColors.primary),
+                  tooltip: 'Current Campus Location',
+                  onPressed: widget.onGpsTap,
+                ),
+              if (widget.showMapPicker)
+                IconButton(
+                  icon: const Icon(Icons.map_outlined, size: 19, color: Color(0xFFE65100)),
+                  tooltip: 'Pick on Google Map',
+                  onPressed: _openMapPicker,
+                ),
+            ],
+          ),
+        ),
 
-                  return InkWell(
+        // Inline Autocomplete Dropdown List
+        if (_showSuggestions && _suggestions.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 230),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE5E7EB)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              itemCount: _suggestions.length,
+              separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF3F4F6)),
+              itemBuilder: (context, index) {
+                final item = _suggestions[index];
+                IconData icon;
+                Color iconColor;
+                switch (item.category) {
+                  case 'campus':
+                    icon = Icons.school;
+                    iconColor = AppColors.primary;
+                    break;
+                  case 'metro':
+                    icon = Icons.train;
+                    iconColor = const Color(0xFF2E7D32);
+                    break;
+                  case 'hub':
+                    icon = Icons.hub;
+                    iconColor = const Color(0xFF1565C0);
+                    break;
+                  default:
+                    icon = Icons.place;
+                    iconColor = const Color(0xFFE65100);
+                }
+
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
                     onTap: () => _selectSuggestion(item),
+                    borderRadius: BorderRadius.circular(8),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       child: Row(
@@ -235,115 +330,13 @@ class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
                         ],
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _debounceTimer?.cancel();
-    _removeOverlay();
-    _focusNode.removeListener(_onFocusChanged);
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CompositedTransformTarget(
-      link: _layerLink,
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: _focusNode.hasFocus ? widget.prefixColor : const Color(0xFFE5E7EB),
-            width: _focusNode.hasFocus ? 1.5 : 1.0,
-          ),
-        ),
-        child: Row(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(left: 12),
-              child: Icon(widget.prefixIcon, color: widget.prefixColor, size: 20),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (widget.labelText != null) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      widget.labelText!,
-                      style: AppTypography.labelSm.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                  TextField(
-                    controller: widget.controller,
-                    focusNode: _focusNode,
-                    onChanged: _onTextChanged,
-                    style: AppTypography.bodyMdMedium.copyWith(fontSize: 13.5),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: widget.hintText,
-                      hintStyle: AppTypography.bodyMd.copyWith(color: AppColors.outline, fontSize: 13),
-                      contentPadding: EdgeInsets.symmetric(
-                        vertical: widget.labelText != null ? 6 : 12,
-                      ),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                    ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
-            if (_isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-            if (widget.controller.text.isNotEmpty)
-              IconButton(
-                icon: const Icon(Icons.clear, size: 16, color: AppColors.outline),
-                tooltip: 'Clear',
-                onPressed: () {
-                  widget.controller.clear();
-                  _removeOverlay();
-                  setState(() {});
-                },
-              ),
-            if (widget.onGpsTap != null)
-              IconButton(
-                icon: const Icon(Icons.my_location, size: 18, color: AppColors.primary),
-                tooltip: 'Current Campus Location',
-                onPressed: widget.onGpsTap,
-              ),
-            if (widget.showMapPicker)
-              IconButton(
-                icon: const Icon(Icons.map_outlined, size: 19, color: Color(0xFFE65100)),
-                tooltip: 'Pick on Google Map',
-                onPressed: _openMapPicker,
-              ),
-          ],
-        ),
-      ),
+          ),
+        ],
+      ],
     );
   }
 }

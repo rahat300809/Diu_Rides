@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:diu_ride/core/config/app_config.dart';
 
 class LocationSearchResult {
   final String title;
@@ -51,6 +53,21 @@ class LocationSearchService {
       },
     ),
   );
+
+  /// Safe API Base URL pointing to local/remote server proxy
+  static String get _apiBaseUrl {
+    try {
+      final base = AppConfig.current.apiBaseUrl;
+      if (base.isNotEmpty) return base;
+    } catch (_) {}
+    if (kIsWeb) {
+      final origin = Uri.base.origin;
+      if (origin.isNotEmpty && origin != 'null') {
+        return '$origin/ride/api';
+      }
+    }
+    return 'http://192.168.0.114:8001/ride/api';
+  }
 
   /// Cache for placeId to LatLng details
   static final Map<String, LatLng> _placeLocationCache = {};
@@ -375,8 +392,9 @@ class LocationSearchService {
   ];
 
   /// Live Search with typing suggestions:
-  /// 1. Instant Landmark & Hub Match (handles "moti", "mir", "dhan", "utt" with zero latency)
-  /// 2. Google Places (New) Autocomplete API with Bangladesh filter (`includedRegionCodes: ["bd"]`)
+  /// 0. Instant Landmark & Hub Match (handles "moti", "mir", "dhan", "utt" with zero latency)
+  /// 1. Backend Server Proxy (`/ride/api/places/autocomplete`) -> 100% CORS-free on Web & Native!
+  /// 2. Direct Google Places (New) Autocomplete API with Bangladesh filter (`includedRegionCodes: ["bd"]`)
   /// 3. Photon / OpenStreetMap high-speed geocoding fallback
   static Future<List<LocationSearchResult>> search(String query) async {
     final clean = query.trim().toLowerCase();
@@ -386,7 +404,7 @@ class LocationSearchService {
 
     final results = <LocationSearchResult>[];
 
-    // 1. Instant Local Landmark & Hub Match (Matches "moti" -> Motijheel)
+    // 0. Instant Local Landmark & Hub Match (Matches "moti" -> Motijheel)
     for (final lm in campusLandmarks) {
       final t = lm.title.toLowerCase();
       final s = lm.subtitle.toLowerCase();
@@ -395,24 +413,13 @@ class LocationSearchService {
       }
     }
 
-    // 2. Google Places (New) Autocomplete API
+    // 1. Backend Server Proxy (Works seamlessly on Web and Native)
     try {
-      final googleRes = await _dio.post(
-        'https://places.googleapis.com/v1/places:autocomplete',
-        options: Options(
-          headers: {
-            'X-Goog-Api-Key': googleApiKey,
-            'Content-Type': 'application/json',
-          },
-        ),
-        data: {
-          'input': query,
-          'includedRegionCodes': ['bd'],
-        },
-      );
-
-      if (googleRes.statusCode == 200 && googleRes.data is Map) {
-        final suggestions = googleRes.data['suggestions'] as List?;
+      final proxyUrl = '$_apiBaseUrl/places/autocomplete?q=${Uri.encodeComponent(query)}';
+      final res = await _dio.get(proxyUrl);
+      if (res.statusCode == 200 && res.data is Map) {
+        final data = res.data['data'] is Map ? res.data['data'] : res.data;
+        final suggestions = data['suggestions'] as List?;
         if (suggestions != null && suggestions.isNotEmpty) {
           for (final sug in suggestions.take(6)) {
             final pred = sug['placePrediction'];
@@ -425,7 +432,6 @@ class LocationSearchService {
               final secondaryText = structured?['secondaryText']?['text']?.toString() ??
                   'Dhaka, Bangladesh';
 
-              // If cached, use coordinates, else estimate from landmark or async load
               LatLng coords = _placeLocationCache[placeId ?? ''] ??
                   _approximateCoords(mainText, secondaryText);
 
@@ -444,6 +450,57 @@ class LocationSearchService {
         }
       }
     } catch (_) {}
+
+    // 2. Direct Google Places (New) Autocomplete API (For native mobile when server proxy is unavailable)
+    if (results.length < 3 && !kIsWeb) {
+      try {
+        final googleRes = await _dio.post(
+          'https://places.googleapis.com/v1/places:autocomplete',
+          options: Options(
+            headers: {
+              'X-Goog-Api-Key': googleApiKey,
+              'Content-Type': 'application/json',
+            },
+          ),
+          data: {
+            'input': query,
+            'includedRegionCodes': ['bd'],
+          },
+        );
+
+        if (googleRes.statusCode == 200 && googleRes.data is Map) {
+          final suggestions = googleRes.data['suggestions'] as List?;
+          if (suggestions != null && suggestions.isNotEmpty) {
+            for (final sug in suggestions.take(6)) {
+              final pred = sug['placePrediction'];
+              if (pred != null) {
+                final placeId = (pred['placeId'] ?? pred['place'])?.toString().replaceAll('places/', '');
+                final structured = pred['structuredFormat'];
+                final mainText = structured?['mainText']?['text']?.toString() ??
+                    pred['text']?['text']?.toString() ??
+                    query;
+                final secondaryText = structured?['secondaryText']?['text']?.toString() ??
+                    'Dhaka, Bangladesh';
+
+                LatLng coords = _placeLocationCache[placeId ?? ''] ??
+                    _approximateCoords(mainText, secondaryText);
+
+                results.add(
+                  LocationSearchResult(
+                    title: mainText,
+                    subtitle: secondaryText,
+                    lat: coords.latitude,
+                    lng: coords.longitude,
+                    category: 'city',
+                    placeId: placeId,
+                  ),
+                );
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
 
     // 3. Fallback: Photon / OpenStreetMap Autocomplete
     if (results.length < 3) {
@@ -483,72 +540,66 @@ class LocationSearchService {
 
   /// Fetches exact coordinates for a Google Place ID
   static Future<LatLng?> getPlaceCoordinates(String placeId) async {
-    if (_placeLocationCache.containsKey(placeId)) {
-      return _placeLocationCache[placeId];
+    final cleanId = placeId.replaceAll('places/', '');
+    if (_placeLocationCache.containsKey(cleanId)) {
+      return _placeLocationCache[cleanId];
     }
 
+    // 1. Try Backend Proxy
     try {
-      final res = await _dio.get(
-        'https://places.googleapis.com/v1/places/$placeId?fields=id,displayName,location,formattedAddress',
-        options: Options(
-          headers: {'X-Goog-Api-Key': googleApiKey},
-        ),
-      );
-
+      final proxyUrl = '$_apiBaseUrl/places/details?place_id=$cleanId';
+      final res = await _dio.get(proxyUrl);
       if (res.statusCode == 200 && res.data is Map) {
-        final loc = res.data['location'];
-        if (loc != null) {
-          final lat = (loc['latitude'] as num).toDouble();
-          final lng = (loc['longitude'] as num).toDouble();
+        final lat = (res.data['lat'] as num?)?.toDouble();
+        final lng = (res.data['lng'] as num?)?.toDouble();
+        if (lat != null && lng != null) {
           final point = LatLng(lat, lng);
-          _placeLocationCache[placeId] = point;
+          _placeLocationCache[cleanId] = point;
           return point;
         }
       }
     } catch (_) {}
 
+    // 2. Direct Google Places API fallback (for native)
+    if (!kIsWeb) {
+      try {
+        final res = await _dio.get(
+          'https://places.googleapis.com/v1/places/$cleanId?fields=id,displayName,location,formattedAddress',
+          options: Options(
+            headers: {'X-Goog-Api-Key': googleApiKey},
+          ),
+        );
+
+        if (res.statusCode == 200 && res.data is Map) {
+          final loc = res.data['location'];
+          if (loc != null) {
+            final lat = (loc['latitude'] as num).toDouble();
+            final lng = (loc['longitude'] as num).toDouble();
+            final point = LatLng(lat, lng);
+            _placeLocationCache[cleanId] = point;
+            return point;
+          }
+        }
+      } catch (_) {}
+    }
+
     return null;
   }
 
   /// Calculates real road path suggestion like Google Maps:
-  /// 1. Google Routes API (computeRoutes) -> returns exact road polyline, distance, and duration.
-  /// 2. OSRM Driving Engine -> free, open-source, returns turn-by-turn road polyline without quota limits.
-  /// 3. Direct smooth polyline fallback.
+  /// 1. Backend Server Proxy (`/ride/api/places/routes`) -> Proxies Google Routes / OSRM, 100% CORS-free!
+  /// 2. Direct Google Routes API (computeRoutes) for Native.
+  /// 3. Direct OSRM Driving Engine.
+  /// 4. Direct smooth polyline fallback.
   static Future<RouteSuggestion> getRoute(LatLng origin, LatLng destination) async {
-    // 1. Try Google Routes API (computeRoutes)
+    // 1. Try Backend Server Proxy (/ride/api/places/routes)
     try {
-      final res = await _dio.post(
-        'https://routes.googleapis.com/directions/v2:computeRoutes',
-        options: Options(
-          headers: {
-            'X-Goog-Api-Key': googleApiKey,
-            'Content-Type': 'application/json',
-            'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.description',
-          },
-        ),
-        data: {
-          'origin': {
-            'location': {
-              'latLng': {
-                'latitude': origin.latitude,
-                'longitude': origin.longitude,
-              }
-            }
-          },
-          'destination': {
-            'location': {
-              'latLng': {
-                'latitude': destination.latitude,
-                'longitude': destination.longitude,
-              }
-            }
-          },
-          'travelMode': 'DRIVE',
-        },
-      );
-
+      final proxyUrl =
+          '$_apiBaseUrl/places/routes?origin_lat=${origin.latitude}&origin_lng=${origin.longitude}&dest_lat=${destination.latitude}&dest_lng=${destination.longitude}';
+      final res = await _dio.get(proxyUrl);
       if (res.statusCode == 200 && res.data is Map) {
-        final routes = res.data['routes'] as List?;
+        final data = res.data['data'] is Map ? res.data['data'] : res.data;
+        final routes = data['routes'] as List?;
         if (routes != null && routes.isNotEmpty) {
           final route = routes.first;
           final encoded = route['polyline']?['encodedPolyline'] as String?;
@@ -568,11 +619,91 @@ class LocationSearchService {
               );
             }
           }
+
+          // If OSRM was proxied:
+          final coords = route['geometry']?['coordinates'] as List?;
+          if (coords != null && coords.isNotEmpty) {
+            final points = coords.map((c) {
+              final lng = (c[0] as num).toDouble();
+              final lat = (c[1] as num).toDouble();
+              return LatLng(lat, lng);
+            }).toList();
+
+            final distM = (route['distance'] as num?)?.toDouble() ?? distanceMeters;
+            final durSec = (route['duration'] as num?)?.toDouble() ?? durationSec.toDouble();
+
+            return RouteSuggestion(
+              polylinePoints: points,
+              distanceKm: (distM / 1000.0),
+              durationMinutes: (durSec / 60.0).round(),
+              summary: 'Road Route via Dhaka Arterial Corridors',
+              source: 'osrm',
+            );
+          }
         }
       }
     } catch (_) {}
 
-    // 2. High-Accuracy OSRM Routing Fallback (Turn-by-turn real road curvature)
+    // 2. Direct Google Routes API (computeRoutes) for Native
+    if (!kIsWeb) {
+      try {
+        final res = await _dio.post(
+          'https://routes.googleapis.com/directions/v2:computeRoutes',
+          options: Options(
+            headers: {
+              'X-Goog-Api-Key': googleApiKey,
+              'Content-Type': 'application/json',
+              'X-Goog-FieldMask': 'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.description',
+            },
+          ),
+          data: {
+            'origin': {
+              'location': {
+                'latLng': {
+                  'latitude': origin.latitude,
+                  'longitude': origin.longitude,
+                }
+              }
+            },
+            'destination': {
+              'location': {
+                'latLng': {
+                  'latitude': destination.latitude,
+                  'longitude': destination.longitude,
+                }
+              }
+            },
+            'travelMode': 'DRIVE',
+          },
+        );
+
+        if (res.statusCode == 200 && res.data is Map) {
+          final routes = res.data['routes'] as List?;
+          if (routes != null && routes.isNotEmpty) {
+            final route = routes.first;
+            final encoded = route['polyline']?['encodedPolyline'] as String?;
+            final distanceMeters = (route['distanceMeters'] as num?)?.toDouble() ?? 0.0;
+            final durationStr = route['duration'] as String? ?? '1800s';
+            final durationSec = int.tryParse(durationStr.replaceAll('s', '')) ?? 1800;
+
+            if (encoded != null && encoded.isNotEmpty) {
+              final points = decodePolyline(encoded);
+              if (points.isNotEmpty) {
+                return RouteSuggestion(
+                  polylinePoints: points,
+                  distanceKm: (distanceMeters / 1000.0),
+                  durationMinutes: (durationSec / 60.0).round(),
+                  summary: route['description'] ?? 'Fastest route via Google Maps',
+                  source: 'google_routes',
+                );
+              }
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. High-Accuracy OSRM Routing Fallback
     try {
       final url =
           'https://router.project-osrm.org/route/v1/driving/${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}?overview=full&geometries=geojson';
@@ -605,7 +736,7 @@ class LocationSearchService {
       }
     } catch (_) {}
 
-    // 3. Fallback: Interpolated smooth points
+    // 4. Fallback: Interpolated smooth points
     final distanceKm = _haversineDistanceKm(origin, destination);
     final durationMins = (distanceKm / 35.0 * 60).round().clamp(10, 180);
     final interpolated = _generateSmoothRoute(origin, destination);
