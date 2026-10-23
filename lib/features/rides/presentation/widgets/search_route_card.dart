@@ -137,6 +137,7 @@ class _SearchRouteCardState extends State<SearchRouteCard> with SingleTickerProv
                           labelText: 'From (Pickup)',
                           prefixIcon: Icons.trip_origin,
                           prefixColor: AppColors.primary,
+                          onChanged: widget.onPickupChanged,
                           onLocationSelected: (result) {
                             _pickupController.text = result.title;
                             widget.onPickupChanged(result.title);
@@ -150,6 +151,7 @@ class _SearchRouteCardState extends State<SearchRouteCard> with SingleTickerProv
                           labelText: 'To (Destination)',
                           prefixIcon: Icons.location_on,
                           prefixColor: AppColors.secondary,
+                          onChanged: widget.onDropoffChanged,
                           onLocationSelected: (result) {
                             _dropoffController.text = result.title;
                             widget.onDropoffChanged(result.title);

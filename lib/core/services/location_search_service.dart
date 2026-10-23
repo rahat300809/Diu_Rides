@@ -391,8 +391,132 @@ class LocationSearchService {
     ),
   ];
 
-  /// Live Search with typing suggestions:
-  /// 0. Instant Landmark & Hub Match (handles "moti", "mir", "dhan", "utt" with zero latency)
+  /// Bangladeshi Phonetic & Typo Normalization Dictionary
+  static const Map<String, String> commonTypoCorrections = {
+    'motijil': 'motijheel',
+    'motijl': 'motijheel',
+    'motijhil': 'motijheel',
+    'motejheel': 'motijheel',
+    'motejil': 'motijheel',
+    'motijel': 'motijheel',
+    'dhanmondy': 'dhanmondi',
+    'danmondi': 'dhanmondi',
+    'dhanmandi': 'dhanmondi',
+    'danmandi': 'dhanmondi',
+    'mirpor': 'mirpur',
+    'mirpr': 'mirpur',
+    'mirpurr': 'mirpur',
+    'mirpur10': 'mirpur 10',
+    'mirpur1': 'mirpur 1',
+    'mirpur2': 'mirpur 2',
+    'mirpur11': 'mirpur 11',
+    'mirpur12': 'mirpur 12',
+    'mirpur14': 'mirpur 14',
+    'uttora': 'uttara',
+    'utara': 'uttara',
+    'uttra': 'uttara',
+    'diabari': 'uttara north metro',
+    'diyabari': 'uttara north metro',
+    'asulia': 'ashulia',
+    'ashulea': 'ashulia',
+    'ashula': 'ashulia',
+    'farmget': 'farmgate',
+    'farmgait': 'farmgate',
+    'gulsan': 'gulshan',
+    'bonani': 'banani',
+    'mohakali': 'mohakhali',
+    'khagon': 'khagan',
+    'khagan bazar': 'khagan',
+    'birulea': 'birulia',
+    'gabtali': 'gabtoli',
+    'kolyanpur': 'kalyanpur',
+    'kallanpur': 'kalyanpur',
+    'sabar': 'savar',
+    'daffodil': 'daffodil smart city',
+    'dafodil': 'daffodil smart city',
+    'diu': 'diu main gate',
+    'dsc': 'daffodil smart city',
+    'ab4': 'academic building 4',
+    'hatirjil': 'hatirjheel',
+  };
+
+  /// Bengali phonetic transliteration normalizer for resilient typo matching
+  static String _normalizePhonetics(String s) {
+    return s
+        .toLowerCase()
+        .replaceAll('sh', 's')
+        .replaceAll('jh', 'j')
+        .replaceAll('dh', 'd')
+        .replaceAll('th', 't')
+        .replaceAll('bh', 'b')
+        .replaceAll('kh', 'k')
+        .replaceAll('gh', 'g')
+        .replaceAll('ph', 'p')
+        .replaceAll('z', 'j')
+        .replaceAll('ee', 'i')
+        .replaceAll('ea', 'i')
+        .replaceAll('oo', 'u')
+        .replaceAll('y', 'i')
+        .replaceAll('v', 'b')
+        .replaceAll('w', 'b')
+        .replaceAll('o', 'a')
+        .replaceAll(RegExp(r'([a-z])\1+'), r'$1')
+        .trim();
+  }
+
+  /// Computes Levenshtein edit distance between two strings
+  static int _levenshtein(String s, String t) {
+    if (s == t) return 0;
+    if (s.isEmpty) return t.length;
+    if (t.isEmpty) return s.length;
+
+    List<int> v0 = List<int>.generate(t.length + 1, (i) => i);
+    List<int> v1 = List<int>.filled(t.length + 1, 0);
+
+    for (int i = 0; i < s.length; i++) {
+      v1[0] = i + 1;
+      for (int j = 0; j < t.length; j++) {
+        int cost = (s[i] == t[j]) ? 0 : 1;
+        v1[j + 1] = math.min(v1[j] + 1, math.min(v0[j + 1] + 1, v0[j] + cost));
+      }
+      for (int j = 0; j <= t.length; j++) {
+        v0[j] = v1[j];
+      }
+    }
+    return v1[t.length];
+  }
+
+  /// Checks if target string fuzzy matches query (typo tolerant + phonetic)
+  static bool _isFuzzyMatch(String target, String query) {
+    final cleanT = target.toLowerCase();
+    final cleanQ = query.toLowerCase().trim();
+    if (cleanT.contains(cleanQ)) return true;
+
+    // Direct phonetic normalizer match
+    final normT = _normalizePhonetics(cleanT);
+    final normQ = _normalizePhonetics(cleanQ);
+    if (normT.contains(normQ) || normQ.contains(normT)) return true;
+
+    final tWords = cleanT.split(RegExp(r'[^a-z0-9]+')).where((w) => w.length >= 2);
+    final qWords = cleanQ.split(RegExp(r'[^a-z0-9]+')).where((w) => w.length >= 2);
+
+    for (final q in qWords) {
+      final nq = _normalizePhonetics(q);
+      for (final t in tWords) {
+        final nt = _normalizePhonetics(t);
+        if (t.startsWith(q) || q.startsWith(t)) return true;
+        if (nt.startsWith(nq) || nq.startsWith(nt)) return true;
+
+        final maxDist = q.length >= 7 ? 3 : (q.length > 4 ? 2 : 1);
+        if (_levenshtein(t, q) <= maxDist) return true;
+        if (_levenshtein(nt, nq) <= maxDist) return true;
+      }
+    }
+    return false;
+  }
+
+  /// Live Search with typing suggestions & Typo-Tolerant Matching:
+  /// 0. Instant Landmark & Hub Match with Substring + Fuzzy + Typo Normalization
   /// 1. Backend Server Proxy (`/ride/api/places/autocomplete`) -> 100% CORS-free on Web & Native!
   /// 2. Direct Google Places (New) Autocomplete API with Bangladesh filter (`includedRegionCodes: ["bd"]`)
   /// 3. Photon / OpenStreetMap high-speed geocoding fallback
@@ -404,18 +528,29 @@ class LocationSearchService {
 
     final results = <LocationSearchResult>[];
 
-    // 0. Instant Local Landmark & Hub Match (Matches "moti" -> Motijheel)
+    // Compute normalized typo query
+    final queryWords = clean.split(RegExp(r'\s+'));
+    final correctedWords = queryWords.map((w) => commonTypoCorrections[w] ?? w).toList();
+    final normalizedQuery = correctedWords.join(' ');
+
+    // 0. Instant Local Landmark & Hub Match (Exact, Substring, and Fuzzy Typo Tolerant)
     for (final lm in campusLandmarks) {
       final t = lm.title.toLowerCase();
       final s = lm.subtitle.toLowerCase();
-      if (t.contains(clean) || s.contains(clean)) {
+      if (t.contains(clean) || s.contains(clean) || t.contains(normalizedQuery) || s.contains(normalizedQuery)) {
+        results.add(lm);
+      } else if (_isFuzzyMatch(t, clean) ||
+          _isFuzzyMatch(s, clean) ||
+          _isFuzzyMatch(t, normalizedQuery) ||
+          _isFuzzyMatch(s, normalizedQuery)) {
         results.add(lm);
       }
     }
 
     // 1. Backend Server Proxy (Works seamlessly on Web and Native)
     try {
-      final proxyUrl = '$_apiBaseUrl/places/autocomplete?q=${Uri.encodeComponent(query)}';
+      final queryToSend = normalizedQuery.isNotEmpty ? normalizedQuery : clean;
+      final proxyUrl = '$_apiBaseUrl/places/autocomplete?q=${Uri.encodeComponent(queryToSend)}';
       final res = await _dio.get(proxyUrl);
       if (res.statusCode == 200 && res.data is Map) {
         final data = res.data['data'] is Map ? res.data['data'] : res.data;

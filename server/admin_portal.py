@@ -650,17 +650,54 @@ async def list_dropping_zones_endpoint():
 
 GOOGLE_API_KEY = "AIzaSyD-hl4Vshm6lqgUopu4rHbwmUbbPNA7kfA"
 
+TYPO_MAP = {
+    "motijil": "motijheel",
+    "motijl": "motijheel",
+    "motijhil": "motijheel",
+    "motejheel": "motijheel",
+    "motejil": "motijheel",
+    "motijel": "motijheel",
+    "dhanmondy": "dhanmondi",
+    "danmondi": "dhanmondi",
+    "dhanmandi": "dhanmondi",
+    "mirpor": "mirpur",
+    "mirpr": "mirpur",
+    "uttora": "uttara",
+    "utara": "uttara",
+    "asulia": "ashulia",
+    "ashulea": "ashulia",
+    "farmget": "farmgate",
+    "farmgait": "farmgate",
+    "gulsan": "gulshan",
+    "bonani": "banani",
+    "mohakali": "mohakhali",
+    "khagon": "khagan",
+    "gabtali": "gabtoli",
+    "kolyanpur": "kalyanpur",
+    "sabar": "savar",
+    "diu": "daffodil smart city",
+    "dafodil": "daffodil smart city",
+    "hatirjil": "hatirjheel",
+    "diabari": "uttara north metro",
+    "diyabari": "uttara north metro",
+}
+
 @admin_router.get("/ride/api/places/autocomplete")
 @admin_router.get("/api/places/autocomplete")
 async def proxy_places_autocomplete_endpoint(q: str = ""):
     """
     Proxies Google Places (New) autocomplete API for Bangladesh destinations,
-    e.g. typing 'moti' returns Motijheel, Dhaka.
+    with smart typo correction and phonetic normalization (e.g. motijil -> Motijheel).
     """
     import urllib.request
     clean = (q or "").strip()
     if not clean:
         return {"status": "success", "suggestions": []}
+
+    # Normalize known typos / phonetic spellings
+    words = clean.lower().split()
+    corrected_words = [TYPO_MAP.get(w, w) for w in words]
+    effective_query = " ".join(corrected_words)
 
     try:
         url = "https://places.googleapis.com/v1/places:autocomplete"
@@ -670,13 +707,18 @@ async def proxy_places_autocomplete_endpoint(q: str = ""):
             "User-Agent": "DIU-Ride-Server/1.0",
         }
         data = json.dumps({
-            "input": clean,
+            "input": effective_query,
             "includedRegionCodes": ["bd"],
         }).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers, method="POST")
         with urllib.request.urlopen(req, timeout=6.0) as resp:
             body = json.loads(resp.read().decode("utf-8"))
-            return {"status": "success", "data": body}
+            return {
+                "status": "success",
+                "original_query": clean,
+                "corrected_query": effective_query if effective_query != clean.lower() else None,
+                "data": body
+            }
     except Exception as e:
         return {"status": "error", "message": str(e), "suggestions": []}
 

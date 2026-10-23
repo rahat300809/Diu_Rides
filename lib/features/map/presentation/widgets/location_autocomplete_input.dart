@@ -8,7 +8,7 @@ import 'package:diu_ride/features/map/presentation/widgets/map_location_picker_s
 
 /// Reusable Autocomplete & Map Search Input Widget
 /// Provides real-time typing suggestions via Google Places API & Campus Landmarks
-/// e.g. Typing "moti" brings up "Motijheel, Dhaka", "Motijheel Metro Station", etc.
+/// Supports typo-correction (e.g. "motijil" -> "Motijheel", "asulia" -> "Ashulia")
 class LocationAutocompleteInput extends StatefulWidget {
   final TextEditingController controller;
   final String hintText;
@@ -16,6 +16,8 @@ class LocationAutocompleteInput extends StatefulWidget {
   final IconData prefixIcon;
   final Color prefixColor;
   final ValueChanged<LocationSearchResult> onLocationSelected;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
   final VoidCallback? onGpsTap;
   final LatLng? mapInitialPosition;
   final bool showMapPicker;
@@ -28,6 +30,8 @@ class LocationAutocompleteInput extends StatefulWidget {
     this.prefixIcon = Icons.location_on,
     this.prefixColor = const Color(0xFFE65100),
     required this.onLocationSelected,
+    this.onChanged,
+    this.onSubmitted,
     this.onGpsTap,
     this.mapInitialPosition,
     this.showMapPicker = true,
@@ -53,8 +57,13 @@ class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
 
   void _onFocusChanged() {
     if (_focusNode.hasFocus) {
-      if (widget.controller.text.isNotEmpty) {
+      if (widget.controller.text.trim().isNotEmpty) {
         _searchPlaces(widget.controller.text);
+      } else {
+        setState(() {
+          _suggestions = LocationSearchService.campusLandmarks.take(6).toList();
+          _showSuggestions = true;
+        });
       }
     } else {
       // 250ms delay allows InkWell.onTap on suggestions to register before closing
@@ -67,15 +76,16 @@ class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
   }
 
   void _onTextChanged(String query) {
+    widget.onChanged?.call(query);
     _debounceTimer?.cancel();
     if (query.trim().isEmpty) {
       setState(() {
-        _suggestions = [];
-        _showSuggestions = false;
+        _suggestions = LocationSearchService.campusLandmarks.take(6).toList();
+        _showSuggestions = true;
       });
       return;
     }
-    _debounceTimer = Timer(const Duration(milliseconds: 160), () {
+    _debounceTimer = Timer(const Duration(milliseconds: 100), () {
       _searchPlaces(query);
     });
   }
@@ -87,12 +97,13 @@ class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
     setState(() {
       _suggestions = results;
       _isLoading = false;
-      _showSuggestions = results.isNotEmpty && _focusNode.hasFocus;
+      _showSuggestions = results.isNotEmpty;
     });
   }
 
   void _selectSuggestion(LocationSearchResult item) async {
     widget.controller.text = item.title;
+    widget.onChanged?.call(item.title);
     setState(() {
       _showSuggestions = false;
       _suggestions = [];
@@ -128,6 +139,7 @@ class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
       initialPosition: widget.mapInitialPosition,
       onLocationPicked: (result) {
         widget.controller.text = result.title;
+        widget.onChanged?.call(result.title);
         widget.onLocationSelected(result);
       },
     );
@@ -184,6 +196,17 @@ class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
                       controller: widget.controller,
                       focusNode: _focusNode,
                       onChanged: _onTextChanged,
+                      onSubmitted: widget.onSubmitted,
+                      onTap: () {
+                        if (widget.controller.text.trim().isEmpty) {
+                          setState(() {
+                            _suggestions = LocationSearchService.campusLandmarks.take(6).toList();
+                            _showSuggestions = true;
+                          });
+                        } else {
+                          _searchPlaces(widget.controller.text);
+                        }
+                      },
                       style: AppTypography.bodyMdMedium.copyWith(fontSize: 13.5),
                       decoration: InputDecoration(
                         isDense: true,
@@ -215,9 +238,10 @@ class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
                   tooltip: 'Clear',
                   onPressed: () {
                     widget.controller.clear();
+                    widget.onChanged?.call('');
                     setState(() {
-                      _suggestions = [];
-                      _showSuggestions = false;
+                      _suggestions = LocationSearchService.campusLandmarks.take(6).toList();
+                      _showSuggestions = true;
                     });
                   },
                 ),
@@ -241,7 +265,7 @@ class _LocationAutocompleteInputState extends State<LocationAutocompleteInput> {
         if (_showSuggestions && _suggestions.isNotEmpty) ...[
           const SizedBox(height: 4),
           Container(
-            constraints: const BoxConstraints(maxHeight: 230),
+            constraints: const BoxConstraints(maxHeight: 240),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),

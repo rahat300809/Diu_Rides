@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,6 +61,8 @@ class _FullScreenCommuteMapScreenState
   // Selected Ride Pin
   RideModel? _selectedRide;
 
+  Timer? _searchDebounceTimer;
+
   @override
   void initState() {
     super.initState();
@@ -73,6 +76,7 @@ class _FullScreenCommuteMapScreenState
 
   @override
   void dispose() {
+    _searchDebounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -209,11 +213,14 @@ class _FullScreenCommuteMapScreenState
     _calculateRouteStats(point, name);
   }
 
-  void _handleSearchChanged(String text) async {
-    if (text.trim().isEmpty) {
+  void _handleSearchChanged(String text) {
+    _searchDebounceTimer?.cancel();
+    final clean = text.trim();
+    if (clean.isEmpty) {
       setState(() {
         _searchResults = LocationSearchService.campusLandmarks.take(8).toList();
-        _showSearchResults = false;
+        _showSearchResults = true;
+        _isSearching = false;
       });
       return;
     }
@@ -223,13 +230,15 @@ class _FullScreenCommuteMapScreenState
       _showSearchResults = true;
     });
 
-    final res = await LocationSearchService.search(text);
-    if (mounted) {
-      setState(() {
-        _searchResults = res;
-        _isSearching = false;
-      });
-    }
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 100), () async {
+      final res = await LocationSearchService.search(clean);
+      if (mounted) {
+        setState(() {
+          _searchResults = res;
+          _isSearching = false;
+        });
+      }
+    });
   }
 
   void _clearDestination() {
@@ -490,12 +499,14 @@ class _FullScreenCommuteMapScreenState
               controller: _searchController,
               onChanged: _handleSearchChanged,
               onTap: () {
-                if (_searchController.text.trim().isEmpty) {
-                  setState(() {
+                setState(() {
+                  _showSearchResults = true;
+                  if (_searchController.text.trim().isEmpty) {
                     _searchResults = LocationSearchService.campusLandmarks.take(8).toList();
-                    _showSearchResults = true;
-                  });
-                }
+                  } else {
+                    _handleSearchChanged(_searchController.text);
+                  }
+                });
               },
               style: const TextStyle(
                 fontSize: 14,
@@ -557,44 +568,62 @@ class _FullScreenCommuteMapScreenState
         ],
         border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
-      child: ListView.separated(
-        shrinkWrap: true,
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        itemCount: _searchResults.length,
-        separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
-        itemBuilder: (context, index) {
-          final item = _searchResults[index];
-          return ListTile(
-            dense: true,
-            leading: CircleAvatar(
-              radius: 15,
-              backgroundColor: const Color(0xFFFFF7ED),
-              child: Icon(
-                item.category == 'campus'
-                    ? Icons.school
-                    : item.category == 'metro'
-                        ? Icons.train
-                        : Icons.location_on,
-                size: 16,
-                color: const Color(0xFFE65100),
+      child: _searchResults.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.search_off, color: Colors.grey, size: 24),
+                    const SizedBox(height: 6),
+                    Text(
+                      'No matching places found.\nTry typing another spot (e.g. Motijheel, Dhanmondi, Mirpur, DIU)',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
+            )
+          : ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              itemCount: _searchResults.length,
+              separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFF1F5F9)),
+              itemBuilder: (context, index) {
+                final item = _searchResults[index];
+                return ListTile(
+                  dense: true,
+                  leading: CircleAvatar(
+                    radius: 15,
+                    backgroundColor: const Color(0xFFFFF7ED),
+                    child: Icon(
+                      item.category == 'campus'
+                          ? Icons.school
+                          : item.category == 'metro'
+                              ? Icons.train
+                              : Icons.location_on,
+                      size: 16,
+                      color: const Color(0xFFE65100),
+                    ),
+                  ),
+                  title: Text(
+                    item.title,
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    item.subtitle,
+                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () => _onLocationSelected(item),
+                );
+              },
             ),
-            title: Text(
-              item.title,
-              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              item.subtitle,
-              style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            onTap: () => _onLocationSelected(item),
-          );
-        },
-      ),
     );
   }
 

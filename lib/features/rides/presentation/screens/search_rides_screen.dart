@@ -197,6 +197,12 @@ class _SearchRidesScreenState extends ConsumerState<SearchRidesScreen> {
                   prefixIcon: Icons.search,
                   prefixColor: AppColors.primary,
                   showMapPicker: true,
+                  onChanged: (val) {
+                    filterNotifier.setGeneralSearch(val);
+                    if (val.isEmpty) {
+                      setState(() => _selectedQuickTag = 'All');
+                    }
+                  },
                   onLocationSelected: (loc) {
                     _searchController.text = loc.title;
                     filterNotifier.setGeneralSearch(loc.title);
