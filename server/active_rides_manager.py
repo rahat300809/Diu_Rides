@@ -329,9 +329,10 @@ def get_active_rides_for_ai() -> str:
     lines = [f"TOTAL ACTIVE POSTED RIDES AVAILABLE: {len(rides)}"]
     for idx, r in enumerate(rides, 1):
         female_str = " (FEMALE ONLY)" if r.get("is_female_only") else ""
+        waypoint_str = f" (via {r['waypoint_name']})" if r.get("waypoint_name") else ""
         lines.append(
             f"{idx}. [ID: {r['id']}] Driver: {r['driver_name']} (Dept: {r.get('driver_dept') or 'Student'} | Phone: {r.get('driver_phone') or 'In App'}) | "
-            f"Route: {r['origin_name']} ➔ {r['destination_name']}{f' (via {r['waypoint_name']})' if r.get('waypoint_name') else ''} | "
+            f"Route: {r['origin_name']} ➔ {r['destination_name']}{waypoint_str} | "
             f"Corridor: {r.get('route_corridor') or 'Campus Highway'} | "
             f"Time: {r['departure_time_formatted']} ({r['departure_time']}) | "
             f"Fare: {r['fare_per_seat']} ৳ | Seats Left: {r['available_seats']}/{r['total_seats']} | "
