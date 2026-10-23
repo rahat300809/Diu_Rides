@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
+import 'package:diu_ride/core/constants/campus_locations.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
 import 'package:diu_ride/features/booking/presentation/widgets/booking_confirmation_sheet.dart';
 import 'package:diu_ride/features/tracking/presentation/screens/ride_details_tracking_screen.dart';
+import 'package:diu_ride/features/rides/data/models/ride_model.dart';
 import 'package:diu_ride/features/rides/presentation/providers/rides_provider.dart';
 import 'package:diu_ride/features/rides/presentation/widgets/ride_result_card.dart';
 import 'package:diu_ride/features/rides/presentation/widgets/search_filter_chips.dart';
@@ -19,6 +22,9 @@ class SearchRidesScreen extends ConsumerStatefulWidget {
 class _SearchRidesScreenState extends ConsumerState<SearchRidesScreen> {
   final _searchController = TextEditingController();
   String _selectedQuickTag = 'All';
+  bool _isMapView = false;
+  GoogleMapController? _mapController;
+  RideModel? _selectedMapRide;
 
   final List<String> _quickTags = [
     'All',
@@ -325,21 +331,61 @@ class _SearchRidesScreenState extends ConsumerState<SearchRidesScreen> {
                       ),
                     ],
                   ),
-                  if (filterState.generalSearchQuery.isNotEmpty || filterState.vehicleType != null || filterState.femaleOnly)
-                    InkWell(
-                      onTap: () {
-                        _searchController.clear();
-                        filterNotifier.clearFilters();
-                        setState(() => _selectedQuickTag = 'All');
-                      },
-                      child: Text(
-                        'Clear Filters',
-                        style: AppTypography.labelSm.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
+                  Row(
+                    children: [
+                      if (filterState.generalSearchQuery.isNotEmpty || filterState.vehicleType != null || filterState.femaleOnly) ...[
+                        InkWell(
+                          onTap: () {
+                            _searchController.clear();
+                            filterNotifier.clearFilters();
+                            setState(() => _selectedQuickTag = 'All');
+                          },
+                          child: Text(
+                            'Clear',
+                            style: AppTypography.labelSm.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      InkWell(
+                        onTap: () => setState(() {
+                          _isMapView = !_isMapView;
+                          _selectedMapRide = null;
+                        }),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _isMapView ? const Color(0xFFE65100) : const Color(0xFFFFF3E0),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0xFFE65100)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _isMapView ? Icons.format_list_bulleted : Icons.map_outlined,
+                                size: 14,
+                                color: _isMapView ? Colors.white : const Color(0xFFE65100),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _isMapView ? 'List' : 'Live Map',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: _isMapView ? Colors.white : const Color(0xFFE65100),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -348,6 +394,9 @@ class _SearchRidesScreenState extends ConsumerState<SearchRidesScreen> {
             Expanded(
               child: resultsAsync.when(
                 data: (rides) {
+                  if (_isMapView) {
+                    return _buildMapRideExplorer(rides);
+                  }
                   if (rides.isEmpty) {
                     return Center(
                       child: Padding(
@@ -429,6 +478,202 @@ class _SearchRidesScreenState extends ConsumerState<SearchRidesScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMapRideExplorer(List<RideModel> rides) {
+    final markers = <Marker>{};
+
+    // DIU Campus Origin marker
+    markers.add(
+      Marker(
+        markerId: const MarkerId('diu_campus_hub'),
+        position: const LatLng(CampusLocations.diuCenterLat, CampusLocations.diuCenterLng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: const InfoWindow(title: '🏛️ DIU Smart City Hub', snippet: 'Ashulia Campus'),
+      ),
+    );
+
+    for (final ride in rides) {
+      markers.add(
+        Marker(
+          markerId: MarkerId('ride_${ride.id}'),
+          position: LatLng(ride.destinationLat, ride.destinationLng),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            _selectedMapRide?.id == ride.id ? BitmapDescriptor.hueRed : BitmapDescriptor.hueOrange,
+          ),
+          infoWindow: InfoWindow(
+            title: '🏍️ ${ride.driverName} (৳${ride.farePerSeat.toInt()})',
+            snippet: '${ride.originName} ➔ ${ride.destinationName}',
+          ),
+          onTap: () {
+            setState(() => _selectedMapRide = ride);
+            _mapController?.animateCamera(
+              CameraUpdate.newLatLngZoom(LatLng(ride.destinationLat, ride.destinationLng), 13.5),
+            );
+          },
+        ),
+      );
+    }
+
+    return Stack(
+      children: [
+        GoogleMap(
+          initialCameraPosition: const CameraPosition(
+            target: LatLng(CampusLocations.diuCenterLat, CampusLocations.diuCenterLng),
+            zoom: 12.0,
+          ),
+          onMapCreated: (ctrl) => _mapController = ctrl,
+          markers: markers,
+          myLocationEnabled: true,
+          zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
+          onTap: (_) {
+            if (_selectedMapRide != null) {
+              setState(() => _selectedMapRide = null);
+            }
+          },
+        ),
+        // Overlay banner
+        Positioned(
+          top: 10,
+          left: 16,
+          right: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.95),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.touch_app, size: 16, color: Color(0xFFE65100)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Tap any pin on the map to inspect peer destination & book seats',
+                    style: AppTypography.labelSm.copyWith(
+                      color: const Color(0xFF1F2937),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        // Floating selected ride card
+        if (_selectedMapRide != null)
+          Positioned(
+            left: 14,
+            right: 14,
+            bottom: 16,
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black26, blurRadius: 14, offset: Offset(0, 4)),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(Icons.two_wheeler, color: Color(0xFFE65100), size: 20),
+                          ),
+                          const SizedBox(width: 10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _selectedMapRide!.driverName,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                              ),
+                              Text(
+                                '${_selectedMapRide!.vehicle.modelName} • ${_selectedMapRide!.availableSeats} seats',
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE65100),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '৳${_selectedMapRide!.farePerSeat.toInt()}',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '${_selectedMapRide!.originName} ➔ ${_selectedMapRide!.destinationName}',
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => RideDetailsTrackingScreen(
+                                  rideId: _selectedMapRide!.id,
+                                ),
+                              ),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF1F2937),
+                            side: const BorderSide(color: Color(0xFFD1D5DB)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          child: const Text('View Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _showBookingSheet(_selectedMapRide!),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFE65100),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                          ),
+                          child: const Text('Reserve Seat', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

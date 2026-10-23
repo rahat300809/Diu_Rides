@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/network/websocket_client.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
@@ -35,6 +37,7 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
   bool _isReserved = false;
   WebSocketClient? _wsClient;
   StreamSubscription? _wsSub;
+  GoogleMapController? _trackingMapController;
 
   double _driverLat = 23.8778;
   double _driverLng = 90.3235;
@@ -75,6 +78,9 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
             _etaMinutes = data['etaMinutes'] as int? ?? _etaMinutes;
             _distanceKm = (data['distanceRemainingKm'] as num?)?.toDouble() ?? _distanceKm;
           });
+          _trackingMapController?.animateCamera(
+            CameraUpdate.newLatLng(LatLng(_driverLat, _driverLng)),
+          );
         }
       } else if (msg['event'] == 'location_shared') {
         final data = msg['data'] as Map<String, dynamic>;
@@ -345,7 +351,7 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
             ClipRRect(
               borderRadius: BorderRadius.circular(24),
               child: Container(
-                height: 250,
+                height: 280,
                 decoration: const BoxDecoration(
                   color: Color(0xFFE2EDE4),
                   boxShadow: [
@@ -354,13 +360,22 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                 ),
                 child: Stack(
                   children: [
-                    // Simulated Campus Road Canvas with Live Moving Marker
-                    CustomPaint(
-                      size: const Size(double.infinity, 250),
-                      painter: _TrackingMapPainter(
-                        driverLat: _driverLat,
-                        driverLng: _driverLng,
+                    // Real Interactive Google Map with live driver and route
+                    GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: LatLng(_driverLat, _driverLng),
+                        zoom: 14.2,
                       ),
+                      onMapCreated: (ctrl) {
+                        _trackingMapController = ctrl;
+                      },
+                      myLocationEnabled: true,
+                      myLocationButtonEnabled: false,
+                      zoomControlsEnabled: false,
+                      compassEnabled: false,
+                      mapToolbarEnabled: false,
+                      markers: _buildTrackingMarkers(ride),
+                      polylines: _buildTrackingPolylines(ride),
                     ),
 
                     // Top Left: Live GPS Active Beacon
@@ -399,75 +414,99 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
                       ),
                     ),
 
-                    // Top Right: Campus SOS Floating Action Shield
+                    // Top Right Action Buttons: Recenter, External Google Maps, Campus SOS
                     Positioned(
                       top: 12,
                       right: 12,
-                      child: InkWell(
-                        onTap: () {
-                          CampusSosDialog.show(
-                            context: context,
-                            onConfirmed: () {
-                              _showToast('Connecting to DIU Smart Campus Proctor Security Hotline...');
-                            },
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.error,
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.error.withOpacity(0.35),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.local_police, color: Colors.white, size: 16),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Campus SOS',
-                                style: AppTypography.labelSm.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 10.5,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Recenter Camera Button
+                          InkWell(
+                            onTap: () {
+                              _trackingMapController?.animateCamera(
+                                CameraUpdate.newLatLngZoom(
+                                  LatLng(_driverLat, _driverLng),
+                                  15.5,
                                 ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.95),
+                                shape: BoxShape.circle,
+                                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Center Animated Moving Driver Car Avatar
-                    Center(
-                      child: Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Center(
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(color: Colors.black26, blurRadius: 6),
-                              ],
+                              child: const Icon(Icons.my_location, size: 16, color: Color(0xFFE65100)),
                             ),
-                            child: const Icon(Icons.two_wheeler, color: Colors.white, size: 18),
                           ),
-                        ),
+                          const SizedBox(width: 6),
+                          // External Google Maps Route Link
+                          InkWell(
+                            onTap: () async {
+                              final url = Uri.parse(
+                                'https://www.google.com/maps/dir/?api=1&origin=${ride.originLat},${ride.originLng}&destination=${ride.destinationLat},${ride.destinationLng}&travelmode=driving',
+                              );
+                              if (await canLaunchUrl(url)) {
+                                await launchUrl(url, mode: LaunchMode.externalApplication);
+                              }
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.95),
+                                shape: BoxShape.circle,
+                                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                              ),
+                              child: const Icon(Icons.directions, size: 16, color: Color(0xFF10B981)),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          // Campus SOS Floating Action Shield
+                          InkWell(
+                            onTap: () {
+                              CampusSosDialog.show(
+                                context: context,
+                                onConfirmed: () {
+                                  _showToast('Connecting to DIU Smart Campus Proctor Security Hotline...');
+                                },
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.error,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.error.withOpacity(0.35),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.local_police, color: Colors.white, size: 15),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'SOS',
+                                    style: AppTypography.labelSm.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
@@ -2596,76 +2635,94 @@ class _RideDetailsTrackingScreenState extends ConsumerState<RideDetailsTrackingS
     distanceKm: 12.0,
     durationMinutes: 25,
   );
-}
 
-class _TrackingMapPainter extends CustomPainter {
-  final double driverLat;
-  final double driverLng;
+  Set<Marker> _buildTrackingMarkers(RideModel ride) {
+    final markers = <Marker>{};
 
-  _TrackingMapPainter({required this.driverLat, required this.driverLng});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Map base
-    final bgPaint = Paint()..color = const Color(0xFFE5ECE5);
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
-
-    // Green Campus Zones
-    final parkPaint = Paint()..color = const Color(0xFFD6EAD7);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(const Rect.fromLTWH(10, 10, 120, 90), const Radius.circular(16)),
-      parkPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(Rect.fromLTWH(size.width - 140, 20, 130, 110), const Radius.circular(16)),
-      parkPaint,
+    // Driver live position
+    markers.add(
+      Marker(
+        markerId: const MarkerId('driver_live'),
+        position: LatLng(_driverLat, _driverLng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+        infoWindow: InfoWindow(
+          title: '🏍️ ${ride.driverName} (Live Biker)',
+          snippet: 'ETA: $_etaMinutes mins away • ${_distanceKm.toStringAsFixed(1)} km',
+        ),
+      ),
     );
 
-    // Birulia Lake Water
-    final waterPaint = Paint()..color = const Color(0xFFCCE0FF);
-    final waterPath = Path()
-      ..moveTo(size.width * 0.45, 0)
-      ..quadraticBezierTo(size.width * 0.55, 100, size.width * 0.48, 180)
-      ..quadraticBezierTo(size.width * 0.42, 220, size.width * 0.5, size.height)
-      ..lineTo(size.width * 0.6, size.height)
-      ..quadraticBezierTo(size.width * 0.52, 180, size.width * 0.62, 0)
-      ..close();
-    canvas.drawPath(waterPath, waterPaint);
+    // Origin
+    markers.add(
+      Marker(
+        markerId: const MarkerId('origin_pin'),
+        position: LatLng(ride.originLat, ride.originLng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+        infoWindow: InfoWindow(
+          title: '🟢 Pickup: ${ride.originName}',
+        ),
+      ),
+    );
 
-    // Birulia-Ashulia Route Polyline
-    final routePaint = Paint()
-      ..color = AppColors.primary
-      ..strokeWidth = 6
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+    // Destination
+    markers.add(
+      Marker(
+        markerId: const MarkerId('destination_pin'),
+        position: LatLng(ride.destinationLat, ride.destinationLng),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        infoWindow: InfoWindow(
+          title: '🏁 Destination: ${ride.destinationName}',
+        ),
+      ),
+    );
 
-    final routeBorderPaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 10
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
+    // Peer shared GPS if any
+    if (_peerSharedLat != null && _peerSharedLng != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('peer_shared_gps'),
+          position: LatLng(_peerSharedLat!, _peerSharedLng!),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          infoWindow: InfoWindow(
+            title: '📍 ${_peerSharedName ?? "Peer"} (Live GPS)',
+            snippet: _peerSharedRole ?? 'Passenger',
+          ),
+        ),
+      );
+    }
 
-    final routePath = Path()
-      ..moveTo(size.width * 0.15, size.height * 0.65)
-      ..quadraticBezierTo(size.width * 0.35, size.height * 0.55, size.width * 0.5, size.height * 0.5)
-      ..quadraticBezierTo(size.width * 0.7, size.height * 0.45, size.width * 0.85, size.height * 0.3);
+    // My shared GPS if any
+    if (_mySharedLat != null && _mySharedLng != null) {
+      markers.add(
+        Marker(
+          markerId: const MarkerId('my_shared_gps'),
+          position: LatLng(_mySharedLat!, _mySharedLng!),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueViolet),
+          infoWindow: const InfoWindow(
+            title: '👤 My Live GPS',
+          ),
+        ),
+      );
+    }
 
-    canvas.drawPath(routePath, routeBorderPaint);
-    canvas.drawPath(routePath, routePaint);
-
-    // Origin Pin (Gate 1)
-    final originPaint = Paint()..color = AppColors.primary;
-    canvas.drawCircle(Offset(size.width * 0.15, size.height * 0.65), 7, Paint()..color = Colors.white);
-    canvas.drawCircle(Offset(size.width * 0.15, size.height * 0.65), 5, originPaint);
-
-    // Destination Pin (Uttara)
-    final destPaint = Paint()..color = AppColors.secondary;
-    canvas.drawCircle(Offset(size.width * 0.85, size.height * 0.3), 7, Paint()..color = Colors.white);
-    canvas.drawCircle(Offset(size.width * 0.85, size.height * 0.3), 5, destPaint);
+    return markers;
   }
 
-  @override
-  bool shouldRepaint(covariant _TrackingMapPainter oldDelegate) {
-    return oldDelegate.driverLat != driverLat || oldDelegate.driverLng != driverLng;
+  Set<Polyline> _buildTrackingPolylines(RideModel ride) {
+    return {
+      Polyline(
+        polylineId: const PolylineId('ride_active_route'),
+        points: [
+          LatLng(ride.originLat, ride.originLng),
+          LatLng(_driverLat, _driverLng),
+          LatLng(ride.destinationLat, ride.destinationLng),
+        ],
+        color: const Color(0xFFE65100),
+        width: 5,
+        jointType: JointType.round,
+        startCap: Cap.roundCap,
+        endCap: Cap.roundCap,
+      ),
+    };
   }
 }

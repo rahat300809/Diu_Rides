@@ -19,6 +19,7 @@ import 'package:diu_ride/features/notifications/presentation/providers/notificat
 import 'package:diu_ride/features/chat/presentation/screens/campus_messages_screen.dart';
 import 'package:diu_ride/features/profile/presentation/screens/profile_screen.dart';
 import 'package:diu_ride/features/home/presentation/widgets/live_ride_status_card.dart';
+import 'package:diu_ride/features/home/presentation/widgets/landing_commute_map_card.dart';
 import 'package:diu_ride/core/constants/campus_locations.dart';
 import 'package:diu_ride/core/providers/app_mode_provider.dart';
 import 'package:diu_ride/features/home/presentation/widgets/app_mode_toggle_bar.dart';
@@ -568,6 +569,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               // Live Ride & Commute Status Card (Instant visibility and quick access)
               LiveRideStatusCard(
                 onNavigateTab: widget.onNavigateTab,
+              ),
+
+              // Interactive Google Maps Commute & Route Finder
+              LandingCommuteMapCard(
+                onFindRides: (dest) {
+                  widget.onSearchQuery(dest);
+                  widget.onNavigateTab(1);
+                },
+                onOfferRide: (dest) {
+                  widget.onNavigateTab(2);
+                },
+                onRequestRide: (dest) {
+                  PostRideRequestSheet.show(context);
+                },
+                onRideSelected: (ride) {
+                  _handleRequestSeat(ride);
+                },
               ),
 
               // 3. Live Destination Bike Matching Results View (Passenger only)

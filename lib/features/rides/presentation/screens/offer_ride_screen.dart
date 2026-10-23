@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:diu_ride/core/constants/app_colors.dart';
 import 'package:diu_ride/core/constants/campus_locations.dart';
 import 'package:diu_ride/core/theme/app_typography.dart';
@@ -37,6 +38,10 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
   final _manualDateController = TextEditingController();
   final _manualTimeController = TextEditingController();
   final List<TextEditingController> _extraDestinationControllers = [];
+
+  GoogleMapController? _offerMapController;
+  LatLng _originLatLng = const LatLng(CampusLocations.diuCenterLat, CampusLocations.diuCenterLng);
+  LatLng _destinationLatLng = const LatLng(23.8710, 90.3800);
 
   bool _isWaypointOpen = false;
   int _selectedDateIndex = 0; // 0: Today, 1: Tomorrow, 2: Custom
@@ -260,11 +265,11 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
           driverPhone: currentUser?.phone,
           driverDepartment: currentUser?.department ?? 'CSE',
           originName: origin,
-          originLat: CampusLocations.diuCenterLat,
-          originLng: CampusLocations.diuCenterLng,
+          originLat: _originLatLng.latitude,
+          originLng: _originLatLng.longitude,
           destinationName: dest,
-          destinationLat: CampusLocations.uttaraHouseBuilding.latitude,
-          destinationLng: CampusLocations.uttaraHouseBuilding.longitude,
+          destinationLat: _destinationLatLng.latitude,
+          destinationLng: _destinationLatLng.longitude,
           waypointName: _isWaypointOpen ? _waypointController.text.trim() : null,
           departureTime: departureDateTime,
           vehicle: vehicle,
@@ -394,6 +399,9 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                     final oldOrigin = _originController.text;
                     _originController.text = _destinationController.text;
                     _destinationController.text = oldOrigin;
+                    final oldOriginLL = _originLatLng;
+                    _originLatLng = _destinationLatLng;
+                    _destinationLatLng = oldOriginLL;
                     setState(() {});
                   },
                   icon: const Icon(Icons.swap_vert, size: 16, color: AppColors.secondary),
@@ -551,6 +559,80 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
                               style: AppTypography.labelSm.copyWith(
                                 color: AppColors.secondary,
                                 fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    // Live Google Maps Route Preview
+                    Text('Route Preview on Google Maps',
+                        style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        height: 190,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                        ),
+                        child: Stack(
+                          children: [
+                            GoogleMap(
+                              initialCameraPosition: CameraPosition(
+                                target: _destinationLatLng,
+                                zoom: 12.0,
+                              ),
+                              onMapCreated: (ctrl) => _offerMapController = ctrl,
+                              myLocationEnabled: true,
+                              zoomControlsEnabled: false,
+                              mapToolbarEnabled: false,
+                              markers: {
+                                Marker(
+                                  markerId: const MarkerId('offer_pickup'),
+                                  position: _originLatLng,
+                                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+                                  infoWindow: InfoWindow(title: 'Pickup: ${_originController.text}'),
+                                ),
+                                Marker(
+                                  markerId: const MarkerId('offer_dest'),
+                                  position: _destinationLatLng,
+                                  icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                                  infoWindow: InfoWindow(title: 'Drop-off: ${_destinationController.text}'),
+                                ),
+                              },
+                              polylines: {
+                                Polyline(
+                                  polylineId: const PolylineId('offer_preview_route'),
+                                  points: [_originLatLng, _destinationLatLng],
+                                  color: const Color(0xFFE65100),
+                                  width: 4,
+                                ),
+                              },
+                              onTap: (latLng) {
+                                setState(() {
+                                  _destinationLatLng = latLng;
+                                  _destinationController.text =
+                                      'Map Pin (${latLng.latitude.toStringAsFixed(3)}, ${latLng.longitude.toStringAsFixed(3)})';
+                                });
+                              },
+                            ),
+                            Positioned(
+                              bottom: 8,
+                              left: 8,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.92),
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+                                ),
+                                child: Text(
+                                  'Tap map to set drop-off pin',
+                                  style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Colors.grey[800]),
+                                ),
                               ),
                             ),
                           ],
@@ -1129,6 +1211,32 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
     );
   }
 
+  void _syncCoordinatesFromDestination(String text) {
+    final lower = text.toLowerCase();
+    LatLng target;
+    if (lower.contains('uttara')) {
+      target = const LatLng(23.8710, 90.3800);
+    } else if (lower.contains('mirpur 10')) {
+      target = const LatLng(23.8071, 90.3686);
+    } else if (lower.contains('mirpur')) {
+      target = const LatLng(23.7956, 90.3537);
+    } else if (lower.contains('dhanmondi')) {
+      target = const LatLng(23.7461, 90.3742);
+    } else if (lower.contains('mohakhali')) {
+      target = const LatLng(23.7776, 90.4005);
+    } else if (lower.contains('ecb')) {
+      target = const LatLng(23.8223, 90.3934);
+    } else {
+      target = const LatLng(23.8710, 90.3800);
+    }
+    setState(() {
+      _destinationLatLng = target;
+    });
+    _offerMapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(target, 13.0),
+    );
+  }
+
   Widget _buildPresetChip(String label, String value, TextEditingController controller) {
     return Padding(
       padding: const EdgeInsets.only(right: 6),
@@ -1138,7 +1246,14 @@ class _OfferRideScreenState extends ConsumerState<OfferRideScreen> {
         backgroundColor: AppColors.surfaceContainer,
         side: BorderSide.none,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        onPressed: () => setState(() => controller.text = value),
+        onPressed: () {
+          setState(() {
+            controller.text = value;
+            if (controller == _destinationController) {
+              _syncCoordinatesFromDestination(value);
+            }
+          });
+        },
       ),
     );
   }
