@@ -49,7 +49,7 @@ run('mkdir -p /home/rahat/backups && cp -r /home/rahat/diu_ride/server/rides.db*
 run('cp /home/rahat/diu_ride/server/completed_trips.csv /home/rahat/backups/completed_trips.csv.bak 2>/dev/null || true', '2. Backing up completed trips CSV')
 
 # 2. Sync to latest origin/main
-run('cd /home/rahat/diu_ride && git stash && git fetch origin && git checkout -B main origin/main && git branch -u origin/main main && git log -n 2 --oneline', '3. Syncing repo to origin/main')
+run('cd /home/rahat/diu_ride && git reset --hard HEAD && git clean -fd && git fetch origin && git reset --hard origin/main && git log -n 2 --oneline', '3. Syncing repo to origin/main')
 
 # 3. Preserve trips
 merge_script = """
@@ -72,21 +72,19 @@ if os.path.exists(bak) and os.path.exists(cur):
 """
 run(f"python3 -c \"{merge_script}\"", '4. Merging runtime completed trips')
 
-# 4. Check Docker deployment
-docker_check = run('which docker && (docker compose version || which docker-compose)', '5. Checking Docker presence')
+# 4. Check Docker deployment & ensure Docker is installed
+docker_check = run('which docker || echo rahat | sudo -S which docker || true', '5. Checking Docker presence')
 
-if 'docker' in docker_check:
-    print("🐳 Deploying via Docker Compose...")
-    run('echo rahat | sudo -S systemctl stop diu-ride.service 2>/dev/null || true', 'Stopping legacy systemd service')
-    run('cd /home/rahat/diu_ride && echo rahat | sudo -S docker compose up -d --build || echo rahat | sudo -S docker-compose up -d --build', 'Building and launching Docker containers')
-    time.sleep(5)
-    run('echo rahat | sudo -S docker ps --filter "name=diu_ride_app"', 'Checking running Docker containers')
-else:
-    print("Using standard systemd deployment...")
-    run('/home/rahat/diu_ride_env/bin/pip install -r /home/rahat/diu_ride/server/requirements.txt', 'Installing Python dependencies')
-    run('echo rahat | sudo -S systemctl restart diu-ride.service', 'Restarting diu-ride.service')
-    time.sleep(3)
-    run('systemctl status diu-ride.service --no-pager', 'Checking diu-ride.service status')
+if 'docker' not in docker_check.lower():
+    print("📦 Installing Docker on Ubuntu server...")
+    run('echo rahat | sudo -S apt-get update -y && echo rahat | sudo -S apt-get install -y docker.io docker-compose-v2 && echo rahat | sudo -S usermod -aG docker rahat && echo rahat | sudo -S systemctl enable --now docker', 'Installing Docker & Docker Compose')
+
+print("🐳 Deploying project with Docker Compose...")
+run('echo rahat | sudo -S systemctl stop diu-ride.service 2>/dev/null || true', 'Stopping legacy systemd service')
+run('cd /home/rahat/diu_ride && echo rahat | sudo -S docker compose down 2>/dev/null || true', 'Stopping old containers')
+run('cd /home/rahat/diu_ride && echo rahat | sudo -S docker compose up -d --build', 'Building and launching Docker containers')
+time.sleep(5)
+run('echo rahat | sudo -S docker ps', 'Checking running Docker containers')
 
 # 5. Test endpoints
 run('curl -s http://127.0.0.1:8001/ride/health', 'Testing /ride/health')
